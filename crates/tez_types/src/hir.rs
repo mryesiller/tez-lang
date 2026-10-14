@@ -153,6 +153,15 @@ pub struct ParamDef {
     pub refine: Vec<Refinement>,
 }
 
+/// Name and type of a local slot (for counterexamples and diagnostics).
+#[derive(Debug, Clone)]
+pub struct LocalInfo {
+    /// Source name; empty for anonymous slots (`_`, `it`).
+    pub name: String,
+    /// Final type.
+    pub ty: Ty,
+}
+
 /// A function.
 #[derive(Debug, Clone)]
 pub struct FnDef {
@@ -188,6 +197,8 @@ pub struct FnDef {
     pub is_recursive: bool,
     /// Number of local slots in the frame.
     pub nlocals: u32,
+    /// Name and type of every local slot.
+    pub locals: Vec<LocalInfo>,
     /// Declaration site.
     pub span: ByteSpan,
 }

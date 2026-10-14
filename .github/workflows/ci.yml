@@ -20,10 +20,12 @@ jobs:
       - name: Install pinned toolchain (rust-toolchain.toml)
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+      - name: Install the SMT solver
+        run: sudo apt-get update && sudo apt-get install -y z3
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - run: cargo build --target wasm32-unknown-unknown -p tez_diag -p tez_syntax
+      - run: cargo build --target wasm32-unknown-unknown -p tez_diag -p tez_syntax -p tez_types
 
   studio:
     runs-on: ubuntu-latest

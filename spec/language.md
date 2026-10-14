@@ -97,8 +97,20 @@ If `tez check` reports no diagnostics, then at run time none of these can happen
 
 **Facts** the solver may use: parameter refinements and `requires`; path conditions from `if` and `match` arms; the contracts of called functions (`ensures`, refined results); values of non-recursive functions are unfolded when expressible; `let` bindings; field refinements when a field is read.
 
-**Termination**: `decreases e` where `e : Int`. At every recursive call within the SCC, `e` must be ≥ 0 at entry and strictly smaller at the call (with arguments substituted). List-consuming recursion typically uses `decreases xs.len()`.
+**Termination**: `decreases e`, where `e` is an `Int` or a data value (a record or sum type). For an `Int`, at every recursive call within the cycle `e` must be ≥ 0 and strictly smaller than at entry (arguments substituted); list recursion typically uses `decreases xs.len()`. For a data value the measure is its structural size: the call must receive a proper sub-value (`decreases t` for `Node(l, x, r) => f(l)`). A recursive function's own definition is available to the solver only after its termination is proved.
 
 ## 8. Entry points and tests
 
-`tez run file.tez [fn]` evaluates the zero-argument function `fn` (default `main`) and prints its value. `test name = <Bool expr>` items are evaluated by `tez test`; tests are not part of the compiled program and not verified.
+`tez run file.tez [fn]` verifies the program, then evaluates the zero-argument function `fn` (default `main`) and prints its value. `--no-verify` skips verification (no guarantee), `--contracts` evaluates contracts at run time. `test name = <Bool expr>` items are evaluated by `tez test`; tests are not part of the compiled program and not verified.
+
+## 9. What the verifier knows
+
+The verifier is sound, not complete: a correct program can be rejected (`E_UNPROVEN`) when the solver cannot find the proof. What it reasons about:
+
+- **Integers** exactly (linear arithmetic; non-linear terms may be too hard), with truncating `/` and `%`.
+- **Lists** through length and element access, including `append`, `take`, `drop`, `concat`, `reverse`, `range`, `repeat`; patterns `[]`, `[h, ..t]`.
+- **Strings** through their length; **floats** through ordering and the sign of differences only (no rounding arithmetic).
+- **Records, sum types, tuples** structurally, with field refinements assumed when a field is read and proved when a value is built.
+- **Calls**: the callee's `requires` is proved at the call, its `ensures` is assumed afterwards. Non-recursive functions are unfolded; recursive ones contribute their definition once proved to terminate.
+- **Lambdas** passed to `map`, `filter`, `any`, `all`, `count`, `flatMap`, `sortBy`, `fold`: the parameter is known to be an element of the list. A named function passed the same way is checked for an arbitrary element.
+- Not modelled: what `map`/`filter` return beyond their length, and `sort` beyond its length. State what you need in a contract on your own function.

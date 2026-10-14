@@ -12,15 +12,18 @@ const USAGE: &str = "\
 tez: a fast, verified language for LLMs and the browser
 
 USAGE:
-    tez check <file> [--json]               type-check (and verify) a program
-    tez run <file> [fn] [--contracts]       run a zero-argument function (default: main)
-    tez test <file> [--contracts]           run the `test` items
+    tez check <file> [--json] [--no-verify]  type-check and verify a program
+    tez run <file> [fn] [--no-verify] [--contracts]
+                                            run a zero-argument function (default: main)
+    tez test <file> [--no-verify] [--contracts]
+                                            run the `test` items
     tez fmt <file> [--check | --write]      print / check / rewrite canonical formatting
     tez grammar                             print the normative grammar (EBNF)
     tez --version
 
-`--contracts` evaluates requires/ensures/refinements while running. Verified programs
-cannot violate them; use it on programs that are not verified yet.
+Programs are verified before they run. `--no-verify` skips verification (nothing is then
+guaranteed); `--contracts` evaluates requires/ensures/refinements while running, which is
+how to test a program that is not verified yet.
 ";
 
 const GRAMMAR: &str = include_str!("../../../spec/grammar.ebnf");
@@ -114,20 +117,28 @@ fn main() -> ExitCode {
 }
 
 fn cmd_check(args: &Args, src: &str, path: &str) -> ExitCode {
-    let c = compile(src, &CompileOptions::default());
+    let c = compile(src, &compile_options(args));
     let json = args.flag("--json");
     if c.report.diagnostics.is_empty() {
         if json {
             print_report(&c.report, src, path, true);
         } else {
-            println!(
-                "ok: {path} (types and patterns only; contract verification is not implemented yet)"
-            );
+            if args.flag("--no-verify") {
+                println!("ok: {path} (NOT verified: --no-verify)");
+            } else {
+                println!("ok: {path}");
+            }
         }
         ExitCode::SUCCESS
     } else {
         print_report(&c.report, src, path, json);
         ExitCode::from(1)
+    }
+}
+
+fn compile_options(args: &Args) -> CompileOptions {
+    CompileOptions {
+        verify: !args.flag("--no-verify"),
     }
 }
 
@@ -139,7 +150,7 @@ fn interp_options(args: &Args) -> Options {
 }
 
 fn cmd_run(args: &Args, src: &str, path: &str) -> ExitCode {
-    let c = compile(src, &CompileOptions::default());
+    let c = compile(src, &compile_options(args));
     let Some(prog) = c.program else {
         print_report(&c.report, src, path, args.flag("--json"));
         return ExitCode::from(1);
@@ -161,7 +172,7 @@ fn cmd_run(args: &Args, src: &str, path: &str) -> ExitCode {
 }
 
 fn cmd_test(args: &Args, src: &str, path: &str) -> ExitCode {
-    let c = compile(src, &CompileOptions::default());
+    let c = compile(src, &compile_options(args));
     let Some(prog) = c.program else {
         print_report(&c.report, src, path, args.flag("--json"));
         return ExitCode::from(1);

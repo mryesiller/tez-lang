@@ -12,7 +12,7 @@ use tez_syntax::{ByteSpan, ParseOptions, Problem, parse};
 
 use crate::PRELUDE_SRC;
 use crate::hir::{
-    self, FieldDef, FnDef, LocalId, ParamDef, Program, Refinement, TypeDef, VariantDef,
+    self, FieldDef, FnDef, LocalId, LocalInfo, ParamDef, Program, Refinement, TypeDef, VariantDef,
 };
 use crate::ty::{Ty, TyDisplay, TypeId};
 
@@ -145,6 +145,7 @@ pub(crate) struct Checker<'a> {
     pub subst: Vec<Option<Ty>>,
     pub scopes: Vec<Vec<(String, LocalId, Ty)>>,
     pub next_local: u32,
+    pub local_info: Vec<(String, Ty)>,
     pub tparams: Vec<String>,
     pub pending: Vec<Pending>,
     pub loading_prelude: bool,
@@ -176,6 +177,7 @@ impl<'a> Checker<'a> {
             subst: Vec::new(),
             scopes: Vec::new(),
             next_local: 0,
+            local_info: Vec::new(),
             tparams: Vec::new(),
             pending: Vec::new(),
             loading_prelude: false,
@@ -696,6 +698,7 @@ impl<'a> Checker<'a> {
                 is_prelude: prelude,
                 is_recursive: false,
                 nlocals: 0,
+                locals: Vec::new(),
                 span: fd.span,
             });
             self.fn_srcs.push(Some(FnSrc {
@@ -746,6 +749,7 @@ impl<'a> Checker<'a> {
         self.subst.clear();
         self.scopes = vec![Vec::new()];
         self.next_local = 0;
+        self.local_info.clear();
         self.tparams = tparams;
         self.pending.clear();
         self.cur_calls.clear();
@@ -760,7 +764,24 @@ impl<'a> Checker<'a> {
     pub fn new_local(&mut self) -> LocalId {
         let id = self.next_local;
         self.next_local += 1;
+        self.local_info.push((String::new(), Ty::Error));
         id
+    }
+
+    fn name_local(&mut self, id: LocalId, name: &str, ty: &Ty) {
+        if let Some(slot) = self.local_info.get_mut(id as usize) {
+            *slot = (name.to_string(), ty.clone());
+        }
+    }
+
+    pub fn final_locals(&self) -> Vec<LocalInfo> {
+        self.local_info
+            .iter()
+            .map(|(n, t)| LocalInfo {
+                name: n.clone(),
+                ty: self.resolve(t),
+            })
+            .collect()
     }
 
     pub fn push_scope(&mut self) {
@@ -805,6 +826,7 @@ impl<'a> Checker<'a> {
             );
         }
         let id = self.new_local();
+        self.name_local(id, &name.name, &ty);
         if let Some(scope) = self.scopes.last_mut() {
             scope.push((name.name.clone(), id, ty));
         }
@@ -824,6 +846,7 @@ impl<'a> Checker<'a> {
             );
         }
         let id = self.new_local();
+        self.name_local(id, name, &ty);
         if let Some(scope) = self.scopes.last_mut() {
             scope.push((name.to_string(), id, ty));
         }
@@ -923,10 +946,16 @@ impl<'a> Checker<'a> {
             .collect();
         self.pop_scope();
         let mut ret_refine = self.lower_refines(&ret_refines);
-        let mut decreases = decl
-            .decreases
-            .as_ref()
-            .map(|e| self.expr(e, Some(&Ty::Int)));
+        let mut decreases = decl.decreases.as_ref().map(|e| {
+            let x = self.expr(e, None);
+            match self.shallow(&x.ty) {
+                Ty::Int | Ty::Adt(..) | Ty::Error => {}
+                other => {
+                    self.expect_ty(e.span, &Ty::Int, &other);
+                }
+            }
+            x
+        });
         let mut body = decl.body.as_ref().map(|b| self.expr(b, Some(&ret)));
 
         // finalize types
@@ -943,6 +972,7 @@ impl<'a> Checker<'a> {
             self.finish_frame_exprs(exprs.into_iter());
         }
         let nl = self.next_local;
+        let locals = self.final_locals();
         let calls = std::mem::take(&mut self.cur_calls);
         self.call_edges[id] = calls;
         let f = &mut self.program.fns[id];
@@ -957,6 +987,7 @@ impl<'a> Checker<'a> {
         f.decreases = decreases;
         f.body = body;
         f.nlocals = nl;
+        f.locals = locals;
     }
 
     fn check_tests(&mut self, items: &[(&'a Item, bool)]) {
@@ -1081,6 +1112,7 @@ fn placeholder_fn(fd: &ast::FnDecl, prelude: bool) -> FnDef {
         is_prelude: prelude,
         is_recursive: false,
         nlocals: 0,
+        locals: Vec::new(),
         span: fd.span,
     }
 }

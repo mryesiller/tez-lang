@@ -1,0 +1,19 @@
+[package]
+name = "tez_verify"
+description = "Verification-condition generation and SMT discharge for Tez"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+tez_diag.workspace = true
+tez_syntax.workspace = true
+tez_types.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+
+[lints]
+workspace = true

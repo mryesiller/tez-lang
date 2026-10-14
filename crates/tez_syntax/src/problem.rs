@@ -27,6 +27,8 @@ pub struct Problem {
     pub expected: Option<String>,
     /// Suggested fixes.
     pub fixes: Vec<ProblemFix>,
+    /// Concrete values that violate the obligation (verification only).
+    pub counterexample: Option<Vec<(String, String)>>,
 }
 
 impl Problem {
@@ -39,6 +41,7 @@ impl Problem {
             span,
             expected: None,
             fixes: Vec::new(),
+            counterexample: None,
         }
     }
 
@@ -70,6 +73,10 @@ impl Problem {
     pub fn to_diagnostic(&self, index: &LineIndex<'_>) -> Diagnostic {
         let mut d = Diagnostic::new(self.code, self.message.clone(), index.span(self.span));
         d.expected = self.expected.clone();
+        d.counterexample = self
+            .counterexample
+            .as_ref()
+            .map(|c| c.iter().cloned().collect());
         for f in &self.fixes {
             d = d.fix(f.title.clone(), index.span(f.span), f.replace.clone());
         }

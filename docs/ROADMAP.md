@@ -8,11 +8,11 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 | Faz | Ad | Süre | Durum |
 |---|---|---|---|
 | A | Altyapı ve ajan ortamı | 1 gün | 🟦 |
-| 0 | Dil tasarımı + ölçüm | 2 hafta | ⬜ |
-| 1 | Çekirdek derleyici | 3 hafta | ⬜ |
+| 0 | Dil tasarımı + ölçüm | 2 hafta | 🟦 (dil ✅, ölçüm bekliyor) |
+| 1 | Çekirdek derleyici | 3 hafta | ✅ |
 | 2 | WasmGC + tarayıcı | 3 hafta | ⬜ |
 | 3 | LLM döngüsü + veri hattı v1 | 2 hafta | ⬜ |
-| 4 | Doğrulama (refinement + SMT) | 4 hafta | ⬜ |
+| 4 | Doğrulama (refinement + SMT) | 4 hafta | 🟦 (çekirdek ✅) |
 | 5 | Tez-Coder v0 (ince ayar) | 3 hafta | ⬜ |
 | 6 | Tarayıcı içi model | 2 hafta | ⬜ |
 | 7 | Etkiler (`Cmd`/`Sub`) | sonra | ⬜ |
@@ -29,7 +29,7 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 - [x] Studio iskeleti (Vite + React + Monaco, COOP/COEP başlıkları)
 - [x] CI iş akışı (`.github/workflows/ci.yml`)
 - [x] Araç zinciri: `rustup` (1.99.0 sabit) + `wasm32-unknown-unknown`, `wasm-tools`, `binaryen`, Z3 — `make doctor` yeşil
-- [ ] CI iş akışının ilk çalıştırması yeşil mi? (yerelde denenemez; run 38606935826)
+- [x] CI ilk çalıştırmaları yeşil; z3 kurulumu eklendi
 - [x] Uzak depo tanımlı: `origin` = github.com/mryesiller/tez-lang (kullanıcı açacak)
 - [ ] İlk commit ve ilk push (kullanıcı onayıyla)
 - [x] **Ad kontrolü (2026-10-14):** `tez` crates.io ve npm'de dolu → paket adı **`tez-lang`** (ikisinde de boş; komut `tez` kalır). İç crate'ler `tez_*` (hepsi crates.io'da boş). GitHub deposu: `mryesiller/tez-lang` (crates.io ve npm ile aynı ad)
@@ -37,36 +37,30 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 
 **Çıkış kriteri:** `make check` yeşil (✅ yerelde doğrulandı), CI yeşil, ad kontrolü tamam.
 
-## Faz 0 — Dil tasarımı + ölçüm (2 hafta)
+## Faz 0 — Dil tasarımı + ölçüm (kısmen)
+
+Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıcı kararı: önce dil).
 
 - [x] Referans model: **Gemma 4 E4B** (Apache-2.0) → [ARCHITECTURE §9.0](ARCHITECTURE.md)
-- [ ] `bench/tokens/tokenizers.toml`: birincil Gemma 4 + iki ikincil tokenizer (aile seçimi)
-- [ ] `bench/tokens` ölçüm aracı (Gemma 4 `tokenizer.json`, 32 MB indirme — onay gerekir)
-- [ ] `q4f16` ONNX dosya boyutlarını ölç (Mod C indirme maliyeti)
-- [ ] Küçük deneme LoRA: Gemma 4 E4B metin çözücüsü, birkaç yüz örnek, araç zinciri çalışıyor mu (Faz 5 riski)
-- [ ] Tek-token anahtar kelime/operatör testi (aday listesi → eleme)
-- [ ] `spec/grammar.ebnf` (normatif, LL(1))
-- [ ] `spec/grammar.gbnf` (EBNF'den üretilir, elle düzenlenmez)
-- [ ] 30 örnek program (`spec/examples/`), her biri kanonik biçimde
-- [ ] `spec/card.md` ≤ 1.200 token
+- [x] `spec/grammar.ebnf` (normatif), `spec/language.md` (anlam), `spec/errors.md` (61 hata kodu, testle senkron)
+- [x] Örnek programlar: 14 kabul edilen + 10 reddedilen (`spec/examples/`, testle zorlanır)
+- [ ] 30 örneğe tamamla
+- [ ] `bench/tokens/tokenizers.toml` ve ölçüm aracı (Gemma 4 `tokenizer.json`, 32 MB indirme — onay gerekir)
+- [ ] `spec/grammar.gbnf` (EBNF'den üretim) ve `spec/card.md` ≤ 1.200 token
 - [ ] TezBench iskeleti: 20 görev + TypeScript karşılıkları
-- [ ] İlk ölçüm: Gemma 4 E4B, kartla, kısıtsız (greedy + önerilen örnekleme; düşünme kapalı/açık) → sözdizimi geçerliliği ve token oranı
+- [ ] `q4f16` ONNX boyutlarını ölç; küçük deneme LoRA
+- [ ] İlk ölçüm: Gemma 4 E4B, kartla → sözdizimi geçerliliği ve token oranı
 
-**Çıkış kriteri:** Mod A'da **Gemma 4 E4B'de** ≥ %80 sözdizimi geçerliliği; Gemma 4 tokenizer'ında token oranı ≤ 0,9.
+## Faz 1 — Çekirdek derleyici ✅
 
-## Faz 1 — Çekirdek derleyici (3 hafta)
-
-- [ ] `tez_syntax`: logos lexer, recursive-descent parser, hata kurtarma, span
-- [ ] `tez_resolve`: ad çözümleme
-- [ ] `tez_types`: çift yönlü denetim, yerel HM, kapsamlılık
-- [ ] `tez_interp`: referans yorumlayıcı (yalnızca test oracle'ı)
-- [ ] `tez_diag`: tüm hata kodları + JSON şeması sürüm 1 (sabitlenir)
-- [ ] `tez_fmt`: kanonik biçimlendirici (idempotent)
-- [ ] `tez_cli`: `check | run | fmt | grammar`
-- [ ] Fuzz: parser çökmez, `fmt(fmt(x)) == fmt(x)`
-- [ ] §5'teki Faz-1 hata sınıflarının her biri için en az bir **reddedilen** ve bir **kabul edilen** test
-
-**Çıkış kriteri:** Faz-1 garantileri testlerle kanıtlı; 30 örnek program çalışıyor.
+- [x] `tez_syntax`: lexer, hata kurtarmalı recursive-descent parser, adlandırma kuralları + otomatik düzeltmeler (46 test)
+- [x] `tez_types`: ad çözümleme, çift yönlü çıkarım + birleştirme, yöntem çözümleme, kapsamlılık/erişilebilirlik (Maranget), sonlanma çağrı grafiği, tipli HIR (32 test)
+- [x] `tez_interp`: referans yorumlayıcı — sınırsız Int, kapanışlar, kaynak sınırları, isteğe bağlı sözleşme denetimi (18 test)
+- [x] `tez_diag`: 61 kararlı hata kodu + JSON şeması v1
+- [x] `tez_fmt`: kanonik biçimlendirici, yorumları korur ya da reddeder (14 test, prelude idempotent)
+- [x] `tez_cli`: `check | run | test | fmt | grammar` (`--json`, `--no-verify`, `--contracts`)
+- [ ] Fuzz: parser çökmez, `fmt(fmt(x)) == fmt(x)` (cargo-fuzz)
+- [ ] Diferansiyel test altyapısı (WASM çıktısı ≡ yorumlayıcı) → Faz 2
 
 ## Faz 2 — WasmGC + tarayıcı (3 hafta)
 
@@ -93,18 +87,20 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 
 **Çıkış kriteri:** İlk uçtan uca demo; ≤ 3 turda yakınsama ≥ %90 (orta model).
 
-## Faz 4 — Doğrulama (4 hafta)
+## Faz 4 — Doğrulama (büyük bölümü ✅)
 
-- [ ] Refinement türleri: `T where P(it)`
-- [ ] VC üretimi: sıfıra bölme, sınır, sözleşme, Float, `decreases`
-- [ ] `tez_solve` (L1): doğrusal tamsayı aritmetiği + eşitlik/UF, < 1 ms/VC
-- [ ] Z3 (L2) tembel yükleme, COOP/COEP
-- [ ] Karşı örnek üretimi ve `fixes` önerileri
+- [x] Refinement türleri (`T where P`), sözleşmeler, yapısal + sayısal `decreases`
+- [x] VC üretimi (sembolik yürütme): sıfıra bölme, Float alanı, indeks, önkoşul, sonkoşul, refinement, assert, sonlanma
+- [x] Z3 (SMT-LIB süreci) ile çözüm; her ihlal kendi koduyla + **sayaç örneği**; kanıtlanamayan reddedilir (`E_UNPROVEN`)
+- [x] Çelişkili aksiyom koruması; ilgi alanı kesme; özyinelemeli tanımlar yalnızca sonlanma kanıtlandıktan sonra
+- [x] Listeler (uzunluk/eleman/append/take/drop/concat/rev/range), dizgiler, kayan sayılar, ADT'ler, demetler
+- [x] Lambda parametreleri liste elemanı olarak bilinir (`map/filter/all/any/count/flatMap/sortBy/fold`)
+- [x] Prelude gövdeleri kendi sözleşmelerini sağlıyor (testle)
+- [x] 27 doğrulayıcı testi (kabul + her kod için ret + çelişki + soundness tuzakları)
+- [ ] `filter/map` sonucunun elemanları hakkında sözleşme (`all(pred)`, eleman eşitliği) — lambda gövdesini kapalı terim olarak aksiyomla
+- [ ] `tez_solve` (L1): gömülü hafif çözücü → tarayıcıda doğrulama (Z3 WASM ya da kendi LIA çözücüsü)
 - [ ] VC önbelleği (normalize hash)
-- [ ] **Sağlamlık testleri:** bilerek hatalı 100+ program → hepsi reddedilmeli
-- [ ] L1 sonuçlarının Z3 ile çapraz doğrulaması (L1 ≠ Z3 ise hata)
-
-**Çıkış kriteri:** ARCHITECTURE §5'teki tüm sınıflar aktif; sağlamlık testlerinde sıfır yanlış-kabul.
+- [ ] Soundness fuzz: rastgele program üret → doğrulanmışsa yorumlayıcıda ihlal OLMADIĞINI kontrol et
 
 ## Faz 5 — Tez-Coder v0 (3 hafta)
 

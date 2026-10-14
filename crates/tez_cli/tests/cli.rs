@@ -157,9 +157,14 @@ fn run_chooses_function_and_reports_runtime_errors() {
         "fn one() -> Int = 1\nfn boom() -> Int = 1 / 0\nfn main() -> Int = 7\n",
     );
     let path = p.to_str().unwrap();
-    assert_eq!(s(&tez(&["run", path]).stdout).trim(), "7");
-    assert_eq!(s(&tez(&["run", path, "one"]).stdout).trim(), "1");
-    let boom = tez(&["run", path, "boom", "--json"]);
+    assert_eq!(s(&tez(&["run", path, "--no-verify"]).stdout).trim(), "7");
+    assert_eq!(
+        s(&tez(&["run", path, "one", "--no-verify"]).stdout).trim(),
+        "1"
+    );
+    // verified by default: the division by zero in `boom` is refused before anything runs
+    assert_eq!(tez(&["run", path]).status.code(), Some(1));
+    let boom = tez(&["run", path, "boom", "--no-verify", "--json"]);
     assert_eq!(boom.status.code(), Some(1));
     let v: serde_json::Value = serde_json::from_slice(&boom.stdout).unwrap();
     assert_eq!(v["diagnostics"][0]["code"], "E_DIV_ZERO");
@@ -173,8 +178,14 @@ fn contracts_flag_catches_violations() {
         "fn f(x: Int) -> Int requires x > 0 = x\nfn main() -> Int = f(0)\n",
     );
     let path = p.to_str().unwrap();
-    assert!(tez(&["run", path]).status.success());
-    let checked = tez(&["run", path, "--contracts", "--json"]);
+    assert!(tez(&["run", path, "--no-verify"]).status.success());
+    let refused = tez(&["run", path]);
+    assert_eq!(
+        refused.status.code(),
+        Some(1),
+        "the verifier must refuse an unprovable precondition"
+    );
+    let checked = tez(&["run", path, "--no-verify", "--contracts", "--json"]);
     let v: serde_json::Value = serde_json::from_slice(&checked.stdout).unwrap();
     assert_eq!(v["diagnostics"][0]["code"], "E_PRECONDITION");
 }
@@ -192,7 +203,7 @@ fn test_command() {
         "bad.tez",
         "fn d(x: Int) -> Int = x * 2\ntest wrong = d(2) == 5\ntest crash = 1 / 0 == 0\n",
     );
-    let out = tez(&["test", bad.to_str().unwrap()]);
+    let out = tez(&["test", bad.to_str().unwrap(), "--no-verify"]);
     assert_eq!(out.status.code(), Some(1));
     let o = s(&out.stdout);
     assert!(

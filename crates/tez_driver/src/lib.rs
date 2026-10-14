@@ -8,8 +8,17 @@ use tez_syntax::{LineIndex, ParseOptions, Problem, parse};
 use tez_types::hir::Program;
 
 /// Options for [`compile`].
-#[derive(Debug, Clone, Default)]
-pub struct CompileOptions {}
+#[derive(Debug, Clone)]
+pub struct CompileOptions {
+    /// Prove contracts, refinements and termination (needs the `z3` solver). On by default.
+    pub verify: bool,
+}
+
+impl Default for CompileOptions {
+    fn default() -> Self {
+        Self { verify: true }
+    }
+}
 
 /// Result of compiling one source file.
 #[derive(Debug)]
@@ -27,9 +36,9 @@ fn diagnostics(src: &str, problems: &[Problem]) -> Vec<Diagnostic> {
     ps.into_iter().map(|p| p.to_diagnostic(&index)).collect()
 }
 
-/// Runs parse, name resolution and type checking.
+/// Runs parse, name resolution, type checking and (by default) verification.
 #[must_use]
-pub fn compile(src: &str, _options: &CompileOptions) -> Compiled {
+pub fn compile(src: &str, options: &CompileOptions) -> Compiled {
     let parsed = parse(src, ParseOptions::default());
     if !parsed.problems.is_empty() {
         return Compiled {
@@ -43,6 +52,27 @@ pub fn compile(src: &str, _options: &CompileOptions) -> Compiled {
             report: Report::new(diagnostics(src, &checked.problems)),
             program: None,
         };
+    }
+    if options.verify {
+        let verified =
+            tez_verify::verify(&checked.program, src, &tez_verify::VerifyOptions::default());
+        let problems = match verified {
+            Ok(p) => p,
+            Err(msg) => vec![
+                Problem::new(
+                    tez_diag::Code::Internal,
+                    format!("the verifier could not run: {msg}"),
+                    tez_syntax::ByteSpan::new(0, 0),
+                )
+                .expected("the `z3` SMT solver on PATH (nothing is accepted without verification)"),
+            ],
+        };
+        if !problems.is_empty() {
+            return Compiled {
+                report: Report::new(diagnostics(src, &problems)),
+                program: None,
+            };
+        }
     }
     Compiled {
         report: Report::new(Vec::new()),

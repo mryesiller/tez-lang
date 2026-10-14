@@ -148,6 +148,7 @@ dependencies = [
  "tez_diag",
  "tez_syntax",
  "tez_types",
+ "tez_verify",
 ]
 
 [[package]]
@@ -183,6 +184,17 @@ dependencies = [
  "num-traits",
  "tez_diag",
  "tez_syntax",
+]
+
+[[package]]
+name = "tez_verify"
+version = "0.0.1"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "tez_diag",
+ "tez_syntax",
+ "tez_types",
 ]
 
 [[package]]

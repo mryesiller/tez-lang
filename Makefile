@@ -23,7 +23,7 @@ test: ## Run Rust tests
 	cargo test --workspace
 
 wasm: ## Build the portable crates for wasm32
-	cargo build --target wasm32-unknown-unknown -p tez_diag -p tez_syntax
+	cargo build --target wasm32-unknown-unknown -p tez_diag -p tez_syntax -p tez_types
 
 studio-install: ## Install Studio dependencies
 	cd studio && pnpm install --frozen-lockfile

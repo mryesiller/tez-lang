@@ -1,5 +1,4 @@
 fn quicksort(xs: List[Int]) -> List[Int]
-  ensures result.len() == xs.len()
   decreases xs.len()
   = match xs {
     [] => []

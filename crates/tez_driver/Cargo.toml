@@ -12,6 +12,7 @@ authors.workspace = true
 tez_diag.workspace = true
 tez_syntax.workspace = true
 tez_types.workspace = true
+tez_verify.workspace = true
 
 [lints]
 workspace = true
