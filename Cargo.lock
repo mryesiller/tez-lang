@@ -193,6 +193,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "tez_diag",
+ "tez_interp",
  "tez_syntax",
  "tez_types",
 ]
