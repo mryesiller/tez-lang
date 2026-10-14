@@ -1,0 +1,14 @@
+{
+  "name": "tez-lang",
+  "version": "0.0.1",
+  "description": "Tez: a fast, verified programming language for LLMs and the browser (pre-alpha). The WebAssembly compiler will be published here.",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mryesiller/tez-lang.git",
+    "directory": "packages/tez-lang"
+  },
+  "homepage": "https://github.com/mryesiller/tez-lang#readme",
+  "keywords": ["tez", "language", "compiler", "webassembly", "wasm", "llm", "verification"],
+  "files": ["README.md"]
+}

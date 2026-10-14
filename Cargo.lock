@@ -89,10 +89,6 @@ dependencies = [
 [[package]]
 name = "tez-lang"
 version = "0.0.1"
-dependencies = [
- "tez_diag",
- "tez_syntax",
-]
 
 [[package]]
 name = "tez_diag"

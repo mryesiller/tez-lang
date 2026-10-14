@@ -33,7 +33,7 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 - [x] Uzak depo tanımlı: `origin` = github.com/mryesiller/tez-lang (kullanıcı açacak)
 - [ ] İlk commit ve ilk push (kullanıcı onayıyla)
 - [x] **Ad kontrolü (2026-10-14):** `tez` crates.io ve npm'de dolu → paket adı **`tez-lang`** (ikisinde de boş; komut `tez` kalır). İç crate'ler `tez_*` (hepsi crates.io'da boş). GitHub deposu: `mryesiller/tez-lang` (crates.io ve npm ile aynı ad)
-- [ ] `tez-lang` ve `tez_*` adlarını yayın öncesi rezerve et (ilk sürüm 0.0.x)
+- [ ] **Ad rezervasyonu** (kullanıcı, token gerekir): `cargo publish -p tez-lang` ve `cd packages/tez-lang && npm publish` — ikisi de dry-run'da geçti. `tez_*` iç crate'leri Faz 1'de kullanılınca yayınlanır
 
 **Çıkış kriteri:** `make check` yeşil (✅ yerelde doğrulandı), CI yeşil, ad kontrolü tamam.
 

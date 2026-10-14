@@ -1,10 +1,13 @@
 [package]
 name = "tez-lang"
-description = "The `tez` command-line tool"
+description = "Tez: a fast, verified programming language for LLMs and the browser (pre-alpha)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
+keywords = ["language", "compiler", "wasm", "llm", "verification"]
+categories = ["compilers", "command-line-utilities"]
 rust-version.workspace = true
 authors.workspace = true
 
@@ -12,9 +15,7 @@ authors.workspace = true
 name = "tez"
 path = "src/main.rs"
 
-[dependencies]
-tez_diag.workspace = true
-tez_syntax.workspace = true
+# tez_diag / tez_syntax are added back (with versions) when the CLI starts using them in Phase 1.
 
 [lints]
 workspace = true
