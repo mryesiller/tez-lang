@@ -29,11 +29,11 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 - [x] Studio iskeleti (Vite + React + Monaco, COOP/COEP başlıkları)
 - [x] CI iş akışı (`.github/workflows/ci.yml`)
 - [x] Araç zinciri: `rustup` (1.99.0 sabit) + `wasm32-unknown-unknown`, `wasm-tools`, `binaryen`, Z3 — `make doctor` yeşil
-- [ ] CI iş akışının GitHub'da ilk çalıştırması (yerelde denenemez)
+- [ ] CI iş akışının ilk çalıştırması yeşil mi? (yerelde denenemez; run 38606935826)
 - [x] Uzak depo tanımlı: `origin` = github.com/mryesiller/tez-lang (kullanıcı açacak)
 - [ ] İlk commit ve ilk push (kullanıcı onayıyla)
 - [x] **Ad kontrolü (2026-10-14):** `tez` crates.io ve npm'de dolu → paket adı **`tez-lang`** (ikisinde de boş; komut `tez` kalır). İç crate'ler `tez_*` (hepsi crates.io'da boş). GitHub deposu: `mryesiller/tez-lang` (crates.io ve npm ile aynı ad)
-- [ ] **Ad rezervasyonu** (kullanıcı, token gerekir): `cargo publish -p tez-lang` ve `cd packages/tez-lang && npm publish` — ikisi de dry-run'da geçti. `tez_*` iç crate'leri Faz 1'de kullanılınca yayınlanır
+- [x] **Ad rezervasyonu (2026-10-14):** `tez-lang` 0.0.1 hem crates.io'da hem npm'de yayında. `tez_*` iç crate'leri Faz 1'de kullanılınca yayınlanır
 
 **Çıkış kriteri:** `make check` yeşil (✅ yerelde doğrulandı), CI yeşil, ad kontrolü tamam.
 
