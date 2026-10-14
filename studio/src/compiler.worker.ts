@@ -3,7 +3,7 @@
 import init, * as tez from "./tez-wasm/tez_web.js";
 import { load, TezError } from "../../runtime/tez-runtime.mjs";
 
-type Request = { id: number; op: "check" | "format" | "run" | "interpret" | "test"; src: string; name?: string; contracts?: boolean };
+type Request = { id: number; op: "check" | "format" | "run" | "interpret" | "test" | "build"; src: string; name?: string; contracts?: boolean };
 
 const ready = init();
 
@@ -51,6 +51,9 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
         break;
       case "run":
         json = contracts ? tez.run(src, name ?? "main", true) : await runCompiled(src, name ?? "main");
+        break;
+      case "build":
+        json = tez.build(src);
         break;
       case "interpret":
         json = tez.run(src, name ?? "main", contracts ?? false);

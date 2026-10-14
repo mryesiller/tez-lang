@@ -227,3 +227,26 @@ fn Result.toOption[T, E](self: Result[T, E]) -> Option[T] = match self {
   Ok(x) => Some(x)
   Err(_) => None
 }
+
+// ------------------------------------------------------------------ Html (the view type of a Tez app)
+
+type Html[M] = UiText(Str) | UiNode(Str, List[Attr[M]], List[Html[M]])
+
+type Attr[M] = UiClick(M) | UiInput((Str) -> M) | UiProp(Str, Str)
+
+fn Html.text[M](s: Str) -> Html[M] = UiText(s)
+
+fn Html.node[M](tag: Str, attrs: List[Attr[M]], kids: List[Html[M]]) -> Html[M] = UiNode(tag, attrs, kids)
+
+fn Html.heading[M](s: Str) -> Html[M] = UiNode("h1", [], [UiText(s)])
+
+fn Html.paragraph[M](s: Str) -> Html[M] = UiNode("p", [], [UiText(s)])
+
+fn Html.button[M](label: Str, onClick: M) -> Html[M] = UiNode("button", [UiClick(onClick)], [UiText(label)])
+
+fn Html.input[M](value: Str, onInput: (Str) -> M) -> Html[M] =
+  UiNode("input", [UiProp("value", value), UiInput(onInput)], [])
+
+fn Html.row[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", "row")], kids)
+
+fn Html.col[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", "col")], kids)

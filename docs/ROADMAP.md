@@ -10,7 +10,7 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 | A | Altyapı ve ajan ortamı | 1 gün | 🟦 |
 | 0 | Dil tasarımı + ölçüm | 2 hafta | 🟦 (dil ✅, ölçüm bekliyor) |
 | 1 | Çekirdek derleyici | 3 hafta | ✅ |
-| 2 | WasmGC + tarayıcı | 3 hafta | 🟦 (derleyici ✅, TEA bekliyor) |
+| 2 | WasmGC + tarayıcı | 3 hafta | 🟦 (derleyici ✅, TEA döngüsü ✅, hot-swap bekliyor) |
 | 3 | LLM döngüsü + veri hattı v1 | 2 hafta | ⬜ |
 | 4 | Doğrulama (refinement + SMT) | 4 hafta | 🟦 (çekirdek ✅) |
 | 5 | Tez-Coder v0 (ince ayar) | 3 hafta | ⬜ |
@@ -46,7 +46,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Örnek programlar: 14 kabul edilen + 10 reddedilen (`spec/examples/`, testle zorlanır)
 - [ ] 30 örneğe tamamla
 - [x] `bench/tokens`: Gemma 4 tokenizer (indirildi, sürüm sabit) + ölçüm aracı; **36/38 anahtar kelime/operatör tek token**, Tez/TS token oranı **0,82** (kanıt satırları hariç 0,78)
-- [x] `spec/card.md`: **889 token** (bütçe 1.200); örnekleri doğrulanıyor, metot listesi prelude ile testle senkron
+- [x] `spec/card.md`: **930 token** (bütçe 1.200); örnekleri doğrulanıyor, metot listesi prelude ile testle senkron
 - [ ] `spec/grammar.gbnf` (EBNF'den üretim)
 - [ ] TezBench iskeleti: 20 görev + TypeScript karşılıkları
 - [ ] `q4f16` ONNX boyutlarını ölç; küçük deneme LoRA
@@ -71,7 +71,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] `tez build`; `tez_web` (`check/format/run/test/build`), tarayıcı derleyicisi **257 KB gzip**
 - [x] Studio: Worker'da derleyici, canlı Monaco tanıları, tek tık düzeltme, biçimlendir/çalıştır (derlenmiş WASM)/test, örnek seçici
 - [x] Hız: `fib(30)` ≈ 0,03 s (WASM) vs 0,65 s (yerel yorumlayıcı); 10 000+ derinlikli özyineleme
-- [ ] `runtime/`: TEA döngüsü (`Html` türü, Virtual DOM diff, olaylar) — **sıradaki büyük iş**
+- [x] `runtime/tez-app.mjs`: TEA döngüsü (`Html[Msg]` türü prelude'da, vnode diff, tıklama/girdi olayları); Studio'da "App" düğmesi; örnekler 15-counter-app, 16-echo-app
+- [ ] Hot-swap: kod değişince model'i koruyarak `update`/`view` değiştir (durum serileştirme/göç) — **sıradaki iş**
 - [ ] Hot-swap: durum serileştirme + yapısal göç
 - [ ] Worker + fuel (sonsuz döngü koruması; doğrulanmamış programlar için) ve bellek tavanı
 - [ ] Studio paketini küçült (Monaco tüm dil tanımlarıyla 4,2 MB) ve tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)

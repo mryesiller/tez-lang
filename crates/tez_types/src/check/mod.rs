@@ -156,7 +156,7 @@ pub(crate) struct Checker<'a> {
 }
 
 const BUILTIN_TYPES: [&str; 6] = ["Int", "Float", "Bool", "Str", "Unit", "List"];
-const MODULES: [&str; 6] = ["Int", "Float", "Str", "List", "Option", "Result"];
+const MODULES: [&str; 7] = ["Int", "Float", "Str", "List", "Option", "Result", "Html"];
 
 impl<'a> Checker<'a> {
     fn new(src: &'a str) -> Self {

@@ -40,3 +40,8 @@ body { background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans
 .ok { color: #35b36b; } .bad { color: #e5534b; }
 .out { margin: 0; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); white-space: pre-wrap; word-break: break-word; font: 13px/1.5 ui-monospace, Menlo, monospace; }
 .out.error { border-color: #e5534b; } .out.ok { border-color: #35b36b; }
+.app { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); margin-bottom: 12px; }
+.app .row { display: flex; gap: 8px; align-items: center; }
+.app .col { display: flex; flex-direction: column; gap: 8px; }
+.app h1 { margin: 0; font-size: 20px; }
+.app p { margin: 0; }

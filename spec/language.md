@@ -103,6 +103,10 @@ If `tez check` reports no diagnostics, then at run time none of these can happen
 
 `tez run file.tez [fn]` verifies the program, then evaluates the zero-argument function `fn` (default `main`) and prints its value. `--no-verify` skips verification (no guarantee), `--contracts` evaluates contracts at run time. `test name = <Bool expr>` items are evaluated by `tez test`; tests are not part of the compiled program and not verified.
 
+## 8.1 Apps (UI)
+
+A program with `fn init() -> Model`, `fn update(m: Model, msg: Msg) -> Model` and `fn view(m: Model) -> Html[Msg]` is an app. The host (`runtime/tez-app.mjs`) calls `view` after every `update` and patches only the DOM that changed. `Html[Msg]` is built with `Html.text`, `Html.heading`, `Html.paragraph`, `Html.button(label, msg)`, `Html.input(value, f)`, `Html.row`, `Html.col` and `Html.node`. Constructors are not functions, so write `s => Typed(s)`, not `Typed`. `update` and `view` are ordinary verified functions: refinements on `Model` hold in every state.
+
 ## 9. What the verifier knows
 
 The verifier is sound, not complete: a correct program can be rejected (`E_UNPROVEN`) when the solver cannot find the proof. What it reasons about:

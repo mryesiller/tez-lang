@@ -58,6 +58,9 @@ export class Compiler {
   run(src: string, name = "main", contracts = false) {
     return this.call<RunResult>("run", src, { name, contracts });
   }
+  build(src: string) {
+    return this.call<{ ok: boolean; wasm?: string; report?: Report; error?: string }>("build", src);
+  }
   test(src: string, contracts = false) {
     return this.call<TestResult>("test", src, { contracts });
   }

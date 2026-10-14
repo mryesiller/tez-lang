@@ -2,6 +2,8 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Compiler, type Diagnostic, type Fix } from "./compiler";
+import { load } from "../../runtime/tez-runtime.mjs";
+import { isApp, mountApp, type AppHandle } from "../../runtime/tez-app.mjs";
 import "./monaco";
 
 const exampleFiles = import.meta.glob("../../spec/examples/*.tez", {
@@ -37,6 +39,9 @@ export default function App() {
   const editorRef = useRef<EditorInstance | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const seq = useRef(0);
+  const appRoot = useRef<HTMLDivElement | null>(null);
+  const app = useRef<AppHandle | null>(null);
+  const [appOn, setAppOn] = useState(false);
 
   const publish = useCallback((ds: Diagnostic[]) => {
     setDiags(ds);
@@ -87,6 +92,37 @@ export default function App() {
     );
     setBusy(false);
   };
+
+  const runApp = async () => {
+    setBusy(true);
+    app.current?.stop();
+    app.current = null;
+    const built = await compiler.build(source);
+    if (!built.ok || !built.wasm) {
+      setOutput({ kind: "error", text: showReport(built) });
+      setBusy(false);
+      return;
+    }
+    try {
+      const bin = atob(built.wasm);
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      const rt = await load(bytes);
+      if (!isApp(rt) || !appRoot.current) {
+        setOutput({ kind: "error", text: "An app needs `fn init() -> Model`, `fn update(m: Model, msg: Msg) -> Model` and `fn view(m: Model) -> Html[Msg]`." });
+      } else {
+        setAppOn(true);
+        app.current = mountApp(rt, appRoot.current, {
+          onError: (e) => setOutput({ kind: "error", text: `app stopped: ${e.message}` }),
+        });
+        setOutput({ kind: "ok", text: "App running. Each click calls update(model, msg), then view(model); only changed DOM is touched." });
+      }
+    } catch (e) {
+      setOutput({ kind: "error", text: String(e instanceof Error ? e.message : e) });
+    }
+    setBusy(false);
+  };
+
+  useEffect(() => () => app.current?.stop(), []);
 
   const runTests = async () => {
     setBusy(true);
@@ -153,6 +189,9 @@ export default function App() {
         <button onClick={run} disabled={busy || diags.length > 0}>
           Run
         </button>
+        <button onClick={runApp} disabled={busy || diags.length > 0} title="Run init/update/view as an app">
+          App
+        </button>
         <button onClick={runTests} disabled={busy || diags.length > 0}>
           Test
         </button>
@@ -192,6 +231,8 @@ export default function App() {
               </li>
             ))}
           </ul>
+          <h2 hidden={!appOn}>App</h2>
+          <div className="app" ref={appRoot} hidden={!appOn} />
           <h2>Output</h2>
           <pre className={`out ${output.kind}`}>{output.text}</pre>
         </section>

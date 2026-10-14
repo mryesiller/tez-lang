@@ -43,6 +43,7 @@ Generic: `fn first[T](xs: List[T]) -> Option[T]`.
 - Str `len slice chars toInt contains startsWith endsWith trim upper lower split repeat isEmpty`
 - List `len get map filter fold flatMap append concat reverse take drop any all count contains indexOf first last zip enumerate sort sortBy sum min max join isEmpty` · static `List.range(lo, hi)` `List.repeat(x, n)`
 - Option `isSome isNone unwrapOr map andThen` · Result `isOk unwrapOr map mapErr toOption`
+- UI view: `Html[Msg]` built with `Html.text(s)` `Html.heading(s)` `Html.paragraph(s)` `Html.button(label, msg)` `Html.input(value, f)` `Html.row(kids)` `Html.col(kids)` `Html.node(tag, attrs, kids)`
 
 ## What the compiler proves (else it rejects with a code and a counterexample)
 Division and `%` need a nonzero divisor; `xs[i]` and `get` need `0 <= i < len`; every call must meet the callee's `requires`; `ensures` and `where` must hold; a recursive function needs `decreases` (an Int that shrinks, or a data value that gets smaller). State what a caller needs in `requires`, what it gets in `ensures`.

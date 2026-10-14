@@ -1,0 +1,27 @@
+type Model = { text: Str }
+
+type Msg = Typed(Str) | Clear
+
+fn init() -> Model = Model { text: "" }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Typed(s) => Model { text: s }
+  Clear => init()
+}
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.input(m.text, s => Typed(s)),
+      Html.paragraph("You typed " ++ m.text.len().toStr() ++ " characters: " ++ m.text),
+      Html.button("clear", Clear)
+    ]
+  )
+
+test startsEmpty = init().text.isEmpty()
+
+test typingStoresText = update(init(), Typed("hi")).text == "hi"
+
+test clearEmpties = update(update(init(), Typed("hi")), Clear).text == ""
+
+fn main() -> Int = update(init(), Typed("hello")).text.len()

@@ -1,0 +1,28 @@
+type Model = { count: Int where it >= 0 }
+
+type Msg = Inc | Dec | Reset
+
+fn init() -> Model = Model { count: 0 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Inc => m with { count: m.count + 1 }
+  Dec => if m.count > 0 { m with { count: m.count - 1 } } else { m }
+  Reset => init()
+}
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Counter"),
+      Html.paragraph("Count: " ++ m.count.toStr()),
+      Html.row([Html.button("-", Dec), Html.button("+", Inc), Html.button("reset", Reset)])
+    ]
+  )
+
+test startsAtZero = init().count == 0
+
+test neverGoesBelowZero = update(init(), Dec).count == 0
+
+test incrementsTwice = update(update(init(), Inc), Inc).count == 2
+
+fn main() -> Int = update(update(init(), Inc), Inc).count
