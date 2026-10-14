@@ -1,0 +1,15 @@
+[package]
+name = "tez_syntax"
+description = "Lexer, parser and AST for Tez (Phase 1); currently source/position utilities"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+tez_diag.workspace = true
+
+[lints]
+workspace = true

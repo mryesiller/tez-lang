@@ -1,0 +1,20 @@
+[package]
+name = "tez-lang"
+description = "The `tez` command-line tool"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "tez"
+path = "src/main.rs"
+
+[dependencies]
+tez_diag.workspace = true
+tez_syntax.workspace = true
+
+[lints]
+workspace = true

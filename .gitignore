@@ -1,0 +1,20 @@
+/target
+node_modules
+dist
+*.wasm
+!spec/**/*.wasm
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Derived by .agents/link.sh (source of truth is .agents/)
+/.claude
+/.mcp.json
+
+# Local benchmark/model artifacts
+/bench/cache
+/data/raw
+/data/out
+*.gguf
+*.safetensors
