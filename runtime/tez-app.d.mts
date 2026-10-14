@@ -3,6 +3,8 @@ import type { TezRuntime } from "./tez-runtime.mjs";
 export interface AppHandle {
   readonly model: unknown;
   dispatch(msg: unknown): void;
+  /** Hot-swap: restart from the new program's `init()` and replay the logged UI events. */
+  swap(next: TezRuntime): { replayed: number; dropped: number };
   stop(): void;
 }
 

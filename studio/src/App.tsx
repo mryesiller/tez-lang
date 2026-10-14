@@ -74,6 +74,7 @@ export default function App() {
 
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    if (import.meta.env.DEV) (window as unknown as { __tezEditor: unknown }).__tezEditor = editor;
     monacoRef.current = monaco;
   };
 
@@ -123,6 +124,24 @@ export default function App() {
   };
 
   useEffect(() => () => app.current?.stop(), []);
+
+  // hot-swap: a valid edit while the app runs replaces the program but keeps the user's session
+  useEffect(() => {
+    if (!app.current) return;
+    const t = setTimeout(async () => {
+      const built = await compiler.build(source);
+      if (!built.ok || !built.wasm || !app.current) return;
+      try {
+        const rt = await load(Uint8Array.from(atob(built.wasm), (c) => c.charCodeAt(0)));
+        if (!isApp(rt)) return;
+        const r = app.current.swap(rt);
+        setOutput({ kind: "ok", text: `Hot-swapped: replayed ${r.replayed} event(s)${r.dropped ? `, dropped ${r.dropped} that no longer apply` : ""}.` });
+      } catch (e) {
+        setOutput({ kind: "error", text: `hot-swap failed, the previous version keeps running: ${e instanceof Error ? e.message : e}` });
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [source, compiler]);
 
   const runTests = async () => {
     setBusy(true);

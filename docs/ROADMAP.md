@@ -10,7 +10,7 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 | A | Altyapı ve ajan ortamı | 1 gün | 🟦 |
 | 0 | Dil tasarımı + ölçüm | 2 hafta | 🟦 (dil ✅, ölçüm bekliyor) |
 | 1 | Çekirdek derleyici | 3 hafta | ✅ |
-| 2 | WasmGC + tarayıcı | 3 hafta | 🟦 (derleyici ✅, TEA döngüsü ✅, hot-swap bekliyor) |
+| 2 | WasmGC + tarayıcı | 3 hafta | 🟦 (derleyici ✅, TEA döngüsü ✅, hot-swap ✅) |
 | 3 | LLM döngüsü + veri hattı v1 | 2 hafta | ⬜ |
 | 4 | Doğrulama (refinement + SMT) | 4 hafta | 🟦 (çekirdek ✅) |
 | 5 | Tez-Coder v0 (ince ayar) | 3 hafta | ⬜ |
@@ -72,7 +72,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Studio: Worker'da derleyici, canlı Monaco tanıları, tek tık düzeltme, biçimlendir/çalıştır (derlenmiş WASM)/test, örnek seçici
 - [x] Hız: `fib(30)` ≈ 0,03 s (WASM) vs 0,65 s (yerel yorumlayıcı); 10 000+ derinlikli özyineleme
 - [x] `runtime/tez-app.mjs`: TEA döngüsü (`Html[Msg]` türü prelude'da, vnode diff, tıklama/girdi olayları); Studio'da "App" düğmesi; örnekler 15-counter-app, 16-echo-app
-- [ ] Hot-swap: kod değişince model'i koruyarak `update`/`view` değiştir (durum serileştirme/göç) — **sıradaki iş**
+- [x] Hot-swap: olay günlüğü (event sourcing) — kod değişince yeni `init()` ile başlayıp kullanıcı olayları yeniden oynatılır; Studio'da ve sitede çalışır
+- [x] `site/`: açılış sayfası + dokümantasyon (Tour, referans, hata kataloğu, örnekler, mimari, yol haritası); çalıştırılabilir örnekler tarayıcıda derlenir; GitHub Pages iş akışı (`.github/workflows/pages.yml`)
 - [ ] Hot-swap: durum serileştirme + yapısal göç
 - [ ] Worker + fuel (sonsuz döngü koruması; doğrulanmamış programlar için) ve bellek tavanı
 - [ ] Studio paketini küçült (Monaco tüm dil tanımlarıyla 4,2 MB) ve tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)

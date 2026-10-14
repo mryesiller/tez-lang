@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tez — a language small models can write and compilers can prove</title>
+  <meta name="description" content="Tez is an open-source language for 3–4B-parameter LLMs and developers. Programs are proven free of whole error classes and compile to WebAssembly. Everything runs in your browser." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b6b57'/%3E%3Cpath d='M8 9h16v4h-6v10h-4V13H8z' fill='white'/%3E%3C/svg%3E" />
+  <script type="module" src="/src/landing.ts"></script>
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="./"><span class="logo">T</span> Tez</a>
+    <nav>
+      <a href="#proof">Proofs</a>
+      <a href="#numbers">Numbers</a>
+      <a href="./docs/#/tour">Docs</a>
+      <a href="https://github.com/mryesiller/tez-lang">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Open source · MIT OR Apache-2.0</p>
+      <h1>The language a small model can write<br />and a compiler can prove.</h1>
+      <p class="lead">
+        Tez is a small, pure, strictly checked language. Programs are verified free of out-of-range indexing, division by zero, missing
+        cases, runaway recursion and broken contracts, then compiled to WebAssembly. A 4B-parameter model can learn the whole language from one page.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="#try">Try it in this page</a>
+        <a class="btn" href="./docs/#/tour">Take the tour</a>
+        <a class="btn" href="./studio/">Open the Studio</a>
+      </div>
+    </section>
+
+    <section id="try" class="try">
+      <div class="try-head">
+        <h2>This page is running Tez.</h2>
+        <p>The compiler is Rust built to WebAssembly (about 257 KB gzipped). The counter on the right is compiled by it, in your browser, to WebAssembly and driven by the Tez app runtime. Edit the code: your count survives the change.</p>
+      </div>
+      <div class="try-grid">
+        <div class="editor">
+          <div class="tabs"><span>counter.tez</span><span id="status" class="status">starting…</span></div>
+          <div class="code-wrap">
+            <pre id="hl" aria-hidden="true"></pre>
+            <textarea id="src" spellcheck="false" aria-label="Tez source code"></textarea>
+          </div>
+        </div>
+        <div class="preview">
+          <div class="tabs"><span>live preview</span></div>
+          <div id="app" class="app-root"></div>
+          <p class="hint">Try changing <code>m.count + 1</code> to <code>m.count + 10</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="pillars">
+      <article><h3>Proved, not tested</h3><p>Every index, division and recursion is checked by an SMT solver at compile time. If Tez cannot prove it, it does not compile. No warnings exist to ignore.</p></article>
+      <article><h3>Made for small models</h3><p>One way to do each thing, no shadowing, no operator overloading, no implicit anything. The whole language card is about 1,000 tokens.</p></article>
+      <article><h3>Token-lean</h3><p>Measured with the Gemma 4 tokenizer: the same programs take about 18% fewer tokens than their TypeScript twins, and 36 of 38 keywords are a single token.</p></article>
+      <article><h3>WebAssembly GC</h3><p>Compiled output uses WasmGC and a tiny runtime. A recursive <code>fib(30)</code> runs in about 0.03 s compiled, against 0.65 s in the reference interpreter.</p></article>
+      <article><h3>Entirely in the browser</h3><p>Parser, type checker, formatter, compiler and the app runtime all run client-side. No server, no install, no account.</p></article>
+      <article><h3>Errors an agent can fix</h3><p>Sixty-one stable error codes with spans, expected forms, counterexamples and machine-applicable fixes, as JSON for tools and as plain text for people.</p></article>
+    </section>
+
+    <section id="proof" class="proof">
+      <h2>When the compiler says no, it says why.</h2>
+      <p class="sub">Real output from <code>tez check</code>. The first program reads a list at an arbitrary index. Tez finds the input that breaks it.</p>
+      <div class="two">
+        <div>
+          <pre class="code" data-tez>fn at(xs: List[Int], i: Int) -> Int = xs.get(i)</pre>
+          <pre class="term">error[E_INDEX_BOUNDS]: the index may be out of range
+  --&gt; a.tez:1:39
+  |
+1 | fn at(xs: List[Int], i: Int) -&gt; Int = xs.get(i)
+  |                                       ^^^^^^^^^
+   = counterexample: i = 1, xs.len() = 1</pre>
+        </div>
+        <div>
+          <pre class="code" data-tez>fn at(xs: List[Int], i: Int) -> Int
+  requires 0 &lt;= i &amp;&amp; i &lt; xs.len()
+  = xs.get(i)
+
+fn main() -> Int = at([1, 2, 3], 5)</pre>
+          <pre class="term">error[E_PRECONDITION]: this call may violate the
+precondition of `at`
+  --&gt; b.tez:5:20
+  |
+5 | fn main() -&gt; Int = at([1, 2, 3], 5)
+  |                    ^^^^^^^^^^^^^^^^
+   = expected: `requires 0 &lt;= i &amp;&amp; i &lt; xs.len()`</pre>
+        </div>
+      </div>
+      <p class="sub">Type-level mistakes are caught in the browser too. Press the button to ask the in-page compiler about a <code>match</code> that forgets a case:</p>
+      <div class="two">
+        <pre class="code" id="miss" data-tez>type Light = Red | Yellow | Green
+
+fn next(l: Light) -> Light = match l {
+  Red => Green
+  Green => Yellow
+}
+
+fn main() -> Light = next(Red)</pre>
+        <div>
+          <button class="btn small" id="miss-run">Compile this</button>
+          <pre class="term" id="miss-out">Press the button.</pre>
+        </div>
+      </div>
+      <p class="note">The in-browser compiler checks syntax, names, types and exhaustiveness. The SMT proofs shown above run in the <code>tez</code> command line today; bringing them to the browser is on the roadmap.</p>
+    </section>
+
+    <section id="numbers" class="numbers">
+      <h2>Measured, not promised.</h2>
+      <div class="stats">
+        <div><b>0.82</b><span>Tez tokens ÷ TypeScript tokens on 14 paired programs (Gemma 4 tokenizer)</span></div>
+        <div><b>~1,000</b><span>tokens for the complete language card (budget 1,200)</span></div>
+        <div><b>61</b><span>stable diagnostic codes, each tested</span></div>
+        <div><b>0</b><span>soundness violations in 4,286 fuzzed runs of 300 generated programs</span></div>
+        <div><b>257 KB</b><span>gzipped compiler that runs in a browser tab</span></div>
+        <div><b>0.03 s</b><span><code>fib(30)</code> compiled to WasmGC</span></div>
+      </div>
+      <p class="note">Numbers come from <code>bench/</code> and the test suite in the repository; rerun them yourself with <code>make check</code>.</p>
+    </section>
+
+    <section class="status-sec">
+      <h2>Where it stands.</h2>
+      <ul class="checks">
+        <li class="done">Lexer, parser, type checker, exhaustiveness, formatter</li>
+        <li class="done">SMT verifier for contracts, indexing, division and termination</li>
+        <li class="done">WasmGC compiler and runtime, checked against the reference interpreter</li>
+        <li class="done">Browser compiler, Studio IDE, TEA app runtime with hot-swap</li>
+        <li class="todo">Verification inside the browser (needs a WebAssembly solver)</li>
+        <li class="todo">Fine-tuned small model and TezBench (next phase, after the language)</li>
+      </ul>
+      <p><a class="btn" href="./docs/#/roadmap">Full roadmap</a></p>
+    </section>
+  </main>
+
+  <footer>
+    <span>Tez is open source. Built to be written by small models and trusted by people.</span>
+    <span><a href="https://github.com/mryesiller/tez-lang">Source</a> · <a href="./docs/#/tour">Docs</a> · <a href="./docs/#/errors">Error catalog</a></span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,47 @@
+name: Website
+
+# Publishes the landing page + docs at the site root and the Studio under /studio/.
+# One-time setup: Settings -> Pages -> Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Install wasm-bindgen CLI and binaryen
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.129 --locked
+          sudo apt-get update && sudo apt-get install -y binaryen
+      - run: make studio-wasm
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: site/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cd site && pnpm install --frozen-lockfile && pnpm build
+      - run: cd studio && pnpm install --frozen-lockfile && pnpm exec vite build --base ./ --outDir ../site/dist/studio
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

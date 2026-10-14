@@ -301,3 +301,50 @@ fn language_card_lists_exactly_the_prelude_methods() {
         );
     }
 }
+
+/// Every program in docs/TOUR.md must do what the text says: `tez` blocks verify (and run, when they have a
+/// `main`), `tez-reject` blocks fail with exactly the code in their `// expect:` line.
+#[test]
+fn tour_snippets_are_real() {
+    let tour =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/TOUR.md"))
+            .unwrap();
+    let mut seen = 0;
+    for (i, block) in tour.split("```").enumerate().filter(|(i, _)| i % 2 == 1) {
+        let (lang, body) = block.split_once('\n').unwrap();
+        if lang != "tez" && lang != "tez-reject" {
+            continue;
+        }
+        seen += 1;
+        let p = temp(&format!("tour{i}.tez"), body);
+        let path = p.to_str().unwrap();
+        if lang == "tez-reject" {
+            let code = body
+                .lines()
+                .next()
+                .and_then(|l| l.strip_prefix("// expect: "))
+                .unwrap();
+            let out = tez(&["check", "--json", path]);
+            assert!(!out.status.success(), "block {i} should be rejected");
+            assert!(
+                s(&out.stdout).contains(code),
+                "block {i}: expected {code}, got {}",
+                s(&out.stdout)
+            );
+        } else {
+            assert!(
+                tez(&["check", path]).status.success(),
+                "tour block {i} must verify"
+            );
+            if body.contains("fn main(") {
+                let out = tez(&["run", path]);
+                assert!(
+                    out.status.success(),
+                    "tour block {i} must run:\n{}",
+                    s(&out.stderr)
+                );
+            }
+        }
+    }
+    assert!(seen >= 12, "the tour lost its code blocks");
+}

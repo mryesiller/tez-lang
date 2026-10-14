@@ -35,12 +35,12 @@ export function readHtml(rt, v) {
   return { tag, props, click, input, kids: ex.__get2(v).map((k) => readHtml(rt, k)) };
 }
 
-function create(doc, vn, send) {
+function create(doc, vn, fire) {
   if (vn.text !== undefined) return doc.createTextNode(vn.text);
   const el = doc.createElement(vn.tag);
   setProps(el, {}, vn);
-  bind(el, vn, send);
-  for (const k of vn.kids) el.appendChild(create(doc, k, send));
+  bind(el, vn, fire);
+  for (const k of vn.kids) el.appendChild(create(doc, k, fire));
   return el;
 }
 
@@ -59,28 +59,22 @@ function setProps(el, old, vn) {
 }
 
 // Handlers read the *current* vnode from the element, so a patch only has to swap `el.__tez`.
-function bind(el, vn, send) {
+function bind(el, vn, fire) {
   el.__tez = vn;
   if (el.__bound) return;
   el.__bound = true;
-  el.addEventListener("click", () => {
-    const cur = el.__tez;
-    if (cur.click !== undefined) send(cur.click);
-  });
-  el.addEventListener("input", () => {
-    const cur = el.__tez;
-    if (cur.input !== undefined) send(cur.input, el.value);
-  });
+  el.addEventListener("click", () => fire(el, "click"));
+  el.addEventListener("input", () => fire(el, "input", el.value));
 }
 
-function patch(doc, parent, el, old, vn, send) {
+function patch(doc, parent, el, old, vn, fire) {
   if (!el) {
-    parent.appendChild(create(doc, vn, send));
+    parent.appendChild(create(doc, vn, fire));
     return;
   }
   const same = old.text !== undefined ? vn.text !== undefined : vn.text === undefined && old.tag === vn.tag;
   if (!same) {
-    parent.replaceChild(create(doc, vn, send), el);
+    parent.replaceChild(create(doc, vn, fire), el);
     return;
   }
   if (vn.text !== undefined) {
@@ -88,56 +82,83 @@ function patch(doc, parent, el, old, vn, send) {
     return;
   }
   setProps(el, old, vn);
-  bind(el, vn, send);
-  const n = Math.max(old.kids.length, vn.kids.length);
+  bind(el, vn, fire);
   for (let i = vn.kids.length; i < old.kids.length; i++) el.removeChild(el.lastChild);
-  for (let i = 0; i < Math.min(n, vn.kids.length); i++) {
-    patch(doc, el, el.childNodes[i], old.kids[i], vn.kids[i], send);
+  for (let i = 0; i < vn.kids.length; i++) {
+    patch(doc, el, el.childNodes[i], old.kids[i], vn.kids[i], fire);
   }
 }
 
+const MAX_LOG = 20000;
+
 /**
- * Starts the app in `root`. Returns `{ model, dispatch, stop }`.
+ * Starts the app in `root`. Returns `{ model, dispatch, swap, stop }`.
  * Runtime failures inside `update`/`view` are reported through `onError` (a `TezError`) and stop the loop.
+ *
+ * Hot-swap is event sourcing: every UI event is logged as (path in the vnode tree, kind, value). `swap` loads
+ * a new program, starts it from its own `init()` and replays the log. The program is pure, so the replay yields
+ * exactly the state the user would have reached; events whose target no longer exists end the replay there.
  */
-export function mountApp(rt, root, { onError = (e) => { throw e; } } = {}) {
-  if (!isApp(rt)) throw new TezError("E_INTERNAL", "an app needs `init()`, `update(model, msg)` and `view(model)`");
-  const ex = rt.exports;
+export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
+  if (!isApp(rt0)) throw new TezError("E_INTERNAL", "an app needs `init()`, `update(model, msg)` and `view(model)`");
   const doc = root.ownerDocument;
-  let model = ex.f_init();
+  let rt = rt0;
+  let model;
   let tree;
   let el;
   let dead = false;
   let queued = false;
+  let log = [];
+  let replaying = false;
 
   const fail = (e) => {
     dead = true;
     onError(e instanceof TezError ? e : new TezError("E_INTERNAL", String(e && e.message ? e.message : e)));
   };
 
+  const pathOf = (node) => {
+    const path = [];
+    for (let n = node; n && n !== el; n = n.parentNode) {
+      path.unshift(Array.prototype.indexOf.call(n.parentNode.childNodes, n));
+    }
+    return path;
+  };
+
+  const step = (vn, kind, value) => {
+    const ex = rt.exports;
+    const msg = kind === "click" ? vn.click : vn.input !== undefined ? ex.__apply1(vn.input, value) : undefined;
+    if (msg !== undefined) model = ex.f_update(model, msg);
+    return msg !== undefined;
+  };
+
+  const draw = () => {
+    const next = readHtml(rt, rt.exports.f_view(model));
+    if (!tree) {
+      root.textContent = "";
+      el = create(doc, next, fire);
+      root.appendChild(el);
+    } else {
+      patch(doc, root, el, tree, next, fire);
+    }
+    tree = next;
+  };
+
   const render = () => {
     queued = false;
     if (dead) return;
     try {
-      const next = readHtml(rt, ex.f_view(model));
-      if (!tree) {
-        root.textContent = "";
-        el = create(doc, next, send);
-        root.appendChild(el);
-      } else {
-        patch(doc, root, el, tree, next, send);
-      }
-      tree = next;
+      draw();
     } catch (e) {
       fail(e);
     }
   };
 
-  const send = (msgOrFn, arg) => {
-    if (dead) return;
+  function fire(node, kind, value) {
+    if (dead || replaying) return;
     try {
-      const msg = arg === undefined ? msgOrFn : ex.__apply1(msgOrFn, arg);
-      model = ex.f_update(model, msg);
+      const path = pathOf(node);
+      if (!step(node.__tez, kind, value)) return;
+      if (log.length < MAX_LOG) log.push({ path, kind, value });
     } catch (e) {
       fail(e);
       return;
@@ -147,14 +168,69 @@ export function mountApp(rt, root, { onError = (e) => { throw e; } } = {}) {
       queued = true;
       queueMicrotask(render);
     }
-  };
+  }
 
+  model = rt.exports.f_init();
   render();
+
   return {
     get model() {
       return model;
     },
-    dispatch: (msg) => send(msg),
+    /** Sends a message value that came from the running program (not logged: it cannot be replayed). */
+    dispatch(msg) {
+      if (dead) return;
+      try {
+        model = rt.exports.f_update(model, msg);
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      if (!queued) {
+        queued = true;
+        queueMicrotask(render);
+      }
+    },
+    /** Replaces the program, keeping the user's session. Returns `{ replayed, dropped }`. */
+    swap(next) {
+      if (dead) return { replayed: 0, dropped: 0 };
+      if (!isApp(next)) throw new TezError("E_INTERNAL", "an app needs `init()`, `update(model, msg)` and `view(model)`");
+      const oldRt = rt;
+      const oldModel = model;
+      const oldTree = tree;
+      let replayed = 0;
+      try {
+        rt = next;
+        model = next.exports.f_init();
+        tree = undefined;
+        // replay against virtual trees only; the DOM is patched once at the end
+        let cur = readHtml(rt, rt.exports.f_view(model));
+        for (const ev of log) {
+          let vn = cur;
+          for (const i of ev.path) vn = vn?.kids?.[i];
+          if (!vn || vn.text !== undefined || !step(vn, ev.kind, ev.value)) break;
+          cur = readHtml(rt, rt.exports.f_view(model));
+          replayed++;
+        }
+        const dropped = log.length - replayed;
+        log = log.slice(0, replayed);
+        // keep the existing DOM and patch it from the old tree to the new one
+        tree = oldTree;
+        replaying = true;
+        const nextTree = readHtml(rt, rt.exports.f_view(model));
+        patch(doc, root, el, tree, nextTree, fire);
+        tree = nextTree;
+        replaying = false;
+        return { replayed, dropped };
+      } catch (e) {
+        // the new program failed while replaying: restore the old one untouched
+        replaying = false;
+        rt = oldRt;
+        model = oldModel;
+        tree = oldTree;
+        throw e;
+      }
+    },
     stop() {
       dead = true;
       root.textContent = "";
