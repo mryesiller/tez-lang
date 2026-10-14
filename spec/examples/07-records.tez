@@ -1,0 +1,13 @@
+type Point = { x: Int, y: Int }
+
+type Segment = { from: Point, to: Point }
+
+fn translate(p: Point, dx: Int, dy: Int) -> Point = p with { x: p.x + dx, y: p.y + dy }
+
+fn manhattan(s: Segment) -> Int = (s.to.x - s.from.x).abs() + (s.to.y - s.from.y).abs()
+
+fn main() -> (Point, Int) = {
+  let a = Point { x: 1, y: 2 }
+  let b = translate(a, 3, -4)
+  (b, manhattan(Segment { from: a, to: b }))
+}

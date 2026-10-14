@@ -1,0 +1,4 @@
+// expect: E_PARSE_NAME_CASE
+fn max_value(a: Int, b: Int) -> Int = if a > b { a } else { b }
+
+fn main() -> Int = max_value(1, 2)

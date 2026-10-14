@@ -1,0 +1,25 @@
+type Expr = Num(Int) | Add(Expr, Expr) | Mul(Expr, Expr) | Neg(Expr)
+
+fn eval(e: Expr) -> Int
+  decreases size(e)
+  = match e {
+    Num(n) => n
+    Add(a, b) => eval(a) + eval(b)
+    Mul(a, b) => eval(a) * eval(b)
+    Neg(a) => 0 - eval(a)
+  }
+
+fn size(e: Expr) -> Int
+  ensures result >= 1
+  decreases 0
+  = match e {
+    Num(_) => 1
+    Add(a, b) => 1 + size(a) + size(b)
+    Mul(a, b) => 1 + size(a) + size(b)
+    Neg(a) => 1 + size(a)
+  }
+
+fn main() -> (Int, Int) = {
+  let e = Add(Mul(Num(3), Num(4)), Neg(Num(5)))
+  (eval(e), size(e))
+}

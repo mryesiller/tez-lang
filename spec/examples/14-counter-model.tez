@@ -1,0 +1,14 @@
+type Model = { count: Int where it >= 0 }
+
+type Msg = Inc | Dec | Reset
+
+fn init() -> Model = Model { count: 0 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Inc => m with { count: m.count + 1 }
+  Dec => if m.count > 0 { m with { count: m.count - 1 } } else { m }
+  Reset => init()
+}
+
+fn main() -> Model =
+  [Inc, Inc, Inc, Dec, Dec, Dec, Dec, Inc].fold(init(), (m, msg) => update(m, msg))

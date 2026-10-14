@@ -1,0 +1,5 @@
+fn isPrime(n: Int) -> Bool = n >= 2 && List.range(2, n).all(d => n % d != 0)
+
+fn primesBelow(limit: Int) -> List[Int] = List.range(0, limit).filter(isPrime)
+
+fn main() -> List[Int] = primesBelow(50)

@@ -1285,7 +1285,11 @@ impl<'a> Checker<'a> {
             } else {
                 hint
             };
-            locals.push(self.declare_local(&p.name, ty.clone()));
+            if p.name.name == "_" {
+                locals.push(self.new_local());
+            } else {
+                locals.push(self.declare_local(&p.name, ty.clone()));
+            }
             ptys.push(ty);
         }
         let b = self.expr(body, ret_hint.as_ref());

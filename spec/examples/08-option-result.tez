@@ -1,0 +1,12 @@
+fn parseAge(s: Str) -> Result[Int, Str] = match s.toInt() {
+  None => Err("not a number: " ++ s)
+  Some(n) if n < 0 => Err("negative age")
+  Some(n) => Ok(n)
+}
+
+fn describe(r: Result[Int, Str]) -> Str = match r {
+  Ok(n) => "age " ++ n.toStr()
+  Err(msg) => "error: " ++ msg
+}
+
+fn main() -> List[Str] = ["42", "abc", "-5"].map(s => describe(parseAge(s)))

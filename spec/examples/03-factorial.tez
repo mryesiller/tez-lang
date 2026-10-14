@@ -1,0 +1,7 @@
+fn factorial(n: Int) -> Int
+  requires n >= 0
+  ensures result >= 1
+  decreases n
+  = if n == 0 { 1 } else { n * factorial(n - 1) }
+
+fn main() -> Int = factorial(30)

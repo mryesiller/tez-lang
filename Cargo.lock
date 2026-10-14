@@ -123,6 +123,15 @@ dependencies = [
 [[package]]
 name = "tez-lang"
 version = "0.0.1"
+dependencies = [
+ "serde_json",
+ "tez_diag",
+ "tez_driver",
+ "tez_fmt",
+ "tez_interp",
+ "tez_syntax",
+ "tez_types",
+]
 
 [[package]]
 name = "tez_diag"
@@ -130,6 +139,22 @@ version = "0.0.1"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "tez_driver"
+version = "0.0.1"
+dependencies = [
+ "tez_diag",
+ "tez_syntax",
+ "tez_types",
+]
+
+[[package]]
+name = "tez_fmt"
+version = "0.0.1"
+dependencies = [
+ "tez_syntax",
 ]
 
 [[package]]

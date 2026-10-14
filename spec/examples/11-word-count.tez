@@ -1,0 +1,8 @@
+fn words(text: Str) -> List[Str] = text.trim().split(" ").filter(w => w.len() > 0)
+
+fn longest(ws: List[Str]) -> Option[Str] = ws.sortBy(w => 0 - w.len()).first()
+
+fn main() -> (Int, Option[Str]) = {
+  let ws = words("  the quick  brown fox jumps ")
+  (ws.len(), longest(ws))
+}

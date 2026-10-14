@@ -1,0 +1,16 @@
+fn sum(xs: List[Int]) -> Int
+  decreases xs.len()
+  = match xs {
+    [] => 0
+    [head, ..tail] => head + sum(tail)
+  }
+
+fn reverse(xs: List[Int]) -> List[Int]
+  ensures result.len() == xs.len()
+  decreases xs.len()
+  = match xs {
+    [] => []
+    [head, ..tail] => reverse(tail).append(head)
+  }
+
+fn main() -> (Int, List[Int]) = (sum([1, 2, 3, 4, 5]), reverse([1, 2, 3]))

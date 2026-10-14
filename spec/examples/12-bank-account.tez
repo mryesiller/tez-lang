@@ -1,0 +1,17 @@
+type Account = { owner: Str, balance: Int where it >= 0 }
+
+fn deposit(a: Account, amount: Int where it > 0) -> Account = a with { balance: a.balance + amount }
+
+fn withdraw(a: Account, amount: Int) -> Result[Account, Str] = if amount <= 0 {
+  Err("amount must be positive")
+} else if amount > a.balance { Err("insufficient funds") } else {
+  Ok(a with { balance: a.balance - amount })
+}
+
+fn main() -> (Int, Str) = {
+  let acct = deposit(Account { owner: "ada", balance: 100 }, 50)
+  match withdraw(acct, 500) {
+    Ok(a) => (a.balance, "ok")
+    Err(msg) => (acct.balance, msg)
+  }
+}

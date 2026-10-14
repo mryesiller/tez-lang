@@ -1,0 +1,7 @@
+fn square(n: Int) -> Int
+  ensures result >= 0
+  = n * n
+
+fn hypotenuseSquared(a: Int, b: Int) -> Int = square(a) + square(b)
+
+fn main() -> Int = hypotenuseSquared(3, 4)

@@ -1,0 +1,9 @@
+// expect: E_MATCH_NON_EXHAUSTIVE
+type Light = Red | Yellow | Green
+
+fn next(l: Light) -> Light = match l {
+  Red => Green
+  Green => Yellow
+}
+
+fn main() -> Light = next(Red)

@@ -1,0 +1,2 @@
+// expect: E_TYPE_MISMATCH
+fn main() -> Int = "one" ++ 2.toStr()

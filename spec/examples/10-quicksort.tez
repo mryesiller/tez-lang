@@ -1,0 +1,13 @@
+fn quicksort(xs: List[Int]) -> List[Int]
+  ensures result.len() == xs.len()
+  decreases xs.len()
+  = match xs {
+    [] => []
+    [pivot, ..rest] => {
+      let smaller = rest.filter(x => x < pivot)
+      let larger = rest.filter(x => x >= pivot)
+      quicksort(smaller).append(pivot).concat(quicksort(larger))
+    }
+  }
+
+fn main() -> List[Int] = quicksort([5, 3, 8, 1, 9, 2, 7])

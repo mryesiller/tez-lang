@@ -1,0 +1,17 @@
+[package]
+name = "tez_driver"
+description = "The compile pipeline shared by the CLI and the WebAssembly build"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+tez_diag.workspace = true
+tez_syntax.workspace = true
+tez_types.workspace = true
+
+[lints]
+workspace = true

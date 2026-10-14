@@ -1072,6 +1072,17 @@ impl Parser<'_> {
             Tok::LBrace => self.block(),
             Tok::Kw(Kw::If) => self.if_expr(),
             Tok::Kw(Kw::Match) => self.match_expr(),
+            Tok::Underscore if !self.no_struct && matches!(self.peek_n(1), Tok::FatArrow) => {
+                let p = self.bump();
+                let param = LambdaParam {
+                    name: Ident {
+                        name: "_".into(),
+                        span: p.span,
+                    },
+                    ty: None,
+                };
+                self.lambda_body(vec![param], span)
+            }
             Tok::Lower(name) => {
                 if !self.no_struct && matches!(self.peek_n(1), Tok::FatArrow) {
                     let p = self.bump();
@@ -1146,7 +1157,15 @@ impl Parser<'_> {
         if is_lambda {
             let mut params = Vec::new();
             while !self.at(&Tok::RParen) && !self.at(&Tok::Eof) {
-                let name = self.lower_name()?;
+                let name = if self.at(&Tok::Underscore) {
+                    let t = self.bump();
+                    Ident {
+                        name: "_".into(),
+                        span: t.span,
+                    }
+                } else {
+                    self.lower_name()?
+                };
                 let ty = if self.eat(&Tok::Colon) {
                     Some(self.type_expr()?)
                 } else {

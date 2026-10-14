@@ -1,0 +1,5 @@
+fn fib(n: Int) -> Int
+  requires n >= 0
+  = List.range(0, n).fold((0, 1), (pair, _) => (pair.1, pair.0 + pair.1)).0
+
+fn main() -> List[Int] = List.range(0, 15).map(fib)

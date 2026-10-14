@@ -1,0 +1,2 @@
+// expect: E_NAME_USE_METHOD_SYNTAX
+fn main() -> Int = List.len([1, 2, 3])

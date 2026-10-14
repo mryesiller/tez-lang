@@ -1,0 +1,4 @@
+// expect: E_TYPE_MISSING_FIELD
+type User = { name: Str, age: Int }
+
+fn main() -> User = User { name: "ada" }

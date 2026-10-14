@@ -15,7 +15,17 @@ authors.workspace = true
 name = "tez"
 path = "src/main.rs"
 
-# tez_diag / tez_syntax are added back (with versions) when the CLI starts using them in Phase 1.
+[dev-dependencies]
+serde_json.workspace = true
+
+[dependencies]
+tez_diag.workspace = true
+tez_syntax.workspace = true
+tez_types.workspace = true
+tez_interp.workspace = true
+tez_fmt.workspace = true
+tez_driver.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true
