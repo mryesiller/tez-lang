@@ -7,7 +7,7 @@ role = "primary"
 source = "google/gemma-4-E4B"   # Hugging Face repo; file: tokenizer.json (~32 MB)
 vocab_size = 262144             # nominal "262K" per model card; verify when loaded
 license = "Apache-2.0"
-revision = ""                   # pin the exact commit when the file is first downloaded
+revision = "411aa17b749aa952df1359d2dcea73917a544d9a"   # google/gemma-4-E4B, tokenizer.json downloaded 2026-10-14 (32,170,070 bytes)
 
 # Two secondary tokenizers from different families are chosen in Phase 0.
 # [[tokenizer]]

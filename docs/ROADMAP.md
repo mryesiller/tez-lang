@@ -45,8 +45,9 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] `spec/grammar.ebnf` (normatif), `spec/language.md` (anlam), `spec/errors.md` (61 hata kodu, testle senkron)
 - [x] Örnek programlar: 14 kabul edilen + 10 reddedilen (`spec/examples/`, testle zorlanır)
 - [ ] 30 örneğe tamamla
-- [ ] `bench/tokens/tokenizers.toml` ve ölçüm aracı (Gemma 4 `tokenizer.json`, 32 MB indirme — onay gerekir)
-- [ ] `spec/grammar.gbnf` (EBNF'den üretim) ve `spec/card.md` ≤ 1.200 token
+- [x] `bench/tokens`: Gemma 4 tokenizer (indirildi, sürüm sabit) + ölçüm aracı; **36/38 anahtar kelime/operatör tek token**, Tez/TS token oranı **0,82** (kanıt satırları hariç 0,78)
+- [x] `spec/card.md`: **889 token** (bütçe 1.200); örnekleri doğrulanıyor, metot listesi prelude ile testle senkron
+- [ ] `spec/grammar.gbnf` (EBNF'den üretim)
 - [ ] TezBench iskeleti: 20 görev + TypeScript karşılıkları
 - [ ] `q4f16` ONNX boyutlarını ölç; küçük deneme LoRA
 - [ ] İlk ölçüm: Gemma 4 E4B, kartla → sözdizimi geçerliliği ve token oranı

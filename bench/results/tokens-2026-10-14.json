@@ -1,0 +1,508 @@
+{
+  "tokenizer": "gemma4",
+  "keywords": [
+    {
+      "token": "fn",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "lineStart"
+      ],
+      "single": true
+    },
+    {
+      "token": "type",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "lineStart"
+      ],
+      "single": true
+    },
+    {
+      "token": "const",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "lineStart"
+      ],
+      "single": true
+    },
+    {
+      "token": "test",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "lineStart"
+      ],
+      "single": true
+    },
+    {
+      "token": "let",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "indented"
+      ],
+      "single": true
+    },
+    {
+      "token": "match",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "if",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "else",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "where",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "with",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "requires",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "indented"
+      ],
+      "single": true
+    },
+    {
+      "token": "ensures",
+      "lineStart": 2,
+      "indented": 2,
+      "midLine": 1,
+      "usedAt": [
+        "indented"
+      ],
+      "single": false
+    },
+    {
+      "token": "decreases",
+      "lineStart": 2,
+      "indented": 2,
+      "midLine": 1,
+      "usedAt": [
+        "indented"
+      ],
+      "single": false
+    },
+    {
+      "token": "assert",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "indented"
+      ],
+      "single": true
+    },
+    {
+      "token": "true",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "false",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "=>",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "->",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "==",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "!=",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "<=",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": ">=",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "&&",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "||",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "++",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "..",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "List",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Option",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Result",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Some",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "None",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Ok",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Err",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Int",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Float",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Bool",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Str",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    },
+    {
+      "token": "Unit",
+      "lineStart": 1,
+      "indented": 1,
+      "midLine": 1,
+      "usedAt": [
+        "midLine"
+      ],
+      "single": true
+    }
+  ],
+  "examples": [
+    {
+      "example": "01-basics",
+      "tez": 68,
+      "tezCodeOnly": 60,
+      "ts": 71,
+      "ratio": 0.96,
+      "ratioCodeOnly": 0.85
+    },
+    {
+      "example": "02-fizzbuzz",
+      "tez": 106,
+      "tezCodeOnly": 106,
+      "ts": 107,
+      "ratio": 0.99,
+      "ratioCodeOnly": 0.99
+    },
+    {
+      "example": "03-factorial",
+      "tez": 66,
+      "tezCodeOnly": 46,
+      "ts": 52,
+      "ratio": 1.27,
+      "ratioCodeOnly": 0.88
+    },
+    {
+      "example": "04-fibonacci",
+      "tez": 78,
+      "tezCodeOnly": 71,
+      "ts": 100,
+      "ratio": 0.78,
+      "ratioCodeOnly": 0.71
+    },
+    {
+      "example": "05-primes",
+      "tez": 79,
+      "tezCodeOnly": 79,
+      "ts": 106,
+      "ratio": 0.75,
+      "ratioCodeOnly": 0.75
+    },
+    {
+      "example": "06-shapes",
+      "tez": 189,
+      "tezCodeOnly": 189,
+      "ts": 319,
+      "ratio": 0.59,
+      "ratioCodeOnly": 0.59
+    },
+    {
+      "example": "07-records",
+      "tez": 171,
+      "tezCodeOnly": 171,
+      "ts": 181,
+      "ratio": 0.94,
+      "ratioCodeOnly": 0.94
+    },
+    {
+      "example": "08-option-result",
+      "tez": 147,
+      "tezCodeOnly": 147,
+      "ts": 199,
+      "ratio": 0.74,
+      "ratioCodeOnly": 0.74
+    },
+    {
+      "example": "09-list-recursion",
+      "tez": 157,
+      "tezCodeOnly": 128,
+      "ts": 142,
+      "ratio": 1.11,
+      "ratioCodeOnly": 0.9
+    },
+    {
+      "example": "10-quicksort",
+      "tez": 134,
+      "tezCodeOnly": 126,
+      "ts": 126,
+      "ratio": 1.06,
+      "ratioCodeOnly": 1
+    },
+    {
+      "example": "11-word-count",
+      "tez": 106,
+      "tezCodeOnly": 106,
+      "ts": 122,
+      "ratio": 0.87,
+      "ratioCodeOnly": 0.87
+    },
+    {
+      "example": "12-bank-account",
+      "tez": 207,
+      "tezCodeOnly": 207,
+      "ts": 261,
+      "ratio": 0.79,
+      "ratioCodeOnly": 0.79
+    },
+    {
+      "example": "13-expression-tree",
+      "tez": 252,
+      "tezCodeOnly": 234,
+      "ts": 349,
+      "ratio": 0.72,
+      "ratioCodeOnly": 0.67
+    },
+    {
+      "example": "14-counter-model",
+      "tez": 150,
+      "tezCodeOnly": 150,
+      "ts": 185,
+      "ratio": 0.81,
+      "ratioCodeOnly": 0.81
+    }
+  ],
+  "total": {
+    "tez": 1910,
+    "tezCodeOnly": 1820,
+    "ts": 2320,
+    "ratio": 0.82,
+    "ratioCodeOnly": 0.78
+  },
+  "card": 930,
+  "cardBudget": 1200
+}

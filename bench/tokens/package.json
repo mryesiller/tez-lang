@@ -1,0 +1,7 @@
+{
+  "name": "tez-bench-tokens",
+  "private": true,
+  "type": "module",
+  "description": "Token-cost measurements for Tez against real tokenizers",
+  "dependencies": { "@huggingface/tokenizers": "0.2.0" }
+}

@@ -230,3 +230,74 @@ fn fmt_modes() {
     let bad = temp("syntax.tez", "fn f( -> Int = 1\n");
     assert_eq!(tez(&["fmt", bad.to_str().unwrap()]).status.code(), Some(1));
 }
+
+fn card() -> String {
+    std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/card.md"))
+        .unwrap()
+}
+
+#[test]
+fn language_card_examples_verify() {
+    let card = card();
+    let mut src = String::new();
+    for block in card.split("```").skip(1).step_by(2) {
+        src.push_str(block.trim_start_matches('\n'));
+        src.push('\n');
+    }
+    src.push_str("fn first[T](xs: List[T]) -> Option[T] = match xs {\n  [] => None\n  [h, ..t] => Some(h)\n}\n");
+    let p = temp("card.tez", &src);
+    let out = tez(&["check", p.to_str().unwrap()]);
+    assert!(
+        out.status.success(),
+        "the card's own examples must verify:\n{}",
+        s(&out.stderr)
+    );
+}
+
+#[test]
+fn language_card_lists_exactly_the_prelude_methods() {
+    let card = card();
+    let prelude = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/tez_types/prelude/prelude.tez"),
+    )
+    .unwrap();
+    for line in card.lines().filter(|l| l.starts_with("- ")) {
+        for module in ["Int", "Float", "Str", "List", "Option", "Result"] {
+            let Some(rest) = line.split(&format!("{module} `")).nth(1) else {
+                continue;
+            };
+            let Some(list) = rest.split('`').next() else {
+                continue;
+            };
+            if list.contains('.') {
+                continue;
+            }
+            for name in list.split_whitespace() {
+                assert!(
+                    prelude.contains(&format!("fn {module}.{name}")),
+                    "the card lists `{module}.{name}` but the prelude has no such function"
+                );
+            }
+        }
+    }
+    // and the other way round: every prelude method appears on the card
+    for line in prelude.lines() {
+        let Some(rest) = line
+            .strip_prefix("extern fn ")
+            .or_else(|| line.strip_prefix("fn "))
+        else {
+            continue;
+        };
+        let Some((module, tail)) = rest.split_once('.') else {
+            continue;
+        };
+        let name: String = tail.chars().take_while(|c| c.is_alphanumeric()).collect();
+        if matches!(name.as_str(), "range" | "repeat") && module == "List" {
+            continue;
+        }
+        assert!(
+            card.contains(&name),
+            "prelude function `{module}.{name}` is missing from spec/card.md"
+        );
+    }
+}
