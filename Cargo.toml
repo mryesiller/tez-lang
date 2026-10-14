@@ -20,6 +20,7 @@ tez_interp = { path = "crates/tez_interp" }
 tez_fmt = { path = "crates/tez_fmt" }
 tez_driver = { path = "crates/tez_driver" }
 tez_verify = { path = "crates/tez_verify" }
+wasm-bindgen = "=0.2.129"
 num-bigint = "0.4"
 num-traits = "0.2"
 

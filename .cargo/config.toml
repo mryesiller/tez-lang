@@ -1,0 +1,4 @@
+# The Tez compiler runs inside the browser's WebAssembly: give its shadow stack room so deep
+# (but legal) Tez recursion ends in a clean E_RESOURCE, never a crash.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=-zstack-size=16777216"]

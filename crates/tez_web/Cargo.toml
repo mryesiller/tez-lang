@@ -1,0 +1,26 @@
+[package]
+name = "tez_web"
+description = "WebAssembly bindings: the Tez compiler, formatter and interpreter in the browser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+tez_diag.workspace = true
+tez_syntax.workspace = true
+tez_types.workspace = true
+tez_interp.workspace = true
+tez_fmt.workspace = true
+tez_driver.workspace = true
+serde_json.workspace = true
+wasm-bindgen.workspace = true
+
+[lints]
+workspace = true

@@ -8,6 +8,9 @@ dist
 .env.*
 !.env.example
 
+# Built by `make studio-wasm`
+/studio/src/tez-wasm
+
 # Derived by .agents/link.sh (source of truth is .agents/)
 /.claude
 /.mcp.json

@@ -17,6 +17,8 @@ use crate::value::{Closure, ListVal, Value, values_cmp, values_eq};
 pub struct Options {
     /// Maximum call depth before `E_RESOURCE`.
     pub max_depth: usize,
+    /// Maximum nesting of expression evaluation (guards the host's stack) before `E_RESOURCE`.
+    pub max_eval_depth: usize,
     /// Maximum number of evaluation steps before `E_RESOURCE`.
     pub fuel: u64,
     /// Evaluate `requires`, `ensures` and refinements at run time. Unverified programs only:
@@ -28,6 +30,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             max_depth: 20_000,
+            max_eval_depth: 1_000_000,
             fuel: 2_000_000_000,
             check_contracts: false,
         }
@@ -63,6 +66,7 @@ pub struct Interp<'p> {
     pub(crate) opts: Options,
     consts: Vec<Option<Value<'p>>>,
     depth: usize,
+    eval_depth: usize,
     steps: u64,
     pub(crate) option_ty: usize,
 }
@@ -81,6 +85,7 @@ impl<'p> Interp<'p> {
             opts,
             consts: vec![None; prog.consts.len()],
             depth: 0,
+            eval_depth: 0,
             steps: 0,
             option_ty,
         }
@@ -261,6 +266,20 @@ impl<'p> Interp<'p> {
     // ------------------------------------------------------------ evaluation
 
     pub(crate) fn eval(&mut self, e: &'p Expr, fr: &mut Frame<'p>) -> R<Value<'p>> {
+        if self.eval_depth >= self.opts.max_eval_depth {
+            return Err(rt(
+                Code::Resource,
+                "expression nesting limit exceeded",
+                e.span,
+            ));
+        }
+        self.eval_depth += 1;
+        let r = self.eval_inner(e, fr);
+        self.eval_depth -= 1;
+        r
+    }
+
+    fn eval_inner(&mut self, e: &'p Expr, fr: &mut Frame<'p>) -> R<Value<'p>> {
         self.tick(e.span)?;
         match &e.kind {
             ExprKind::Int(b) => Ok(Value::from_big(b.clone())),
