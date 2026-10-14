@@ -25,6 +25,7 @@ tez_types.workspace = true
 tez_interp.workspace = true
 tez_fmt.workspace = true
 tez_driver.workspace = true
+tez_wasm.workspace = true
 serde_json.workspace = true
 
 [lints]

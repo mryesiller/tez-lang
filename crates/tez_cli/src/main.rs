@@ -17,6 +17,8 @@ USAGE:
                                             run a zero-argument function (default: main)
     tez test <file> [--no-verify] [--contracts]
                                             run the `test` items
+    tez build <file> [-o out.wasm] [--no-verify]
+                                            compile to a WebAssembly (WasmGC) module
     tez fmt <file> [--check | --write]      print / check / rewrite canonical formatting
     tez grammar                             print the normative grammar (EBNF)
     tez --version
@@ -32,6 +34,7 @@ struct Args {
     cmd: String,
     positional: Vec<String>,
     flags: Vec<String>,
+    out: Option<String>,
 }
 
 fn parse_args() -> Args {
@@ -39,17 +42,21 @@ fn parse_args() -> Args {
     let cmd = it.next().unwrap_or_default();
     let mut positional = Vec::new();
     let mut flags = Vec::new();
-    for a in it {
-        if a.starts_with("--") {
-            flags.push(a)
+    let mut out = None;
+    while let Some(a) = it.next() {
+        if a == "-o" {
+            out = it.next();
+        } else if a.starts_with("--") {
+            flags.push(a);
         } else {
-            positional.push(a)
+            positional.push(a);
         }
     }
     Args {
         cmd,
         positional,
         flags,
+        out,
     }
 }
 
@@ -97,7 +104,7 @@ fn main() -> ExitCode {
             print!("{GRAMMAR}");
             ExitCode::SUCCESS
         }
-        "check" | "run" | "test" | "fmt" => {
+        "check" | "run" | "test" | "fmt" | "build" => {
             let Some(path) = args.positional.first().cloned() else {
                 return usage_error(&format!("`{}` needs a file", args.cmd));
             };
@@ -109,6 +116,7 @@ fn main() -> ExitCode {
                 "check" => cmd_check(&args, &src, &path),
                 "run" => cmd_run(&args, &src, &path),
                 "test" => cmd_test(&args, &src, &path),
+                "build" => cmd_build(&args, &src, &path),
                 _ => cmd_fmt(&args, &src, &path),
             }
         }
@@ -169,6 +177,34 @@ fn cmd_run(args: &Args, src: &str, path: &str) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+fn cmd_build(args: &Args, src: &str, path: &str) -> ExitCode {
+    let c = compile(src, &compile_options(args));
+    let Some(prog) = c.program else {
+        print_report(&c.report, src, path, args.flag("--json"));
+        return ExitCode::from(1);
+    };
+    let module = match tez_wasm::compile(&prog) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("tez: code generation failed: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    let out = args
+        .out
+        .clone()
+        .unwrap_or_else(|| format!("{}.wasm", path.trim_end_matches(".tez")));
+    if let Err(e) = std::fs::write(&out, &module.wasm) {
+        eprintln!("tez: cannot write `{out}`: {e}");
+        return ExitCode::from(2);
+    }
+    println!(
+        "built {out} ({} bytes); run it with `node runtime/run.mjs {out}`",
+        module.wasm.len()
+    );
+    ExitCode::SUCCESS
 }
 
 fn cmd_test(args: &Args, src: &str, path: &str) -> ExitCode {

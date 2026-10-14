@@ -62,6 +62,44 @@ pub fn format(src: &str) -> String {
     to_string(&v)
 }
 
+fn base64(bytes: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = (u32::from(chunk[0]) << 16)
+            | (u32::from(*chunk.get(1).unwrap_or(&0)) << 8)
+            | u32::from(*chunk.get(2).unwrap_or(&0));
+        out.push(T[(n >> 18) as usize & 63] as char);
+        out.push(T[(n >> 12) as usize & 63] as char);
+        out.push(if chunk.len() > 1 {
+            T[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            T[n as usize & 63] as char
+        } else {
+            '='
+        });
+    }
+    out
+}
+
+/// Compiles `src` to a WasmGC module. Returns `{ok: true, wasm}` (base64) or
+/// `{ok: false, report | error}`. Run it with `runtime/tez-runtime.mjs`.
+#[wasm_bindgen]
+pub fn build(src: &str) -> String {
+    let c = compile(src, &CompileOptions { verify: false });
+    let Some(prog) = c.program else {
+        return to_string(&json!({ "ok": false, "report": report_json(&c.report) }));
+    };
+    let v = match tez_wasm::compile(&prog) {
+        Ok(m) => json!({ "ok": true, "wasm": base64(&m.wasm) }),
+        Err(e) => json!({ "ok": false, "error": e.to_string() }),
+    };
+    to_string(&v)
+}
+
 /// Runs the zero-argument function `name`. Returns `{ok: true, value}` or `{ok: false, report}`.
 #[wasm_bindgen]
 pub fn run(src: &str, name: &str, contracts: bool) -> String {
@@ -142,6 +180,18 @@ mod tests {
         let t = parse(&test("test a = 1 == 1\ntest b = 1 == 2", false));
         assert_eq!(t["results"][0]["outcome"], "pass");
         assert_eq!(t["results"][1]["outcome"], "fail");
+    }
+
+    #[test]
+    fn build_produces_a_wasm_module() {
+        let r = parse(&build("fn main() -> Int = 6 * 7"));
+        assert_eq!(r["ok"], true);
+        let b64 = r["wasm"].as_str().unwrap_or("");
+        assert!(
+            b64.starts_with("AGFzbQ"),
+            "base64 of the wasm magic number: {b64}"
+        );
+        assert_eq!(parse(&build("fn main() -> Int = \"x\""))["ok"], false);
     }
 
     #[test]

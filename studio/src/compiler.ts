@@ -17,7 +17,7 @@ export type Report = { version: number; status: "ok" | "error"; diagnostics: Dia
 
 export type CheckResult = { report: Report; verified: boolean };
 export type FormatResult = { ok: boolean; text?: string; report?: Report; comment?: Pos };
-export type RunResult = { ok: boolean; value?: string; report?: Report; crash?: string };
+export type RunResult = { ok: boolean; value?: string; report?: Report; crash?: string; ms?: number; bytes?: number };
 export type TestResult = {
   ok: boolean;
   results?: { name: string; outcome: "pass" | "fail" | "error"; message?: string; code?: string }[];

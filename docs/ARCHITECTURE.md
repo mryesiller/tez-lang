@@ -6,7 +6,14 @@
 
 ## 0. Sürüm Geçmişi
 
-**v0.4 (bu sürüm)**
+**v0.5 (uygulama)** — v0.4 tasarımı gerçekleştirildi; sapmalar:
+- Doğrulama: ilk sürümde **Z3 süreci** (SMT-LIB); gömülü `tez_solve` (L1) ve tarayıcıda Z3 WASM ertelendi. Tarayıcıdaki `check` doğrulamayı **çalıştırmaz** ve bunu `verified: false` ile açıkça bildirir.
+- Hata kodu sayısı 61; `decreases` artık `Int` ya da veri değeri (yapısal ölçü); özyinelemeli tanımlar yalnızca sonlanma kanıtlandıktan sonra çözücüye verilir.
+- Kod üretimi: **tek tip `anyref` gösterimi** (spec için bkz. `crates/tez_wasm`), kütüphane JS çalışma zamanında (`runtime/`). Yorumlayıcı referans/oracle olarak kalır; her program için derlenmiş WASM ≡ yorumlayıcı diferansiyel testle doğrulanır.
+- Sözdizimi: boru (`|>`) yok, tek yol metot sözdizimi (`xs.map(f)`); `List.map(xs, f)` hata ve otomatik düzeltme üretir.
+- Soundness: aksiyom tutarlılık denetimi, ilgi alanı kesme, rastgele program fuzz'ı (kabul edilen program çalışırken ihlal üretmez).
+
+**v0.4**
 - **Referans model: Gemma 4 E4B** (Apache-2.0). Tokenizer, kart ve ölçümler buna göre ayarlanır (§9.0).
 - Tek-token kuralı: **birincil tokenizer'da (Gemma 4) zorunlu**, ikincil tokenizer'larda yalnızca raporlanır.
 - Mod C için yol netleşti: `onnx-community/gemma-4-E4B-it-ONNX` + Transformers.js (`q4f16`, WebGPU).

@@ -1,10 +1,41 @@
 /// <reference lib="webworker" />
 // The Tez compiler (Rust, built to WebAssembly) running off the main thread.
 import init, * as tez from "./tez-wasm/tez_web.js";
+import { load, TezError } from "../../runtime/tez-runtime.mjs";
 
-type Request = { id: number; op: "check" | "format" | "run" | "test"; src: string; name?: string; contracts?: boolean };
+type Request = { id: number; op: "check" | "format" | "run" | "interpret" | "test"; src: string; name?: string; contracts?: boolean };
 
 const ready = init();
+
+function fromBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** Compiles to WebAssembly (GC) and runs the function there; the result mimics `tez.run`. */
+async function runCompiled(src: string, name: string): Promise<string> {
+  const built = JSON.parse(tez.build(src)) as { ok: boolean; wasm?: string; report?: unknown; error?: string };
+  if (!built.ok || !built.wasm) return JSON.stringify({ ok: false, report: built.report, crash: built.error });
+  const t0 = performance.now();
+  try {
+    const rt = await load(fromBase64(built.wasm));
+    const value = rt.run(name);
+    return JSON.stringify({ ok: true, value, ms: Math.round((performance.now() - t0) * 10) / 10, bytes: built.wasm.length * 0.75 });
+  } catch (e) {
+    const code = e instanceof TezError ? e.code : "E_INTERNAL";
+    const message = e instanceof Error ? e.message : String(e);
+    return JSON.stringify({
+      ok: false,
+      report: {
+        version: 1,
+        status: "error",
+        diagnostics: [{ code, phase: "runtime", message, span: { start: { line: 1, col: 1 }, end: { line: 1, col: 1 } } }],
+      },
+    });
+  }
+}
 
 self.onmessage = async (ev: MessageEvent<Request>) => {
   const { id, op, src, name, contracts } = ev.data;
@@ -19,6 +50,9 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
         json = tez.format(src);
         break;
       case "run":
+        json = contracts ? tez.run(src, name ?? "main", true) : await runCompiled(src, name ?? "main");
+        break;
+      case "interpret":
         json = tez.run(src, name ?? "main", contracts ?? false);
         break;
       default:

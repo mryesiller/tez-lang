@@ -10,7 +10,7 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 | A | Altyapı ve ajan ortamı | 1 gün | 🟦 |
 | 0 | Dil tasarımı + ölçüm | 2 hafta | 🟦 (dil ✅, ölçüm bekliyor) |
 | 1 | Çekirdek derleyici | 3 hafta | ✅ |
-| 2 | WasmGC + tarayıcı | 3 hafta | ⬜ |
+| 2 | WasmGC + tarayıcı | 3 hafta | 🟦 (derleyici ✅, TEA bekliyor) |
 | 3 | LLM döngüsü + veri hattı v1 | 2 hafta | ⬜ |
 | 4 | Doğrulama (refinement + SMT) | 4 hafta | 🟦 (çekirdek ✅) |
 | 5 | Tez-Coder v0 (ince ayar) | 3 hafta | ⬜ |
@@ -62,19 +62,22 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [ ] Fuzz: parser çökmez, `fmt(fmt(x)) == fmt(x)` (cargo-fuzz)
 - [ ] Diferansiyel test altyapısı (WASM çıktısı ≡ yorumlayıcı) → Faz 2
 
-## Faz 2 — WasmGC + tarayıcı (3 hafta)
+## Faz 2 — WasmGC + tarayıcı 🟦 (çekirdeği ✅)
 
-- [ ] `tez_ir`: Core IR (ANF)
-- [ ] `tez_wasm`: WasmGC codegen (`wasm-encoder`), `Int` hızlı yol + bigint terfisi
-- [ ] Diferansiyel test: `tez_wasm` çıktısı ≡ `tez_interp` çıktısı (tüm örnekler + fuzz)
-- [ ] `tez_web`: wasm-bindgen API, derleyici `.wasm` < 1,5 MB (gzip)
-- [ ] `runtime/`: TEA döngüsü, Virtual DOM diff, Worker host, fuel, bellek tavanı
+- [x] `tez_wasm`: WasmGC kod üretimi (`wasm-encoder`) — tek tip `anyref` gösterimi (küçük Int `i31ref`, büyük Int JS `BigInt`, ADT/demet GC yapıları, kapanışlar `call_ref`)
+- [x] `runtime/tez-runtime.mjs`: yerleşik kütüphane + büyük sayı + yapısal eşitlik + değer yazdırıcı (Node ve tarayıcı)
+- [x] Diferansiyel test: derlenmiş WASM ≡ yorumlayıcı (7 grup, 120+ parça, 14 örnek, çalışma anı hataları; `wasm-tools validate` ile)
+- [x] `tez build`; `tez_web` (`check/format/run/test/build`), tarayıcı derleyicisi **257 KB gzip**
+- [x] Studio: Worker'da derleyici, canlı Monaco tanıları, tek tık düzeltme, biçimlendir/çalıştır (derlenmiş WASM)/test, örnek seçici
+- [x] Hız: `fib(30)` ≈ 0,03 s (WASM) vs 0,65 s (yerel yorumlayıcı); 10 000+ derinlikli özyineleme
+- [ ] `runtime/`: TEA döngüsü (`Html` türü, Virtual DOM diff, olaylar) — **sıradaki büyük iş**
 - [ ] Hot-swap: durum serileştirme + yapısal göç
-- [ ] Studio: tanılar + canlı önizleme
-- [ ] Studio paketini küçült: Monaco şu an tüm dil tanımlarıyla 4,2 MB (1,1 MB gzip); çekirdek-only paket veya CodeMirror 6 değerlendir (§7 bütçesi)
+- [ ] Worker + fuel (sonsuz döngü koruması; doğrulanmamış programlar için) ve bellek tavanı
+- [ ] Studio paketini küçült (Monaco tüm dil tanımlarıyla 4,2 MB) ve tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)
 - [ ] Artımlı derleme: fonksiyon başına önbellek
+- [ ] Kod üretimi: yerel Float/Int fast path, nullary ADT singleton, kuyruk çağrıları (`return_call`)
 
-**Çıkış kriteri:** Sayaç uygulaması tarayıcıda canlı; ARCHITECTURE §7 bütçeleri (L1 hariç) tutuyor.
+**Çıkış kriteri:** TEA uygulaması (sayaç) tarayıcıda canlı; ARCHITECTURE §7 bütçeleri.
 
 ## Faz 3 — LLM döngüsü + veri hattı v1 (2 hafta)
 

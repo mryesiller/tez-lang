@@ -10,7 +10,8 @@ const isolation = {
 
 export default defineConfig({
   plugins: [react()],
-  server: { headers: isolation },
+  // the runtime shared with the CLI/tests lives one level up
+  server: { headers: isolation, fs: { allow: [".."] } },
   preview: { headers: isolation },
   worker: { format: "es" },
 });

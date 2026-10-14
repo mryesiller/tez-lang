@@ -20,6 +20,9 @@ jobs:
       - name: Install pinned toolchain (rust-toolchain.toml)
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # WasmGC needs V8 >= 11.9
       - name: Install the SMT solver
         run: sudo apt-get update && sudo apt-get install -y z3
       - run: cargo fmt --all -- --check

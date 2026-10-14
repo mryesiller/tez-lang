@@ -80,7 +80,11 @@ export default function App() {
   const run = async () => {
     setBusy(true);
     const r = await compiler.run(source, "main", false);
-    setOutput(r.ok ? { kind: "ok", text: r.value ?? "" } : { kind: "error", text: showReport(r) });
+    setOutput(
+      r.ok
+        ? { kind: "ok", text: `${r.value ?? ""}\n\n(compiled to WebAssembly: ${Math.round(r.bytes ?? 0)} bytes, ran in ${r.ms ?? "?"} ms)` }
+        : { kind: "error", text: showReport(r) },
+    );
     setBusy(false);
   };
 
