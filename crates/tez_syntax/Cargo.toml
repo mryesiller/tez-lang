@@ -1,6 +1,6 @@
 [package]
 name = "tez_syntax"
-description = "Lexer, parser and AST for Tez (Phase 1); currently source/position utilities"
+description = "Lexer, parser and AST for Tez"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,0 +1,80 @@
+(* Tez grammar v0.1 — normative.
+   Notation: "x" terminal, A | B choice, { A } zero or more, [ A ] optional, ( A ) group.
+   LOWER = identifier starting with a lowercase letter or '_' (not '_' alone)
+   UPPER = identifier starting with an uppercase letter
+   NL    = one or more newlines (statement separator).
+   Newlines are ignored inside ( ) and [ ]; inside { } blocks and at top level they separate items.
+   A line may continue on the next line if that line starts with '.', '&&' or '||',
+   or if the previous line ends with a binary operator or an opening bracket. *)
+
+file        = { item } ;
+item        = typeDecl | fnDecl | constDecl | testDecl ;
+
+(* ---------- declarations ---------- *)
+typeDecl    = "type" UPPER [ tparams ] "=" typeBody ;
+tparams     = "[" UPPER { "," UPPER } "]" ;
+typeBody    = recordBody | variants | type ;                 (* alias if neither record nor variants *)
+recordBody  = "{" field { "," field } [ "," ] "}" ;
+field       = LOWER ":" type ;
+variants    = [ "|" ] variant { "|" variant } ;              (* >= 2 variants, or 1 with payload/leading "|" *)
+variant     = UPPER [ "(" type { "," type } ")" ] ;
+
+fnDecl      = "fn" LOWER [ tparams ] "(" [ param { "," param } ] ")" "->" type
+              { clause } "=" expr ;
+param       = LOWER ":" type ;
+clause      = "requires" expr | "ensures" expr | "decreases" expr ;
+
+constDecl   = "const" LOWER ":" type "=" expr ;
+testDecl    = "test" LOWER "=" expr ;                        (* expr : Bool *)
+
+(* ---------- types ---------- *)
+type        = atype [ "where" expr ] ;                       (* refinement; `it` names the value *)
+atype       = UPPER [ "[" type { "," type } "]" ]
+            | "(" ")"                                        (* Unit *)
+            | "(" type { "," type } ")" [ "->" type ] ;      (* tuple, or function type when followed by -> ;
+                                                                a single parenthesised type without -> is that type *)
+
+(* ---------- expressions (lowest to highest precedence) ---------- *)
+expr        = orExpr ;
+orExpr      = andExpr { "||" andExpr } ;
+andExpr     = cmpExpr { "&&" cmpExpr } ;                     (* mixing && and || without parentheses is an error *)
+cmpExpr     = catExpr [ ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) catExpr ] ;   (* non-associative *)
+catExpr     = addExpr { "++" addExpr } ;                     (* Str concatenation *)
+addExpr     = mulExpr { ( "+" | "-" ) mulExpr } ;
+mulExpr     = unary { ( "*" | "/" | "%" ) unary } ;
+unary       = ( "-" | "!" ) unary | postfix ;
+postfix     = primary { "." LOWER "(" [ args ] ")"           (* method call *)
+                      | "." LOWER                             (* field *)
+                      | "." INT                               (* tuple field *)
+                      | "(" [ args ] ")"                      (* call *)
+                      | "[" expr "]"                          (* index, same line *)
+                      | "with" "{" fieldInit { "," fieldInit } [ "," ] "}" } ;   (* record update *)
+args        = expr { "," expr } [ "," ] ;
+primary     = INT | FLOAT | STRING | "true" | "false" | "(" ")"
+            | LOWER                                          (* variable / function *)
+            | UPPER "." LOWER                                (* static builtin: List.range *)
+            | UPPER                                          (* constructor *)
+            | UPPER "{" fieldInit { "," fieldInit } [ "," ] "}"   (* record literal *)
+            | "(" expr ")" | "(" expr "," expr { "," expr } ")"   (* paren, tuple *)
+            | "[" [ expr { "," expr } [ "," ] ] "]"          (* list *)
+            | lambda | ifExpr | matchExpr | block ;
+fieldInit   = LOWER ":" expr ;
+lambda      = LOWER "=>" expr
+            | "(" [ lparam { "," lparam } ] ")" "=>" expr ;
+lparam      = LOWER [ ":" type ] ;
+ifExpr      = "if" expr block "else" ( ifExpr | block ) ;     (* condition: no record literals *)
+matchExpr   = "match" expr "{" NL { arm NL } "}" ;           (* scrutinee: no record literals *)
+arm         = pattern [ "if" expr ] "=>" expr ;
+block       = "{" NL { stmt NL } expr NL "}" ;               (* value of the last expression *)
+stmt        = "let" pattern [ ":" type ] "=" expr | "assert" expr ;
+
+(* ---------- patterns ---------- *)
+pattern     = "_" | LOWER | INT | "-" INT | FLOAT | STRING | "true" | "false"
+            | UPPER [ "(" pattern { "," pattern } ")" ]
+            | "(" pattern "," pattern { "," pattern } ")"
+            | "[" [ pattern { "," pattern } [ "," ".." [ LOWER ] ] | ".." [ LOWER ] ] "]" ;
+
+(* ---------- lexical ---------- *)
+(* comment: "//" to end of line.  INT: digits with optional "_".  FLOAT: digits "." digits.
+   STRING: '"' chars '"' with escapes \n \t \r \\ \" \0 \u{hex}. Keywords:
+   fn type const test let match if else where with requires ensures decreases assert extern true false *)

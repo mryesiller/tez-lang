@@ -9,6 +9,38 @@ pub struct ByteSpan {
     pub end: usize,
 }
 
+impl ByteSpan {
+    /// A range `[start, end)`.
+    #[must_use]
+    pub const fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    /// The smallest range covering both.
+    #[must_use]
+    pub fn join(self, other: Self) -> Self {
+        Self {
+            start: self.start.min(other.start),
+            end: self.end.max(other.end),
+        }
+    }
+
+    /// An empty range at the end of this one (an insertion point).
+    #[must_use]
+    pub const fn end_point(self) -> Self {
+        Self {
+            start: self.end,
+            end: self.end,
+        }
+    }
+
+    /// The text this range covers.
+    #[must_use]
+    pub fn text(self, src: &str) -> &str {
+        src.get(self.start..self.end).unwrap_or("")
+    }
+}
+
 /// Maps byte offsets to line/column positions for one source text.
 #[derive(Debug, Clone)]
 pub struct LineIndex<'a> {

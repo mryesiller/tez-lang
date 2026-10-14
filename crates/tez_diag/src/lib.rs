@@ -46,31 +46,96 @@ pub enum Phase {
     Runtime,
 }
 
-/// Stable diagnostic codes. Names are part of the public contract.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum Code {
-    /// A token that cannot appear at this point.
-    #[serde(rename = "E_PARSE_UNEXPECTED_TOKEN")]
-    ParseUnexpectedToken,
-    /// Expected and found types differ.
-    #[serde(rename = "E_TYPE_MISMATCH")]
-    TypeMismatch,
-    /// A `match` does not cover every case.
-    #[serde(rename = "E_MATCH_NON_EXHAUSTIVE")]
-    MatchNonExhaustive,
-    /// A refinement, `requires` or `ensures` can be violated.
-    #[serde(rename = "E_REFINEMENT")]
-    Refinement,
-    /// The solver could neither prove nor refute an obligation. Rejected (soundness).
-    #[serde(rename = "E_UNPROVEN")]
-    Unproven,
-    /// A `decreases` measure is not proven to shrink.
-    #[serde(rename = "E_TERMINATION")]
-    Termination,
-    /// A run-time resource limit (memory, fuel) was hit.
-    #[serde(rename = "E_RESOURCE")]
-    Resource,
+macro_rules! codes {
+    ($($variant:ident => $name:literal, $phase:ident;)*) => {
+        /// Stable diagnostic codes. Names are part of the public contract and are
+        /// documented in `spec/errors.md`; a test keeps the two in sync.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[non_exhaustive]
+        #[allow(missing_docs)]
+        pub enum Code {
+            $(#[serde(rename = $name)] $variant,)*
+        }
+
+        impl Code {
+            /// Every code, in catalog order.
+            pub const ALL: &'static [Code] = &[$(Code::$variant,)*];
+
+            /// The stable string form, e.g. `E_TYPE_MISMATCH`.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self { $(Code::$variant => $name,)* }
+            }
+
+            /// The phase that normally reports this code.
+            #[must_use]
+            pub const fn phase(self) -> Phase {
+                match self { $(Code::$variant => Phase::$phase,)* }
+            }
+        }
+    };
+}
+
+codes! {
+    LexUnexpectedChar => "E_LEX_UNEXPECTED_CHAR", Parse;
+    LexUnterminatedString => "E_LEX_UNTERMINATED_STRING", Parse;
+    LexBadEscape => "E_LEX_BAD_ESCAPE", Parse;
+    LexBadNumber => "E_LEX_BAD_NUMBER", Parse;
+    ParseUnexpectedToken => "E_PARSE_UNEXPECTED_TOKEN", Parse;
+    ParseUnexpectedEof => "E_PARSE_UNEXPECTED_EOF", Parse;
+    ParseUnclosedDelimiter => "E_PARSE_UNCLOSED_DELIMITER", Parse;
+    ParseExpectedExpr => "E_PARSE_EXPECTED_EXPR", Parse;
+    ParseExpectedType => "E_PARSE_EXPECTED_TYPE", Parse;
+    ParseExpectedPattern => "E_PARSE_EXPECTED_PATTERN", Parse;
+    ParseMixedLogic => "E_PARSE_MIXED_LOGIC", Parse;
+    ParseChainedComparison => "E_PARSE_CHAINED_COMPARISON", Parse;
+    ParseBlockNoTail => "E_PARSE_BLOCK_NO_TAIL", Parse;
+    ParseElseRequired => "E_PARSE_ELSE_REQUIRED", Parse;
+    ParseStraySeparator => "E_PARSE_STRAY_SEPARATOR", Parse;
+    ParseReservedWord => "E_PARSE_RESERVED_WORD", Parse;
+    ParseNameCase => "E_PARSE_NAME_CASE", Parse;
+    ParseDuplicateClause => "E_PARSE_DUPLICATE_CLAUSE", Parse;
+    ParseBadItem => "E_PARSE_BAD_ITEM", Parse;
+    NameUnknown => "E_NAME_UNKNOWN", Resolve;
+    NameUnknownType => "E_NAME_UNKNOWN_TYPE", Resolve;
+    NameUnknownCtor => "E_NAME_UNKNOWN_CTOR", Resolve;
+    NameUnknownMethod => "E_NAME_UNKNOWN_METHOD", Resolve;
+    NameDuplicate => "E_NAME_DUPLICATE", Resolve;
+    NameShadowing => "E_NAME_SHADOWING", Resolve;
+    NamePrelude => "E_NAME_PRELUDE", Resolve;
+    NameUseMethodSyntax => "E_NAME_USE_METHOD_SYNTAX", Resolve;
+    ContractScope => "E_CONTRACT_SCOPE", Resolve;
+    TypeMismatch => "E_TYPE_MISMATCH", Types;
+    TypeArity => "E_TYPE_ARITY", Types;
+    TypeNotFunction => "E_TYPE_NOT_FUNCTION", Types;
+    TypeUnknownField => "E_TYPE_UNKNOWN_FIELD", Types;
+    TypeMissingField => "E_TYPE_MISSING_FIELD", Types;
+    TypeExtraField => "E_TYPE_EXTRA_FIELD", Types;
+    TypeAmbiguous => "E_TYPE_AMBIGUOUS", Types;
+    TypeInfinite => "E_TYPE_INFINITE", Types;
+    TypeNotBool => "E_TYPE_NOT_BOOL", Types;
+    TypeBadOperand => "E_TYPE_BAD_OPERAND", Types;
+    TypeNotEquatable => "E_TYPE_NOT_EQUATABLE", Types;
+    TypeNotOrdered => "E_TYPE_NOT_ORDERED", Types;
+    TypeTupleIndex => "E_TYPE_TUPLE_INDEX", Types;
+    TypeRefinementPosition => "E_TYPE_REFINEMENT_POSITION", Types;
+    TypeRecursiveAlias => "E_TYPE_RECURSIVE_ALIAS", Types;
+    MatchNonExhaustive => "E_MATCH_NON_EXHAUSTIVE", Types;
+    MatchUnreachable => "E_MATCH_UNREACHABLE", Types;
+    MatchBindingMismatch => "E_MATCH_BINDING_MISMATCH", Types;
+    DivZero => "E_DIV_ZERO", Verify;
+    FloatDomain => "E_FLOAT_DOMAIN", Verify;
+    IndexBounds => "E_INDEX_BOUNDS", Verify;
+    Precondition => "E_PRECONDITION", Verify;
+    Postcondition => "E_POSTCONDITION", Verify;
+    Refinement => "E_REFINEMENT", Verify;
+    Assert => "E_ASSERT", Verify;
+    TerminationMissing => "E_TERMINATION_MISSING", Verify;
+    Termination => "E_TERMINATION", Verify;
+    Unproven => "E_UNPROVEN", Verify;
+    Resource => "E_RESOURCE", Runtime;
+    TestFailed => "E_TEST_FAILED", Runtime;
+    Internal => "E_INTERNAL", Runtime;
 }
 
 /// A single text edit: replace `span` with `replace` (an empty span is an insertion).
@@ -111,6 +176,49 @@ pub struct Diagnostic {
     /// Suggested fixes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fixes: Vec<Fix>,
+}
+
+impl Diagnostic {
+    /// A diagnostic whose phase is the code's usual phase.
+    #[must_use]
+    pub fn new(code: Code, message: impl Into<String>, span: Span) -> Self {
+        Self {
+            code,
+            phase: code.phase(),
+            message: message.into(),
+            span,
+            expected: None,
+            counterexample: None,
+            fixes: Vec::new(),
+        }
+    }
+
+    /// Sets the `expected` field.
+    #[must_use]
+    pub fn expected(mut self, expected: impl Into<String>) -> Self {
+        self.expected = Some(expected.into());
+        self
+    }
+
+    /// Adds a one-edit fix that replaces `span` with `replace`.
+    #[must_use]
+    pub fn fix(mut self, title: impl Into<String>, span: Span, replace: impl Into<String>) -> Self {
+        self.fixes.push(Fix {
+            title: title.into(),
+            edits: vec![Edit {
+                span,
+                replace: replace.into(),
+            }],
+        });
+        self
+    }
+
+    /// Moves the diagnostic to another phase (e.g. verification codes found at run time).
+    #[must_use]
+    pub fn in_phase(mut self, phase: Phase) -> Self {
+        self.phase = phase;
+        self
+    }
 }
 
 /// Overall outcome of a compiler run.
@@ -211,6 +319,39 @@ mod tests {
     fn status_follows_diagnostics() {
         assert_eq!(Report::new(vec![]).status, Status::Ok);
         assert_eq!(Report::new(vec![sample()]).status, Status::Error);
+    }
+
+    #[test]
+    fn codes_are_unique_and_prefixed() {
+        let mut seen = std::collections::BTreeSet::new();
+        for code in Code::ALL {
+            assert!(code.as_str().starts_with("E_"), "{}", code.as_str());
+            assert!(seen.insert(code.as_str()), "duplicate {}", code.as_str());
+        }
+    }
+
+    #[test]
+    fn every_code_is_documented_in_the_catalog() {
+        let catalog = include_str!("../../../spec/errors.md");
+        for code in Code::ALL {
+            assert!(
+                catalog.contains(&format!("`{}`", code.as_str())),
+                "{} missing from spec/errors.md",
+                code.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn every_catalog_code_exists() {
+        let catalog = include_str!("../../../spec/errors.md");
+        for line in catalog.lines().filter(|l| l.starts_with("| `E_")) {
+            let name = line.trim_start_matches("| `").split('`').next().unwrap();
+            assert!(
+                Code::ALL.iter().any(|c| c.as_str() == name),
+                "{name} in catalog but not in Code"
+            );
+        }
     }
 
     #[test]
