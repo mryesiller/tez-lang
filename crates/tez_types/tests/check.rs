@@ -1,4 +1,5 @@
 //! Type checker tests: every accepted shape and every error code it can produce.
+#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
 
 use tez_diag::Code;
 use tez_syntax::{ParseOptions, parse};

@@ -16,6 +16,7 @@ serde_json = "1"
 tez_diag = { path = "crates/tez_diag" }
 tez_syntax = { path = "crates/tez_syntax" }
 tez_types = { path = "crates/tez_types" }
+tez_interp = { path = "crates/tez_interp" }
 num-bigint = "0.4"
 num-traits = "0.2"
 

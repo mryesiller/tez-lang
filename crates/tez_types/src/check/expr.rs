@@ -645,6 +645,11 @@ impl<'a> Checker<'a> {
                 )
             }
             A::Path { module, name } => {
+                if !Self::is_module(&module.name) && self.ctors.contains_key(&module.name) {
+                    // `None.unwrapOr(1)`: a method call on a constructor value
+                    let r = self.ctor_value(module, module.span);
+                    return self.method_call_on(r, name, args, span);
+                }
                 let Some(&f) = self.methods.get(&(module.name.clone(), name.name.clone())) else {
                     return self.unknown_path(module, name, callee.span);
                 };
@@ -730,6 +735,17 @@ impl<'a> Checker<'a> {
         span: ByteSpan,
     ) -> Expr {
         let r = self.expr(recv, None);
+        self.method_call_on(r, name, args, span)
+    }
+
+    fn method_call_on(
+        &mut self,
+        r: Expr,
+        name: &Ident,
+        args: &'a [ast::Expr],
+        span: ByteSpan,
+    ) -> Expr {
+        let recv_span = r.span;
         let rt = self.shallow(&r.ty);
         let Some(module) = self.module_of(&rt) else {
             match rt {
@@ -745,7 +761,7 @@ impl<'a> Checker<'a> {
                             "the type of the receiver of `.{}` is not known here",
                             name.name
                         ),
-                        recv.span,
+                        recv_span,
                     )
                     .expected("a type annotation, e.g. `let xs: List[Int] = ..`"),
                 ),

@@ -133,6 +133,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tez_interp"
+version = "0.0.1"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "tez_diag",
+ "tez_syntax",
+ "tez_types",
+]
+
+[[package]]
 name = "tez_syntax"
 version = "0.0.1"
 dependencies = [
