@@ -6,7 +6,12 @@
 
 ## 0. Sürüm Geçmişi
 
-**v0.3 (bu sürüm)**
+**v0.4 (bu sürüm)**
+- **Referans model: Gemma 4 E4B** (Apache-2.0). Tokenizer, kart ve ölçümler buna göre ayarlanır (§9.0).
+- Tek-token kuralı: **birincil tokenizer'da (Gemma 4) zorunlu**, ikincil tokenizer'larda yalnızca raporlanır.
+- Mod C için yol netleşti: `onnx-community/gemma-4-E4B-it-ONNX` + Transformers.js (`q4f16`, WebGPU).
+
+**v0.3**
 - Ad: AILang/Axiom → **Tez** (`.tez`, CLI `tez`). Sunholo'nun AILang projesiyle ad çakışması.
 - Hedef model boyutu: **3–4B**. Dil kartı bütçesi 2.000 → **1.200 token**.
 - Yeni §9: **Eğitim seti ve model stratejisi** (derleyici-doğrulamalı sentetik veri, ince ayar).
@@ -38,7 +43,7 @@ Tasarım çatışmalarında bu sıra hakemdir:
 3. **Yerel akıl yürütme.** Üst düzey fonksiyonlarda tür imzası zorunlu; gölgeleme, aşırı yükleme, örtük dönüşüm yok. Bir satırı anlamak uzak bağlam gerektirmez — küçük modellerin kısa dikkat menzili için kritik.
 4. **Yanlış yazımı imkânsız kılan sözdizimi.** `null`, istisna, değişken atama, `for/while`, sınıf, kalıtım, makro, varsayılan parametre yok. `&&` ile `||` parantezsiz karıştırılamaz.
 5. **LL(1), bağlamdan bağımsız gramer.** GBNF olarak yayımlanır → kısıtlı üretimle sözdizimi hatası sıfır.
-6. **Tek-token anahtar kelimeler.** Her anahtar kelime ve operatör, hedef tokenizer'ların (§9.4) tamamında tek token olmalı; olmayan aday reddedilir.
+6. **Tek-token anahtar kelimeler.** Her anahtar kelime ve operatör, **birincil tokenizer'da (Gemma 4, §9.4)** tek token olmalı; olmayan aday reddedilir. İkincil tokenizer'larda sonuç raporlanır ama engelleyici değildir.
 7. **Küçük yüzey alanı.** Dil kartı ≤ 1.200 token. Eklenen her özellik bu bütçeden pay alır; bütçeyi aşan özellik kabul edilmez.
 
 ## 3. Sözdizimi Taslağı (v0)
@@ -221,13 +226,34 @@ fn view(m: Model) -> Html[Msg] =
 
 ## 9. LLM Stratejisi: Eğitim Seti, Model, Ölçüm
 
+### 9.0 Referans model: Gemma 4 E4B
+
+| Özellik | Değer (kaynak: model kartı) |
+|---|---|
+| Lisans | Apache-2.0 → ince ayarlı ağırlıkları ve veri setini açık yayınlayabiliriz |
+| Boyut | 4,5B etkin parametre, gömülemelerle 8B toplam (Per-Layer Embeddings) |
+| Sözlük / bağlam | 262K token / 128K |
+| Mimari | 42 katman, 512 token kayan pencere + global dikkat karışımı; görüntü ve ses kodlayıcıları var |
+| Kod başarımı (talimatlı) | LiveCodeBench v6: %52,0 · Codeforces ELO: 940 |
+| Önerilen örnekleme | sıcaklık 1,0 · top_p 0,95 · top_k 64 |
+| Düşünme modu | `enable_thinking` ile açılır/kapanır |
+| Tarayıcı | `onnx-community/gemma-4-E4B-it-ONNX`, Transformers.js, `q4f16`, WebGPU |
+
+Sonuçları ve tasarım etkileri:
+- **262K sözlük**, yaygın kelimelerin tek token olma ihtimalini artırır; yine de her anahtar kelime ölçülür (§2, ilke 6).
+- **Kart bütçesi** (1.200 token) bağlam sınırından değil, küçük modelde dikkat kalitesinden ve tarayıcıda ilk dolum (prefill) gecikmesinden gelir; 128K bağlam bunu değiştirmez.
+- **Benchmark protokolü:** her ölçüm hem *greedy* hem önerilen örneklemeyle, düşünme modu kapalı **ve** açık raporlanır. Mod C varsayılanı gecikme için düşünme kapalıdır.
+- **İnce ayar riski (Faz 5):** model çok kipli sarmalayıcıyla geliyor (`Gemma4ForConditionalGeneration`) ve PLE tabloları var; LoRA yalnızca metin çözücüsüne uygulanacak. Araç desteği (ör. Unsloth sürümleri) mevcut görünüyor ama **Faz 0'da küçük bir deneme ince ayarıyla doğrulanmalı**.
+- **Mod C riski:** 8B toplam ağırlık tarayıcıda indirme boyutunu belirler; `q4f16` dosya boyutları Faz 0'da ölçülmeli. Çok büyükse Mod C "isteğe bağlı indirme" olarak sunulur.
+- Diğer 3–4B modeller **desteklenir ama hedeflenmez**: kart ve sözdizimi Gemma 4'e göre ayarlanır, diğerleri regresyon göstergesidir.
+
 ### 9.1 Kullanım modları
 
 | Mod | Model | Mekanizma |
 |---|---|---|
-| **A — Sıfır ince ayar** | Herhangi bir 3–4B+ model | `card.md` + birkaç örnek + GBNF kısıtlı üretim + hata döngüsü |
-| **B — İnce ayarlı** | Tez-Coder (3–4B, açık ağırlık) | LoRA/tam ince ayar; kart gerekmez |
-| **C — Tamamen tarayıcıda** | Tez-Coder, kuantize (q4) | WebGPU (WebLLM vb.) + GBNF; sunucu yok, ağ yok |
+| **A — Sıfır ince ayar** | Gemma 4 E4B (referans); diğer 3–4B+ modeller | `card.md` + birkaç örnek + GBNF kısıtlı üretim + hata döngüsü |
+| **B — İnce ayarlı** | Tez-Coder = Gemma 4 E4B ince ayarı (açık ağırlık, Apache-2.0) | LoRA/tam ince ayar; kart gerekmez |
+| **C — Tamamen tarayıcıda** | Tez-Coder, `q4f16` ONNX | WebGPU (Transformers.js) + GBNF; sunucu yok, ağ yok |
 
 Mod C, "tamamen tarayıcıda geliştirme" hedefinin uç noktasıdır: editör, derleyici, doğrulayıcı, runtime **ve model** kullanıcının cihazında.
 
@@ -248,7 +274,7 @@ Derleyici bir **mükemmel doğrulayıcı** olduğundan, veriyi büyük ölçüde
 
 - 100+ görev: saf fonksiyonlar, veri dönüşümleri, TEA uygulamaları; her biri testli ve sözleşmeli.
 - Karşılaştırma: aynı görevlerin TypeScript sürümleri, aynı modellerle.
-- Model sınıfları: 3–4B (ana hedef), 7–8B, öncü model.
+- Model sınıfları: **Gemma 4 E4B (ana hedef)**, bir ikincil küçük model (regresyon göstergesi), bir öncü model.
 
 | Metrik | Tanım | Hedef (Faz 0'da kalibre) |
 |---|---|---|
@@ -256,11 +282,13 @@ Derleyici bir **mükemmel doğrulayıcı** olduğundan, veriyi büyük ölçüde
 | pass@1 (Mod A, 3–4B) | İlk denemede tüm kontrolleri geçen | TypeScript ile eşit veya üstü |
 | pass@1 (Mod B, 3–4B) | İnce ayarlı | Mod A'nın belirgin üstü |
 | Döngü yakınsaması | ≤ 3 turda geçen | ≥ %90 |
-| Token oranı | Tez / TS token sayısı | ≤ 0,8 (tüm hedef tokenizer'larda) |
+| Token oranı | Tez / TS token sayısı | ≤ 0,8 (Gemma 4 tokenizer'ında; ikincillerde raporlanır) |
 
 ### 9.4 Tokenizer kümesi
 
-Kararlar tek bir tokenizer'a göre değil, yaygın küçük model ailelerinin tokenizer'larının **tamamında** ölçülür (ör. Qwen, Llama, Gemma, Phi ve bir öncü model tokenizer'ı). Kesin liste Faz 0'da sabitlenir.
+**Birincil:** Gemma 4 (`google/gemma-4-E4B`, `tokenizer.json`, 262K sözlük). Tasarım kararları buna göre verilir; tek-token kuralı ve token oranı hedefi burada **bağlayıcıdır**.
+
+**İkincil:** iki farklı aileden birer tokenizer (seçim Faz 0'da). Yalnızca raporlanır; Tez'in tek bir tokenizer'a aşırı uyum sağlamadığını göstermek içindir. İkincilde belirgin kötüleşme varsa karar gözden geçirilir ama otomatik reddedilmez.
 
 ## 10. Yapılandırılmış Hata Şeması
 
@@ -316,7 +344,7 @@ Kararlar tek bir tokenizer'a göre değil, yaygın küçük model ailelerinin to
 
 ## 13. Açık Sorular
 
-1. **Ad kontrolü:** `tez` adı için crates.io, npm, GitHub organizasyonu ve domain uygunluğu doğrulanmalı (ör. `tez-lang`).
-2. **Referans 3–4B model(ler):** Faz 0 ölçümleri ve Faz 5 ince ayarı için hangi aile(ler)? (Lisansı açık ağırlık yayınına izin vermeli.)
+1. ~~Ad kontrolü~~ **Karar: marka Tez, paket/depo `tez-lang`** (yayında, 2026-10-14). Açık: domain.
+2. ~~Referans model~~ **Karar: Gemma 4 E4B** (§9.0). Açık: iki ikincil tokenizer ailesi, Mod C indirme boyutu, LoRA denemesi.
 3. **Veri üretimi için büyük model:** §9.2 adım 2'de hangi model/API kullanılacak? (Çıktı lisans koşulları kontrol edilmeli.)
 4. **Studio dağıtımı:** Statik barındırma (COOP/COEP başlıkları destekli) — hangi platform?

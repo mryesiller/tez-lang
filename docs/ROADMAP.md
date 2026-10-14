@@ -39,17 +39,20 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 
 ## Faz 0 — Dil tasarımı + ölçüm (2 hafta)
 
-- [ ] Referans 3–4B model ailesi(leri) seçimi → [ARCHITECTURE §13](ARCHITECTURE.md)
-- [ ] Hedef tokenizer kümesi (≥ 4 aile) ve `bench/tokens` ölçüm aracı
+- [x] Referans model: **Gemma 4 E4B** (Apache-2.0) → [ARCHITECTURE §9.0](ARCHITECTURE.md)
+- [ ] `bench/tokens/tokenizers.toml`: birincil Gemma 4 + iki ikincil tokenizer (aile seçimi)
+- [ ] `bench/tokens` ölçüm aracı (Gemma 4 `tokenizer.json`, 32 MB indirme — onay gerekir)
+- [ ] `q4f16` ONNX dosya boyutlarını ölç (Mod C indirme maliyeti)
+- [ ] Küçük deneme LoRA: Gemma 4 E4B metin çözücüsü, birkaç yüz örnek, araç zinciri çalışıyor mu (Faz 5 riski)
 - [ ] Tek-token anahtar kelime/operatör testi (aday listesi → eleme)
 - [ ] `spec/grammar.ebnf` (normatif, LL(1))
 - [ ] `spec/grammar.gbnf` (EBNF'den üretilir, elle düzenlenmez)
 - [ ] 30 örnek program (`spec/examples/`), her biri kanonik biçimde
 - [ ] `spec/card.md` ≤ 1.200 token
 - [ ] TezBench iskeleti: 20 görev + TypeScript karşılıkları
-- [ ] İlk ölçüm: 3–4B model, kartla, kısıtsız → sözdizimi geçerliliği ve token oranı
+- [ ] İlk ölçüm: Gemma 4 E4B, kartla, kısıtsız (greedy + önerilen örnekleme; düşünme kapalı/açık) → sözdizimi geçerliliği ve token oranı
 
-**Çıkış kriteri:** Mod A'da bir 3–4B modelde ≥ %80 sözdizimi geçerliliği; token oranı ≤ 0,9.
+**Çıkış kriteri:** Mod A'da **Gemma 4 E4B'de** ≥ %80 sözdizimi geçerliliği; Gemma 4 tokenizer'ında token oranı ≤ 0,9.
 
 ## Faz 1 — Çekirdek derleyici (3 hafta)
 

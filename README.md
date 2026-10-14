@@ -5,7 +5,7 @@
 > Status: pre-alpha — infrastructure and design only. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 - **Few errors by construction** — refinement types and contracts checked by an SMT solver; what cannot be proven is rejected.
-- **Built for small models** — 3–4B parameter LLMs, a ≤ 1,200-token language card, a grammar for constrained decoding, structured JSON diagnostics.
+- **Built for small models** — small LLMs (reference: Gemma 4 E4B), a ≤ 1,200-token language card, a grammar for constrained decoding, structured JSON diagnostics.
 - **Token-lean** — measured against TypeScript on real tokenizers.
 - **WebAssembly (WasmGC)** — compiler, verifier and runtime all run in the browser.
 

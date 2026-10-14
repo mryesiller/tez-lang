@@ -6,10 +6,10 @@ description: Measure how many tokens Tez code, keywords and the language card co
 
 Never estimate. Count with real tokenizers.
 
-1. Read the tokenizer set in `bench/tokens/tokenizers.toml` (fixed in Phase 0; ≥ 4 families incl. small open models). Pin versions.
-2. **Keywords/operators:** every candidate must encode to exactly one token in every tokenizer, with and without a leading space and after a newline. Report failures per tokenizer.
+1. Read the tokenizer set in `bench/tokens/tokenizers.toml` (primary: Gemma 4; plus two secondary families, fixed in Phase 0). Pin versions.
+2. **Keywords/operators:** every candidate must encode to exactly one token in the primary tokenizer (blocking) and is reported for secondaries (non-blocking), with and without a leading space and after a newline. Report failures per tokenizer.
 3. **Programs:** count tokens for each `spec/examples/*.tez` and for its TypeScript twin under `bench/ts/`. Report the ratio Tez/TS per tokenizer; target ≤ 0.8 overall (≤ 0.9 at the end of Phase 0).
-4. **Card:** count `spec/card.md`; hard cap 1,200 tokens in the largest tokenizer.
+4. **Card:** count `spec/card.md`; hard cap 1,200 tokens in the primary (Gemma 4) tokenizer.
 5. Save results as JSON in `bench/results/tokens-<date>.json`; do not overwrite earlier files.
 6. Report a table (rows = tokenizer, columns = keywords failing / mean ratio / card tokens). Never average across tokenizers.
 

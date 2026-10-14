@@ -6,13 +6,13 @@ Read first: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (design) and [`docs/R
 
 ## Priorities (in order)
 1. Minimum errors — the compiler is **sound**: anything it cannot prove is rejected.
-2. LLM comprehension (3–4B models) 3. token economy 4. speed 5. WasmGC 6. fully in-browser.
+2. LLM comprehension (reference model: Gemma 4 E4B) 3. token economy 4. speed 5. WasmGC 6. fully in-browser.
 
 ## Non-negotiables
 - **Never make the compiler accept more programs to get a test or demo passing.** Fix the cause. Unimplemented paths fail loudly; a stub that says "ok" is a bug.
 - No `unwrap`/`expect`/`panic`/`todo!` in non-test code (workspace lints). The compiler must not panic on any input.
 - Language/syntax claims need measurements (`measure-tokens`, `run-tezbench`), not intuition.
-- The language card stays ≤ 1,200 tokens; every keyword is one token in all target tokenizers.
+- The language card stays ≤ 1,200 tokens; every keyword is one token in the Gemma 4 tokenizer (primary).
 - TezBench tasks never enter training data.
 - Diagnostic codes are stable; JSON schema changes bump `SCHEMA_VERSION`.
 
