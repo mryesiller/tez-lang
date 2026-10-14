@@ -1073,7 +1073,7 @@ impl Parser<'_> {
             Tok::Kw(Kw::If) => self.if_expr(),
             Tok::Kw(Kw::Match) => self.match_expr(),
             Tok::Lower(name) => {
-                if matches!(self.peek_n(1), Tok::FatArrow) {
+                if !self.no_struct && matches!(self.peek_n(1), Tok::FatArrow) {
                     let p = self.bump();
                     let param = LambdaParam {
                         name: Ident { name, span: p.span },

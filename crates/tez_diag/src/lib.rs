@@ -105,6 +105,7 @@ codes! {
     NamePrelude => "E_NAME_PRELUDE", Resolve;
     NameUseMethodSyntax => "E_NAME_USE_METHOD_SYNTAX", Resolve;
     ContractScope => "E_CONTRACT_SCOPE", Resolve;
+    ConstInit => "E_CONST_INIT", Resolve;
     TypeMismatch => "E_TYPE_MISMATCH", Types;
     TypeArity => "E_TYPE_ARITY", Types;
     TypeNotFunction => "E_TYPE_NOT_FUNCTION", Types;

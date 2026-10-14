@@ -1,0 +1,229 @@
+// Tez prelude: built-in types and functions, written in Tez with trusted contracts.
+// `extern fn` bodies are implemented by the runtime; their contracts are assumed by the verifier
+// and tested against the interpreter. Methods take `self` as the first parameter.
+
+type Option[T] = None | Some(T)
+type Result[T, E] = Ok(T) | Err(E)
+
+// ------------------------------------------------------------------ Int
+
+fn Int.abs(self: Int) -> Int
+  ensures result >= 0 && (result == self || result == 0 - self)
+  = if self < 0 { 0 - self } else { self }
+
+fn Int.min(self: Int, other: Int) -> Int
+  ensures result <= self && result <= other && (result == self || result == other)
+  = if self < other { self } else { other }
+
+fn Int.max(self: Int, other: Int) -> Int
+  ensures result >= self && result >= other && (result == self || result == other)
+  = if self > other { self } else { other }
+
+fn Int.clamp(self: Int, lo: Int, hi: Int) -> Int
+  requires lo <= hi
+  ensures lo <= result && result <= hi
+  = if self < lo { lo } else if self > hi { hi } else { self }
+
+fn Int.isEven(self: Int) -> Bool = self % 2 == 0
+
+fn Int.isOdd(self: Int) -> Bool = self % 2 != 0
+
+extern fn Int.pow(self: Int, exp: Int where it >= 0) -> Int
+
+extern fn Int.toStr(self: Int) -> Str
+
+extern fn Int.toFloat(self: Int) -> Float
+
+// ------------------------------------------------------------------ Float
+
+fn Float.abs(self: Float) -> Float
+  ensures result >= 0.0
+  = if self < 0.0 { 0.0 - self } else { self }
+
+fn Float.min(self: Float, other: Float) -> Float
+  ensures result <= self && result <= other
+  = if self < other { self } else { other }
+
+fn Float.max(self: Float, other: Float) -> Float
+  ensures result >= self && result >= other
+  = if self > other { self } else { other }
+
+extern fn Float.sqrt(self: Float where it >= 0.0) -> Float
+  ensures result >= 0.0
+
+extern fn Float.floor(self: Float) -> Int
+
+extern fn Float.ceil(self: Float) -> Int
+
+extern fn Float.round(self: Float) -> Int
+
+extern fn Float.toStr(self: Float) -> Str
+
+// ------------------------------------------------------------------ Str
+
+extern fn Str.len(self: Str) -> Int
+  ensures result >= 0
+
+extern fn Str.slice(self: Str, from: Int, to: Int) -> Str
+  requires 0 <= from && from <= to && to <= self.len()
+  ensures result.len() == to - from
+
+extern fn Str.chars(self: Str) -> List[Str]
+  ensures result.len() == self.len()
+
+extern fn Str.toInt(self: Str) -> Option[Int]
+
+extern fn Str.contains(self: Str, part: Str) -> Bool
+
+extern fn Str.startsWith(self: Str, prefix: Str) -> Bool
+
+extern fn Str.endsWith(self: Str, suffix: Str) -> Bool
+
+extern fn Str.trim(self: Str) -> Str
+  ensures result.len() <= self.len()
+
+extern fn Str.upper(self: Str) -> Str
+  ensures result.len() == self.len()
+
+extern fn Str.lower(self: Str) -> Str
+  ensures result.len() == self.len()
+
+extern fn Str.split(self: Str, sep: Str where it.len() > 0) -> List[Str]
+  ensures result.len() >= 1
+
+extern fn Str.repeat(self: Str, n: Int where it >= 0) -> Str
+  ensures result.len() == self.len() * n
+
+fn Str.isEmpty(self: Str) -> Bool = self.len() == 0
+
+// ------------------------------------------------------------------ List
+
+extern fn List.len[A](self: List[A]) -> Int
+  ensures result >= 0
+
+extern fn List.get[A](self: List[A], i: Int) -> A
+  requires 0 <= i && i < self.len()
+
+extern fn List.range(lo: Int, hi: Int) -> List[Int]
+  ensures result.len() == (if hi > lo { hi - lo } else { 0 })
+
+extern fn List.repeat[A](x: A, n: Int where it >= 0) -> List[A]
+  ensures result.len() == n
+
+extern fn List.map[A, B](self: List[A], f: (A) -> B) -> List[B]
+  ensures result.len() == self.len()
+
+extern fn List.filter[A](self: List[A], f: (A) -> Bool) -> List[A]
+  ensures result.len() <= self.len()
+
+extern fn List.fold[A, B](self: List[A], init: B, f: (B, A) -> B) -> B
+
+extern fn List.flatMap[A, B](self: List[A], f: (A) -> List[B]) -> List[B]
+
+extern fn List.append[A](self: List[A], x: A) -> List[A]
+  ensures result.len() == self.len() + 1
+
+extern fn List.concat[A](self: List[A], other: List[A]) -> List[A]
+  ensures result.len() == self.len() + other.len()
+
+extern fn List.reverse[A](self: List[A]) -> List[A]
+  ensures result.len() == self.len()
+
+extern fn List.take[A](self: List[A], n: Int) -> List[A]
+  ensures result.len() == (if n <= 0 { 0 } else if n < self.len() { n } else { self.len() })
+
+extern fn List.drop[A](self: List[A], n: Int) -> List[A]
+  ensures result.len() == (if n <= 0 { self.len() } else if n < self.len() { self.len() - n } else { 0 })
+
+extern fn List.any[A](self: List[A], f: (A) -> Bool) -> Bool
+
+extern fn List.all[A](self: List[A], f: (A) -> Bool) -> Bool
+
+extern fn List.count[A](self: List[A], f: (A) -> Bool) -> Int
+  ensures result >= 0 && result <= self.len()
+
+extern fn List.contains[A](self: List[A], x: A) -> Bool
+
+extern fn List.indexOf[A](self: List[A], x: A) -> Option[Int]
+
+extern fn List.first[A](self: List[A]) -> Option[A]
+
+extern fn List.last[A](self: List[A]) -> Option[A]
+
+extern fn List.zip[A, B](self: List[A], other: List[B]) -> List[(A, B)]
+  ensures result.len() == (if self.len() < other.len() { self.len() } else { other.len() })
+
+extern fn List.enumerate[A](self: List[A]) -> List[(Int, A)]
+  ensures result.len() == self.len()
+
+extern fn List.sortBy[A](self: List[A], key: (A) -> Int) -> List[A]
+  ensures result.len() == self.len()
+
+extern fn List.sort(self: List[Int]) -> List[Int]
+  ensures result.len() == self.len()
+
+extern fn List.sum(self: List[Int]) -> Int
+
+extern fn List.min(self: List[Int]) -> Option[Int]
+
+extern fn List.max(self: List[Int]) -> Option[Int]
+
+extern fn List.join(self: List[Str], sep: Str) -> Str
+
+fn List.isEmpty[A](self: List[A]) -> Bool
+  ensures result == (self.len() == 0)
+  = self.len() == 0
+
+// ------------------------------------------------------------------ Option
+
+fn Option.isSome[T](self: Option[T]) -> Bool = match self {
+  Some(_) => true
+  None => false
+}
+
+fn Option.isNone[T](self: Option[T]) -> Bool = match self {
+  Some(_) => false
+  None => true
+}
+
+fn Option.unwrapOr[T](self: Option[T], default: T) -> T = match self {
+  Some(x) => x
+  None => default
+}
+
+fn Option.map[A, B](self: Option[A], f: (A) -> B) -> Option[B] = match self {
+  Some(x) => Some(f(x))
+  None => None
+}
+
+fn Option.andThen[A, B](self: Option[A], f: (A) -> Option[B]) -> Option[B] = match self {
+  Some(x) => f(x)
+  None => None
+}
+
+// ------------------------------------------------------------------ Result
+
+fn Result.isOk[T, E](self: Result[T, E]) -> Bool = match self {
+  Ok(_) => true
+  Err(_) => false
+}
+
+fn Result.unwrapOr[T, E](self: Result[T, E], default: T) -> T = match self {
+  Ok(x) => x
+  Err(_) => default
+}
+
+fn Result.map[T, U, E](self: Result[T, E], f: (T) -> U) -> Result[U, E] = match self {
+  Ok(x) => Ok(f(x))
+  Err(e) => Err(e)
+}
+
+fn Result.mapErr[T, E, F](self: Result[T, E], f: (E) -> F) -> Result[T, F] = match self {
+  Ok(x) => Ok(x)
+  Err(e) => Err(f(e))
+}
+
+fn Result.toOption[T, E](self: Result[T, E]) -> Option[T] = match self {
+  Ok(x) => Some(x)
+  Err(_) => None
+}

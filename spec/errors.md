@@ -40,6 +40,7 @@ Every diagnostic has a **stable code**. Codes are never renamed or reused. All p
 | `E_NAME_SHADOWING` | A `let`, parameter or pattern binding reuses a name already in scope | pick a new name |
 | `E_NAME_PRELUDE` | Redefining a built-in type, constructor or module | rename |
 | `E_NAME_USE_METHOD_SYNTAX` | `List.map(xs, f)` written instead of `xs.map(f)` | the `fixes` entry rewrites it |
+| `E_CONST_INIT` | A `const` initializer uses a user function or a later constant | use literals, constructors, earlier constants and prelude functions |
 | `E_CONTRACT_SCOPE` | `result` outside `ensures`, or `it` outside a refinement | move it |
 
 ## Types (phase `types`)

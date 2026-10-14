@@ -15,6 +15,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tez_diag = { path = "crates/tez_diag" }
 tez_syntax = { path = "crates/tez_syntax" }
+tez_types = { path = "crates/tez_types" }
+num-bigint = "0.4"
+num-traits = "0.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
