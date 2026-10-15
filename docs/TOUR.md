@@ -160,6 +160,8 @@ fn view(m: Model) -> Html[Msg] =
 
 Time is an input too. An app may define `fn subs(m: Model) -> List[Sub[Msg]]`; `Sub.every(1000, Tick)` makes the runtime send `Tick` every second for as long as the model lists it. So a timer is just another event for the pure `update`, and the compiler proves the interval is at least 50 ms. Example 49 (a traffic light that changes colour by itself, with different durations per light) and 41 (a countdown with Start/Pause) are written this way.
 
+Schedules and browser state are inputs as well: `Sub.clock(1000, t => Clock(t))` delivers the wall clock (seconds since 1970), so "run the job when the minute changes" is plain pure code in `update`, and `Sub.online`/`Sub.visible` deliver connectivity and page visibility. Example 55 is a page that greets by the hour, refreshes a "report" every minute while the page is visible, and notices when you go offline.
+
 Edit an app while it runs in the playground and the running session is kept: the runtime replays your clicks into the new program.
 
 ## 11. More than one file

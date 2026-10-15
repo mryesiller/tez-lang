@@ -251,8 +251,18 @@ fn Html.row[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", 
 
 // ------------------------------------------------------------------ Sub (time as an input, not an effect)
 
-type Sub[M] = UiEvery(Int, M)
+type Sub[M] = UiEvery(Int, M) | UiClock(Int, (Int) -> M) | UiOnline((Bool) -> M) | UiVisible((Bool) -> M)
 
 fn Sub.every[M](ms: Int where it >= 50, msg: M) -> Sub[M] = UiEvery(ms, msg)
+
+// every `ms` the host sends the wall clock (seconds since 1970-01-01 UTC) as the message's argument; schedules (cron
+// style: "at 09:00, once a day") are then ordinary pure code over that number
+fn Sub.clock[M](ms: Int where it >= 1000, toMsg: (Int) -> M) -> Sub[M] = UiClock(ms, toMsg)
+
+// the browser went online (true) or offline (false)
+fn Sub.online[M](toMsg: (Bool) -> M) -> Sub[M] = UiOnline(toMsg)
+
+// the page became visible (true) or hidden (false)
+fn Sub.visible[M](toMsg: (Bool) -> M) -> Sub[M] = UiVisible(toMsg)
 
 fn Html.col[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", "col")], kids)

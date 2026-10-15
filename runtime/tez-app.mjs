@@ -12,11 +12,35 @@ export function isApp(rt) {
   return Boolean(f.init && f.update && f.view && f.init.params === 0 && f.update.params === 2 && f.view.params === 1);
 }
 
-/** The active subscriptions of a model: `[{ms, msg}]` from the optional `subs(model)` function. */
+/** Ints that fit 31 bits are plain numbers in WebAssembly, larger ones BigInts (see tez-runtime.mjs). */
+const wasmInt = (n) => (Math.abs(n) < 2 ** 30 ? n : BigInt(n));
+
+/**
+ * The active subscriptions of a model, from the optional `subs(model)` function:
+ * `{kind: "every", ms, msg}` (a fixed message), `{kind: "clock", ms, fn}` (the wall clock in seconds is the
+ * argument), `{kind: "online" | "visible", fn}` (a Bool argument, sent when the browser's state changes).
+ */
 export function readSubs(rt, model) {
   if (!rt.meta.fns.subs || rt.meta.fns.subs.params !== 1) return [];
   const ex = rt.exports;
-  return ex.f_subs(model).map((s) => ({ ms: Math.max(50, Number(ex.__get0(s))), msg: ex.__get1(s) }));
+  return ex.f_subs(model).map((s) => {
+    switch (ex.__tag(s)) {
+      case 0:
+        return { kind: "every", ms: Math.max(50, Number(ex.__get0(s))), msg: ex.__get1(s) };
+      case 1:
+        return { kind: "clock", ms: Math.max(1000, Number(ex.__get0(s))), fn: ex.__get1(s) };
+      case 2:
+        return { kind: "online", fn: ex.__get0(s) };
+      default:
+        return { kind: "visible", fn: ex.__get0(s) };
+    }
+  });
+}
+
+/** The message a subscription delivers; `value` is the clock (seconds) or the Bool of a state change. */
+export function subMessage(rt, sub, value) {
+  if (sub.kind === "every") return sub.msg;
+  return rt.exports.__apply1(sub.fn, sub.kind === "clock" ? wasmInt(value) : value ? 1 : 0);
 }
 
 /** Reads an `Html[Msg]` value out of WebAssembly into `{text}` / `{tag, props, click, input, kids}` vnodes. */
@@ -201,11 +225,11 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
   };
 
   const stopTimers = () => {
-    for (const t of timers) clearInterval(t.id);
+    for (const t of timers) t?.stop();
     timers = [];
   };
 
-  /** Starts, keeps or stops timers so that they match `subs(model)`; messages are always the latest ones. */
+  /** Starts, keeps or stops the subscriptions so that they match `subs(model)`; messages are always the latest. */
   const syncTimers = () => {
     if (dead) return;
     try {
@@ -214,19 +238,33 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
       fail(e);
       return;
     }
-    while (timers.length > subsNow.length) clearInterval(timers.pop().id);
+    while (timers.length > subsNow.length) timers.pop()?.stop();
+    const win = doc.defaultView;
     subsNow.forEach((sub, i) => {
-      if (timers[i] && timers[i].ms === sub.ms) return;
-      if (timers[i]) clearInterval(timers[i].id);
-      timers[i] = { ms: sub.ms, id: setInterval(() => tick(i), sub.ms) };
+      const key = `${sub.kind}:${sub.ms ?? ""}`;
+      if (timers[i]?.key === key) return;
+      timers[i]?.stop();
+      if (sub.kind === "every" || sub.kind === "clock") {
+        const id = setInterval(() => tick(i, sub.kind === "clock" ? Math.floor(Date.now() / 1000) : 0), sub.ms);
+        timers[i] = { key, stop: () => clearInterval(id) };
+      } else if (win) {
+        const target = sub.kind === "online" ? win : doc;
+        const events = sub.kind === "online" ? ["online", "offline"] : ["visibilitychange"];
+        const on = (ev) =>
+          tick(i, sub.kind === "online" ? (ev.type === "online" ? 1 : 0) : doc.visibilityState === "visible" ? 1 : 0);
+        for (const e of events) target.addEventListener(e, on);
+        timers[i] = { key, stop: () => events.forEach((e) => target.removeEventListener(e, on)) };
+      } else {
+        timers[i] = { key, stop() {} };
+      }
     });
   };
 
-  function tick(i) {
+  function tick(i, value) {
     if (dead || replaying || !subsNow[i]) return;
     try {
-      model = rt.exports.f_update(model, subsNow[i].msg);
-      if (log.length < MAX_LOG) log.push({ kind: "tick", path: [i] });
+      model = rt.exports.f_update(model, subMessage(rt, subsNow[i], value));
+      if (log.length < MAX_LOG) log.push({ kind: "tick", path: [i], value });
     } catch (e) {
       fail(e);
       return;
@@ -295,7 +333,7 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
             const subs = readSubs(rt, model);
             const sub = subs[ev.path[0]];
             if (!sub) break;
-            model = rt.exports.f_update(model, sub.msg);
+            model = rt.exports.f_update(model, subMessage(rt, sub, ev.value));
             cur = readHtml(rt, rt.exports.f_view(model));
             replayed++;
             continue;

@@ -28,3 +28,41 @@ test("ordinary attributes pass", () => {
   assert.equal(safeAttr("style", "color: red; width: 50%"), "color: red; width: 50%");
   assert.equal(safeAttr("data-id", "3"), "3");
 });
+
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { load } from "./tez-runtime.mjs";
+import { readSubs, subMessage } from "./tez-app.mjs";
+
+test("subscriptions: fixed messages, the clock and browser state", async () => {
+  const root = new URL("../", import.meta.url).pathname;
+  const bin = process.env.TEZ_BIN ?? `${root}target/debug/tez`;
+  const src = `type Msg = Tick | At(Int) | Net(Bool) | Seen(Bool)
+fn init() -> Int = 0
+fn update(m: Int, msg: Msg) -> Int = match msg {
+  Tick => m + 1
+  At(t) => t
+  Net(b) => if b { 1 } else { 0 }
+  Seen(b) => if b { 10 } else { 20 }
+}
+fn view(m: Int) -> Html[Msg] = Html.text(m.toStr())
+fn subs(m: Int) -> List[Sub[Msg]] =
+  [Sub.every(100, Tick), Sub.clock(1000, t => At(t)), Sub.online(b => Net(b)), Sub.visible(b => Seen(b))]
+`;
+  const dir = mkdtempSync(join(tmpdir(), "tez-subs-"));
+  writeFileSync(join(dir, "a.tez"), src);
+  const r = spawnSync(bin, ["build", "--no-verify", join(dir, "a.tez"), "-o", join(dir, "a.wasm")], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const rt = await load(readFileSync(join(dir, "a.wasm")));
+  const model = rt.exports.f_init();
+  const subs = readSubs(rt, model);
+  assert.deepEqual(subs.map((s) => s.kind), ["every", "clock", "online", "visible"]);
+  const upd = (sub, v) => rt.exports.f_update(model, subMessage(rt, sub, v));
+  assert.equal(upd(subs[0]), 1);
+  assert.equal(upd(subs[1], 1_700_000_000), 1_700_000_000n); // bigger than 31 bits: a BigInt in WebAssembly
+  assert.equal(upd(subs[1], 42), 42);
+  assert.equal(upd(subs[2], 1), 1);
+  assert.equal(upd(subs[3], 0), 20);
+});

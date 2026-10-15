@@ -171,7 +171,7 @@ Asıl amaç: tarayıcıdaki bir LLM Tez yazar, kod aynı tarayıcıda derlenip �
 
 - [x] Studio'da çok dosyalı proje: dosya sekmeleri (+ dosya / sil), proje tarayıcıda saklanır, tanılar doğru dosyayı gösterir, çalıştır/test/App/hot-swap/Verify (Z3) bütün projede; örnek: Examples → shop (`tez_web` proje API'si: `check_project`, `verify_project_step`, `run_project`, `test_project`, `build_project`)
 - [x] Siteyi dışa aktar: Studio **Publish** ve `tez site main.tez -o index.html` → tek dosya (wasm + runtime + app host gömülü, sıkı CSP, ağ yok); herhangi bir statik barındırmada ya da diskten çalışır. (Henüz yok: paylaşılabilir bağlantı/barındırma)
-- [ ] Tetikleyiciler: zamanlayıcı (`Sub.every` var), takvim/cron ifadesi, sayfa görünürlüğü/çevrimiçi olayları, `Sub.on(...)`
+- [x] Tetikleyiciler: `Sub.every` (aralık), `Sub.clock(ms, f)` (duvar saati → cron benzeri zamanlama saf kod olarak), `Sub.online`, `Sub.visible`; olay günlüğü argümanı da kaydeder (hot-swap tekrar oynatır). Örnek 55. Kart tam 1.200 token (sınırda)
 - [ ] Kalıcılık ve ağ efektleri (yerel depolama, `Http.get`), sözleşmeli ve sandbox'lı
 - [ ] Tarayıcıda LLM → derle → doğrula → çalıştır döngüsü uçtan uca (WebGPU model, tamir döngüsü)
 

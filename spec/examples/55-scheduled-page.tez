@@ -1,0 +1,55 @@
+type Model = { now: Int, runs: Int where it >= 0, log: List[Str], online: Bool, visible: Bool }
+
+type Msg = Clock(Int) | Net(Bool) | Seen(Bool) | Clear
+
+fn init() -> Model = Model { now: 0, runs: 0, log: [], online: true, visible: true }
+
+fn pad(n: Int) -> Str = if n < 10 { "0" ++ n.toStr() } else { n.toStr() }
+
+fn hhmm(t: Int) -> Str = pad(t / 3600 % 24) ++ ":" ++ pad(t / 60 % 60)
+
+fn greeting(t: Int) -> Str = {
+  let h = t / 3600 % 24
+  if h < 12 { "Good morning" } else if h < 18 { "Good afternoon" } else { "Good evening" }
+}
+
+// a scheduled job is just pure code over the clock: "when the minute changes, run it"
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Clock(t) => if m.now / 60 != t / 60 && m.visible {
+    m with { now: t, runs: m.runs + 1, log: [hhmm(t)].concat(m.log.take(4)) }
+  } else { m with { now: t } }
+  Net(up) => m with { online: up }
+  Seen(v) => m with { visible: v }
+  Clear => m with { runs: 0, log: [] }
+}
+
+// time and browser state enter as subscriptions; the program stays pure
+fn subs(m: Model) -> List[Sub[Msg]] =
+  [Sub.clock(1000, t => Clock(t)), Sub.online(up => Net(up)), Sub.visible(v => Seen(v))]
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading(greeting(m.now) ++ ", it is " ++ hhmm(m.now) ++ " UTC"),
+      Html.paragraph(
+        "Report refreshed " ++
+          m.runs.toStr() ++
+          " time(s) since you opened this page" ++
+          if m.online { "" } else { " (offline)" }
+      ),
+      Html.node("ul", [], m.log.map(l => Html.node("li", [], [Html.text("ran at " ++ l)]))),
+      Html.button("Clear", Clear)
+    ]
+  )
+
+test minuteRollsOver = update(update(init(), Clock(60)), Clock(120)).runs == 2
+
+test sameMinuteIsQuiet = update(update(init(), Clock(60)), Clock(90)).runs == 1
+
+test hiddenPagesDoNotRun = update(update(init(), Seen(false)), Clock(60)).runs == 0
+
+test formatsTime = hhmm(3600 * 9 + 60 * 5) == "09:05"
+
+test subscribes = subs(init()).len() == 3
+
+fn main() -> (Str, Int) = (greeting(3600 * 14), update(init(), Clock(60)).runs)
