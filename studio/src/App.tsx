@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Compiler, type Diagnostic, type Files, type Fix } from "./compiler";
 import { load } from "../../runtime/tez-runtime.mjs";
 import card from "../../spec/card.md?raw";
+import runtimeSrc from "../../runtime/tez-runtime.mjs?raw";
+import appSrc from "../../runtime/tez-app.mjs?raw";
+import styleSrc from "./styles.css?raw";
+import { siteHtml } from "../../runtime/export-site.mjs";
 import { solve } from "../../tools/agent/loop.mjs";
 import { inBrowserModel, webGpuAvailable } from "./localModel";
 import { openAICompatible } from "../../tools/agent/providers.mjs";
@@ -277,6 +281,29 @@ export default function App() {
     setBusy(false);
   };
 
+  /** Downloads the program as one self-contained web page (module, runtime and app host inlined). */
+  const publish_ = async () => {
+    setBusy(true);
+    const built = await compiler.build(files);
+    if (!built.ok || !built.wasm) {
+      setOutput({ kind: "error", text: showReport(built) });
+      setBusy(false);
+      return;
+    }
+    const css = styleSrc
+      .split("\n")
+      .filter((l) => l.startsWith(".app"))
+      .join("\n");
+    const html = siteHtml({ title: "Tez site", wasm: built.wasm, runtime: runtimeSrc, app: appSrc, css });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    a.download = "index.html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setOutput({ kind: "ok", text: `Saved index.html (${Math.round(html.length / 1024)} KB): one file with the program, the runtime and the app host. Put it on any static host, or open it from disk.` });
+    setBusy(false);
+  };
+
   const format = async () => {
     const r = await compiler.format(source);
     if (r.ok && r.text !== undefined) setSource(r.text);
@@ -345,6 +372,9 @@ export default function App() {
         </button>
         <button onClick={runApp} disabled={busy || diags.length > 0} title="Run init/update/view as an app">
           App
+        </button>
+        <button onClick={publish_} disabled={busy || diags.length > 0} title="Download the program as one self-contained web page">
+          Publish
         </button>
         <button onClick={verify} disabled={busy || diags.length > 0} title="Prove contracts, indexing, division and termination with Z3 in the browser">
           Verify

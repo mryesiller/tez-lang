@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, basename, relative, sep } from "node:path";
 import { open, TezError } from "../src/api.mjs";
+import { siteHtml } from "../runtime/export-site.mjs";
 
 const USAGE = `tez: a fast, verified language for LLMs and the browser
 
@@ -15,6 +16,8 @@ USAGE:
     tez build <file> [-o out.wasm] [--no-verify]
                                             compile to a WebAssembly (WasmGC) module
     tez fmt <file> [--check | --write]      print / check / rewrite canonical formatting
+    tez site <file> [-o index.html] [--no-verify]
+                                            write one self-contained web page (program + runtime)
     tez grammar                             print the normative grammar (EBNF)
     tez --version
 
@@ -68,7 +71,7 @@ async function main() {
     process.stdout.write(readFileSync(new URL("../grammar.ebnf", import.meta.url), "utf8"));
     return 0;
   }
-  if (!["check", "run", "test", "build", "fmt"].includes(cmd)) {
+  if (!["check", "run", "test", "build", "site", "fmt"].includes(cmd)) {
     console.error(`tez: unknown command \`${cmd}\`\n\n${USAGE}`);
     return 2;
   }
@@ -139,6 +142,15 @@ async function main() {
       }
       console.log(`${r.results.length - failed} passed, ${failed} failed`);
       return failed ? 1 : 0;
+    }
+    case "site": {
+      const b = tez.build(entry, files, dir);
+      if (!b.ok) return b.report ? reject(b) : fail(`code generation failed: ${b.error}`, 1);
+      const here = (f) => readFileSync(new URL(`../runtime/${f}`, import.meta.url), "utf8");
+      const target = out ?? "index.html";
+      writeFileSync(target, siteHtml({ title: basename(file, ".tez"), wasm: b.wasm, runtime: here("tez-runtime.mjs"), app: here("tez-app.mjs") }));
+      console.log(`wrote ${target}: one self-contained page; serve it from any static host`);
+      return 0;
     }
     case "build": {
       const b = tez.build(entry, files, dir);

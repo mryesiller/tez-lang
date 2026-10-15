@@ -16,7 +16,7 @@ renameSync(`${pkg}wasm/opt.wasm`, `${pkg}wasm/tez_web_bg.wasm`);
 rmSync(`${pkg}wasm/.gitignore`, { force: true });
 
 mkdirSync(`${pkg}runtime`, { recursive: true });
-for (const f of ["tez-runtime.mjs", "tez-app.mjs"]) copyFileSync(`${root}runtime/${f}`, `${pkg}runtime/${f}`);
+for (const f of ["tez-runtime.mjs", "tez-app.mjs", "export-site.mjs"]) copyFileSync(`${root}runtime/${f}`, `${pkg}runtime/${f}`);
 copyFileSync(`${root}spec/grammar.ebnf`, `${pkg}grammar.ebnf`);
 for (const f of ["LICENSE-MIT", "LICENSE-APACHE"]) {
   try { copyFileSync(`${root}${f}`, `${pkg}${f}`); } catch { /* licence files are optional locally */ }

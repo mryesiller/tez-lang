@@ -170,7 +170,7 @@ Terminalde Tez ile geliştirme yapmak isteyen biri için eksikler; sırayla:
 Asıl amaç: tarayıcıdaki bir LLM Tez yazar, kod aynı tarayıcıda derlenip çalışır, site zamanlayıcı/tetikleyicilerle (cron benzeri) kendini günceller; tüm yapı web'e ait. Faz 8 bu hedefi destekler, onun yerine geçmez. Sırayla:
 
 - [x] Studio'da çok dosyalı proje: dosya sekmeleri (+ dosya / sil), proje tarayıcıda saklanır, tanılar doğru dosyayı gösterir, çalıştır/test/App/hot-swap/Verify (Z3) bütün projede; örnek: Examples → shop (`tez_web` proje API'si: `check_project`, `verify_project_step`, `run_project`, `test_project`, `build_project`)
-- [ ] Siteyi yayınla: Studio'dan tek dosyalık (HTML + wasm + runtime) çıktı / paylaşılabilir bağlantı
+- [x] Siteyi dışa aktar: Studio **Publish** ve `tez site main.tez -o index.html` → tek dosya (wasm + runtime + app host gömülü, sıkı CSP, ağ yok); herhangi bir statik barındırmada ya da diskten çalışır. (Henüz yok: paylaşılabilir bağlantı/barındırma)
 - [ ] Tetikleyiciler: zamanlayıcı (`Sub.every` var), takvim/cron ifadesi, sayfa görünürlüğü/çevrimiçi olayları, `Sub.on(...)`
 - [ ] Kalıcılık ve ağ efektleri (yerel depolama, `Http.get`), sözleşmeli ve sandbox'lı
 - [ ] Tarayıcıda LLM → derle → doğrula → çalıştır döngüsü uçtan uca (WebGPU model, tamir döngüsü)
