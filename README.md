@@ -2,7 +2,7 @@
 
 **A fast, verified programming language that small LLMs write well and browsers run natively.**
 
-> Status: pre-alpha — the language works end to end (parser, type checker, SMT verifier, interpreter, formatter, WasmGC compiler, in-browser Studio). UI apps with hot-swap run in the browser. Not yet: in-browser verification, LLM tooling. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> Status: pre-alpha — the language works end to end (parser, type checker, SMT verifier, interpreter, formatter, WasmGC compiler, in-browser Studio). UI apps with hot-swap run in the browser, and so do the proofs (Z3 as WebAssembly). The LLM tooling (repair loop, MCP server, data pipeline, TezBench) is built; waiting on a model to measure. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 - **Few errors by construction** — refinement types and contracts checked by an SMT solver; what cannot be proven is rejected.
 - **Built for small models** — small LLMs (reference: Gemma 4 E4B), a ≤ 1,200-token language card, a grammar for constrained decoding, structured JSON diagnostics.

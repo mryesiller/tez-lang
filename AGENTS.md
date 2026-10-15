@@ -26,10 +26,12 @@ Read first: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (design) and [`docs/R
 ```
 crates/   Rust workspace (tez_diag, tez_syntax, tez_cli; more per phase)
 studio/   React + Monaco in-browser IDE (Vite, pnpm)
-runtime/  TypeScript runtime (Phase 2)
+runtime/  JS runtime + TEA app host (tez-runtime.mjs, tez-app.mjs)
+tools/    repair loop + providers (agent/), MCP server (tez-mcp/)
+site/     website: landing page + docs (Vite); docs/TOUR.md is tested
 spec/     grammar.ebnf (normative), grammar.gbnf (generated), card.md, examples/
-bench/    tokenizer measurements and TezBench
-data/     training-data pipeline
+bench/    tokenizer measurements and TezBench (bench/tezbench)
+data/     training-data pipeline (mutation traces, rejection sampling, contamination check)
 docs/     architecture and roadmap
 .agents/  shared agents, skills, commands, MCP config
 ```
