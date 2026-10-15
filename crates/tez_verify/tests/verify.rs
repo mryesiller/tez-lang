@@ -25,6 +25,7 @@ fn run(src: &str) -> Vec<Problem> {
         &VerifyOptions {
             timeout_ms: 6000,
             include_prelude: false,
+            cache_dir: None,
         },
     )
     .unwrap()
@@ -72,6 +73,7 @@ fn prelude_function_bodies_satisfy_their_contracts() {
         &VerifyOptions {
             timeout_ms: 8000,
             include_prelude: true,
+            cache_dir: None,
         },
     )
     .unwrap();
@@ -515,4 +517,44 @@ fn elements_of_lists_are_known_inside_lambdas() {
         "fn g(x: Int) -> Int requires x > 0 = x\nfn f() -> List[Int] = List.range(0, 5).map(g)",
         Code::Precondition,
     );
+}
+
+fn run_cached(src: &str, dir: &std::path::Path) -> Vec<Problem> {
+    let parsed = parse(src, ParseOptions::default());
+    let out = check(&parsed.file, src);
+    assert!(out.problems.is_empty(), "check: {:#?}", out.problems);
+    verify(
+        &out.program,
+        src,
+        &VerifyOptions {
+            timeout_ms: 6000,
+            include_prelude: false,
+            cache_dir: Some(dir.to_path_buf()),
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn proofs_are_cached_and_refutations_never_are() {
+    need_z3!();
+    let dir = std::env::temp_dir().join(format!("tez-vc-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let good = "fn f(xs: List[Int], i: Int) -> Int\n  requires 0 <= i && i < xs.len()\n  = xs.get(i)\n\nfn main() -> Int = f([1, 2, 3], 1)\n";
+    let bad = "fn f(xs: List[Int], i: Int) -> Int = xs.get(i)\n";
+
+    let before = tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed);
+    assert!(run_cached(good, &dir).is_empty());
+    assert_eq!(tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed), before, "first run solves everything");
+    assert!(std::fs::read_dir(&dir).unwrap().count() > 0, "proofs are stored");
+
+    assert!(run_cached(good, &dir).is_empty());
+    assert!(tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed) > before, "second run is answered from the cache");
+
+    // a program that can fail is rejected every time, with the cache warm or cold
+    for _ in 0..2 {
+        let ps = run_cached(bad, &dir);
+        assert!(ps.iter().any(|p| p.code == tez_diag::Code::IndexBounds), "{ps:?}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }

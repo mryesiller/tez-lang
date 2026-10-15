@@ -1,7 +1,26 @@
 //! A Z3 process driven over SMT-LIB 2 (native builds only).
 
 use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use sha2::{Digest, Sha256};
+
+/// How many `check-sat` answers came from the proof cache instead of the solver (diagnostics and tests).
+pub static CACHE_HITS: AtomicUsize = AtomicUsize::new(0);
+
+/// Where proofs are cached: `$TEZ_CACHE_DIR`, else `~/.cache/tez/vc`; `TEZ_NO_CACHE` turns the cache off.
+#[must_use]
+pub fn default_cache_dir() -> Option<PathBuf> {
+    if std::env::var_os("TEZ_NO_CACHE").is_some() {
+        return None;
+    }
+    if let Some(d) = std::env::var_os("TEZ_CACHE_DIR") {
+        return Some(PathBuf::from(d));
+    }
+    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache/tez/vc"))
+}
 
 /// Answer to `(check-sat)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +38,11 @@ pub struct Z3 {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
+    /// Everything sent so far (and the solver's version): a proved script is remembered under its hash.
+    /// Only `unsat` answers are cached, so a stale or foreign entry can never turn a refutation into a proof
+    /// unless the *identical* script with the *same solver* was proved before.
+    script: Sha256,
+    cache: Option<PathBuf>,
 }
 
 impl Z3 {
@@ -26,7 +50,16 @@ impl Z3 {
     ///
     /// # Errors
     /// Returns a message when the `z3` executable cannot be started.
+    #[cfg(test)]
     pub fn spawn(timeout_ms: u32) -> Result<Z3, String> {
+        Self::spawn_cached(timeout_ms, None)
+    }
+
+    /// Starts Z3 remembering proved queries in `cache` (a directory).
+    ///
+    /// # Errors
+    /// Returns a message when the `z3` executable cannot be started.
+    pub fn spawn_cached(timeout_ms: u32, cache: Option<PathBuf>) -> Result<Z3, String> {
         let mut child = Command::new("z3")
             .args(["-in", "-smt2"])
             .stdin(Stdio::piped())
@@ -40,7 +73,15 @@ impl Z3 {
             child,
             stdin,
             stdout,
+            script: Sha256::new(),
+            cache,
         };
+        z.stdin
+            .write_all(b"(get-info :version)\n")
+            .and_then(|()| z.stdin.flush())
+            .map_err(|e| format!("z3 write error: {e}"))?;
+        let version = z.line()?;
+        z.script.update(version.as_bytes());
         z.run(&[
             "(set-option :print-success true)".to_string(),
             format!("(set-option :timeout {timeout_ms})"),
@@ -71,6 +112,7 @@ impl Z3 {
                 text.push_str(c);
                 text.push('\n');
             }
+            self.script.update(text.as_bytes());
             self.stdin
                 .write_all(text.as_bytes())
                 .map_err(|e| format!("z3 write error: {e}"))?;
@@ -99,6 +141,31 @@ impl Z3 {
     /// # Errors
     /// Returns a message when the solver misbehaves.
     pub fn check_sat(&mut self) -> Result<Verdict, String> {
+        let key = self.cache.as_ref().map(|dir| {
+            let digest = self.script.clone().finalize();
+            let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+            dir.join(hex)
+        });
+        if let Some(path) = &key
+            && path.is_file()
+        {
+            CACHE_HITS.fetch_add(1, Ordering::Relaxed);
+            return Ok(Verdict::Proved);
+        }
+        let verdict = self.check_sat_uncached()?;
+        if verdict == Verdict::Proved
+            && let Some(path) = &key
+        {
+            // best effort: a read-only or missing cache directory only costs speed
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(path, b"");
+        }
+        Ok(verdict)
+    }
+
+    fn check_sat_uncached(&mut self) -> Result<Verdict, String> {
         self.stdin
             .write_all(b"(check-sat)\n")
             .map_err(|e| format!("z3 write error: {e}"))?;

@@ -23,6 +23,7 @@ tez_verify = { path = "crates/tez_verify" }
 tez_wasm = { path = "crates/tez_wasm" }
 wasm-bindgen = "=0.2.129"
 num-bigint = "0.4"
+sha2 = "0.10"
 num-traits = "0.2"
 
 [workspace.lints.rust]

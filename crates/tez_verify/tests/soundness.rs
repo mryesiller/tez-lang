@@ -150,6 +150,7 @@ fn accepted_programs_never_violate_their_contracts() {
             &VerifyOptions {
                 timeout_ms: 2000,
                 include_prelude: false,
+                cache_dir: None,
             },
         )
         .unwrap_or_else(|e| panic!("verifier error: {e}\n{src}"));

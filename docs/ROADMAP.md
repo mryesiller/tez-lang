@@ -107,7 +107,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] 27 doğrulayıcı testi (kabul + her kod için ret + çelişki + soundness tuzakları)
 - [ ] `filter/map` sonucunun elemanları hakkında sözleşme (`all(pred)`, eleman eşitliği) — lambda gövdesini kapalı terim olarak aksiyomla
 - [ ] `tez_solve` (L1): gömülü hafif çözücü → tarayıcıda doğrulama (Z3 WASM ya da kendi LIA çözücüsü)
-- [ ] VC önbelleği (normalize hash)
+- [x] VC önbelleği: çözücüye gönderilen betiğin (çözücü sürümü dahil) SHA-256'sı; yalnız `unsat` kaydedilir, yani yanlış bir girdi asla ret → kabul çevirmez; soğuk 0,90 s → sıcak 0,32 s; `TEZ_CACHE_DIR`, `TEZ_NO_CACHE`; `cache_dir` seçeneği
 - [x] Soundness fuzz: `tez_verify/tests/soundness.rs` — 300 program, 75 doğrulandı, ~4286 çalıştırma, 0 ihlal
 
 ## Faz 5 — Tez-Coder v0 (3 hafta)
