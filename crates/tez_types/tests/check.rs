@@ -135,8 +135,11 @@ fn recursion_needs_decreases() {
   requires n >= 0
   decreases n
   = if n == 0 { 1 } else { n * fact(n - 1) }");
+    // countdown by a literal is inferred (the verifier still has to prove it) ...
+    ok("fn fact(n: Int) -> Int = if n == 0 { 1 } else { n * fact(n - 1) }");
+    // ... counting up is not
     has(
-        "fn fact(n: Int) -> Int = if n == 0 { 1 } else { n * fact(n - 1) }",
+        "fn up(n: Int) -> Int = if n >= 100 { n } else { up(n + 1) }",
         Code::TerminationMissing,
     );
     has(
@@ -573,7 +576,8 @@ fn non_structural_recursion_still_needs_decreases() {
     for src in [
         "fn bad(xs: List[Int]) -> Int = match xs {\n  [] => 0\n  [h, ..t] => bad(xs)\n}\n",
         "fn bad(xs: List[Int]) -> Int = match xs {\n  [] => 0\n  [h, ..t] => bad(t.append(h))\n}\n",
-        "fn fib(n: Int) -> Int = if n < 2 { n } else { fib(n - 1) + fib(n - 2) }\n",
+        "fn up(n: Int) -> Int = if n >= 100 { n } else { up(n + 1) }\n",
+        "fn halve(n: Int) -> Int = if n <= 1 { n } else { halve(n / 2) }\n",
     ] {
         let parsed = tez_syntax::parse(src, tez_syntax::ParseOptions::default());
         let out = tez_types::check(&parsed.file, src);
