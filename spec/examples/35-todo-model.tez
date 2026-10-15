@@ -1,0 +1,21 @@
+type Item = { title: Str, done: Bool }
+
+type Model = { items: List[Item], doneCount: Int where it >= 0 }
+
+fn empty() -> Model = Model { items: [], doneCount: 0 }
+
+fn add(m: Model, title: Str) -> Model =
+  m with { items: m.items.append(Item { title: title, done: false }) }
+
+fn titles(m: Model) -> List[Str] = m.items.map(i => i.title)
+
+fn pending(m: Model) -> Int = m.items.filter(i => !i.done).len()
+
+test addsItems = add(add(empty(), "write"), "test").items.len() == 2
+
+test newItemsArePending = pending(add(empty(), "x")) == 1
+
+fn main() -> (List[Str], Int) = {
+  let m = add(add(empty(), "write"), "test")
+  (titles(m), pending(m))
+}

@@ -1,0 +1,29 @@
+type Tree = Leaf | Node(Tree, Int, Tree)
+
+fn insert(t: Tree, x: Int) -> Tree
+  decreases t
+  = match t {
+    Leaf => Node(Leaf, x, Leaf)
+    Node(l, v, r) => if x < v { Node(insert(l, x), v, r) } else { Node(l, v, insert(r, x)) }
+  }
+
+fn depth(t: Tree) -> Int
+  ensures result >= 0
+  decreases t
+  = match t {
+    Leaf => 0
+    Node(l, _, r) => 1 + depth(l).max(depth(r))
+  }
+
+fn size(t: Tree) -> Int
+  ensures result >= 0
+  decreases t
+  = match t {
+    Leaf => 0
+    Node(l, _, r) => size(l) + 1 + size(r)
+  }
+
+fn main() -> (Int, Int) = {
+  let t = insert(insert(insert(insert(Leaf, 5), 2), 8), 1)
+  (size(t), depth(t))
+}

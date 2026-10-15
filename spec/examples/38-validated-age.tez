@@ -1,0 +1,10 @@
+type Age = Int where it >= 0 && it <= 150
+
+fn category(a: Age) -> Str = if a < 18 { "minor" } else if a < 65 { "adult" } else { "senior" }
+
+fn describe(s: Str) -> Str = match s.toInt() {
+  None => "not a number"
+  Some(n) => if n >= 0 && n <= 150 { category(n) } else { "out of range" }
+}
+
+fn main() -> List[Str] = ["12", "40", "70", "abc", "200"].map(describe)

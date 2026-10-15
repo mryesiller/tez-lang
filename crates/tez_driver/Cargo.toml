@@ -16,3 +16,6 @@ tez_verify.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tez_fmt.workspace = true

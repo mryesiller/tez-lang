@@ -31,7 +31,7 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti`
 - [x] Araç zinciri: `rustup` (1.99.0 sabit) + `wasm32-unknown-unknown`, `wasm-tools`, `binaryen`, Z3 — `make doctor` yeşil
 - [x] CI ilk çalıştırmaları yeşil; z3 kurulumu eklendi
 - [x] Uzak depo tanımlı: `origin` = github.com/mryesiller/tez-lang (kullanıcı açacak)
-- [ ] İlk commit ve ilk push (kullanıcı onayıyla)
+- [x] İlk commit ve ilk push (kullanıcı onayıyla)
 - [x] **Ad kontrolü (2026-10-14):** `tez` crates.io ve npm'de dolu → paket adı **`tez-lang`** (ikisinde de boş; komut `tez` kalır). İç crate'ler `tez_*` (hepsi crates.io'da boş). GitHub deposu: `mryesiller/tez-lang` (crates.io ve npm ile aynı ad)
 - [x] **Ad rezervasyonu (2026-10-14):** `tez-lang` 0.0.1 hem crates.io'da hem npm'de yayında. `tez_*` iç crate'leri Faz 1'de kullanılınca yayınlanır
 
@@ -44,10 +44,10 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Referans model: **Gemma 4 E4B** (Apache-2.0) → [ARCHITECTURE §9.0](ARCHITECTURE.md)
 - [x] `spec/grammar.ebnf` (normatif), `spec/language.md` (anlam), `spec/errors.md` (61 hata kodu, testle senkron)
 - [x] Örnek programlar: 14 kabul edilen + 10 reddedilen (`spec/examples/`, testle zorlanır)
-- [ ] 30 örneğe tamamla
-- [x] `bench/tokens`: Gemma 4 tokenizer (indirildi, sürüm sabit) + ölçüm aracı; **36/38 anahtar kelime/operatör tek token**, Tez/TS token oranı **0,82** (kanıt satırları hariç 0,78)
+- [x] 30 kabul edilen örneğe tamamlandı (+10 reddedilen); her biri için TypeScript karşılığı `bench/ts/` (uygulama örnekleri hariç)
+- [x] `bench/tokens`: Gemma 4 tokenizer (indirildi, sürüm sabit) + ölçüm aracı; **36/38 anahtar kelime/operatör tek token**, Tez/TS token oranı **0,88** (28 eşli program; kanıt satırları hariç 0,84; ilk 14 programda 0,82 idi, örnek sayısı artınca yükseldi — kısa programlarda sözleşme satırları ağır basıyor)
 - [x] `spec/card.md`: **930 token** (bütçe 1.200); örnekleri doğrulanıyor, metot listesi prelude ile testle senkron
-- [ ] `spec/grammar.gbnf` (EBNF'den üretim)
+- [x] `spec/grammar.gbnf`: `spec/tools/ebnf2gbnf.py` ile EBNF'den üretilir; `--check` güncelliği ve 30 örneğin türetilebilirliğini doğrular (üst küme: boşluk/yeni satır serbest, anahtar sözcükler tanımlayıcıdan dışlanmaz)
 - [ ] TezBench iskeleti: 20 görev + TypeScript karşılıkları
 - [ ] `q4f16` ONNX boyutlarını ölç; küçük deneme LoRA
 - [ ] İlk ölçüm: Gemma 4 E4B, kartla → sözdizimi geçerliliği ve token oranı
@@ -60,8 +60,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] `tez_diag`: 61 kararlı hata kodu + JSON şeması v1
 - [x] `tez_fmt`: kanonik biçimlendirici, yorumları korur ya da reddeder (14 test, prelude idempotent)
 - [x] `tez_cli`: `check | run | test | fmt | grammar` (`--json`, `--no-verify`, `--contracts`)
-- [ ] Fuzz: parser çökmez, `fmt(fmt(x)) == fmt(x)` (cargo-fuzz)
-- [ ] Diferansiyel test altyapısı (WASM çıktısı ≡ yorumlayıcı) → Faz 2
+- [x] Fuzz: `crates/tez_driver/tests/robust.rs` — tohumlu mutasyon fuzz'ı (örnek başına `TEZ_FUZZ_N`, 4000 ile ~100 bin mutasyon): ön yüz çökmez, `fmt(fmt(x)) == fmt(x)`, biçimli çıktı yeniden ayrışır. İlk koşuda gerçek hata buldu (`(p,)` demet deseni) ve düzeltildi
+- [x] Diferansiyel test altyapısı (WASM çıktısı ≡ yorumlayıcı) → Faz 2'de `tez_wasm/tests/differential.rs`
 
 ## Faz 2 — WasmGC + tarayıcı 🟦 (çekirdeği ✅)
 
@@ -74,7 +74,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] `runtime/tez-app.mjs`: TEA döngüsü (`Html[Msg]` türü prelude'da, vnode diff, tıklama/girdi olayları); Studio'da "App" düğmesi; örnekler 15-counter-app, 16-echo-app
 - [x] Hot-swap: olay günlüğü (event sourcing) — kod değişince yeni `init()` ile başlayıp kullanıcı olayları yeniden oynatılır; Studio'da ve sitede çalışır
 - [x] `site/`: açılış sayfası + dokümantasyon (Tour, referans, hata kataloğu, örnekler, mimari, yol haritası); çalıştırılabilir örnekler tarayıcıda derlenir; GitHub Pages iş akışı (`.github/workflows/pages.yml`)
-- [ ] Hot-swap: durum serileştirme + yapısal göç
+- [x] Hot-swap: durum serileştirme yerine olay günlüğü yeniden oynatma (yapısal göç gerekmez: program saftır, model her seferinde yeniden hesaplanır)
 - [ ] Worker + fuel (sonsuz döngü koruması; doğrulanmamış programlar için) ve bellek tavanı
 - [ ] Studio paketini küçült (Monaco tüm dil tanımlarıyla 4,2 MB) ve tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)
 - [ ] Artımlı derleme: fonksiyon başına önbellek
@@ -106,7 +106,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [ ] `filter/map` sonucunun elemanları hakkında sözleşme (`all(pred)`, eleman eşitliği) — lambda gövdesini kapalı terim olarak aksiyomla
 - [ ] `tez_solve` (L1): gömülü hafif çözücü → tarayıcıda doğrulama (Z3 WASM ya da kendi LIA çözücüsü)
 - [ ] VC önbelleği (normalize hash)
-- [ ] Soundness fuzz: rastgele program üret → doğrulanmışsa yorumlayıcıda ihlal OLMADIĞINI kontrol et
+- [x] Soundness fuzz: `tez_verify/tests/soundness.rs` — 300 program, 75 doğrulandı, ~4286 çalıştırma, 0 ihlal
 
 ## Faz 5 — Tez-Coder v0 (3 hafta)
 

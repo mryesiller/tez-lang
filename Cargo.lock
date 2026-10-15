@@ -211,6 +211,7 @@ name = "tez_driver"
 version = "0.0.1"
 dependencies = [
  "tez_diag",
+ "tez_fmt",
  "tez_syntax",
  "tez_types",
  "tez_verify",

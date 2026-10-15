@@ -58,7 +58,7 @@
     <section class="pillars">
       <article><h3>Proved, not tested</h3><p>Every index, division and recursion is checked by an SMT solver at compile time. If Tez cannot prove it, it does not compile. No warnings exist to ignore.</p></article>
       <article><h3>Made for small models</h3><p>One way to do each thing, no shadowing, no operator overloading, no implicit anything. The whole language card is about 1,000 tokens.</p></article>
-      <article><h3>Token-lean</h3><p>Measured with the Gemma 4 tokenizer: the same programs take about 18% fewer tokens than their TypeScript twins, and 36 of 38 keywords are a single token.</p></article>
+      <article><h3>Token-lean</h3><p>Measured with the Gemma 4 tokenizer: the same programs take about 12% fewer tokens than their TypeScript twins (16% when the lines that exist only to be proved are not counted), and 36 of 38 keywords are a single token.</p></article>
       <article><h3>WebAssembly GC</h3><p>Compiled output uses WasmGC and a tiny runtime. A recursive <code>fib(30)</code> runs in about 0.03 s compiled, against 0.65 s in the reference interpreter.</p></article>
       <article><h3>Entirely in the browser</h3><p>Parser, type checker, formatter, compiler and the app runtime all run client-side. No server, no install, no account.</p></article>
       <article><h3>Errors an agent can fix</h3><p>Sixty-one stable error codes with spans, expected forms, counterexamples and machine-applicable fixes, as JSON for tools and as plain text for people.</p></article>
@@ -113,7 +113,7 @@ fn main() -> Light = next(Red)</pre>
     <section id="numbers" class="numbers">
       <h2>Measured, not promised.</h2>
       <div class="stats">
-        <div><b>0.82</b><span>Tez tokens ÷ TypeScript tokens on 14 paired programs (Gemma 4 tokenizer)</span></div>
+        <div><b>0.88</b><span>Tez tokens ÷ TypeScript tokens over 28 paired programs (0.84 without proof lines; Gemma 4 tokenizer)</span></div>
         <div><b>~1,000</b><span>tokens for the complete language card (budget 1,200)</span></div>
         <div><b>61</b><span>stable diagnostic codes, each tested</span></div>
         <div><b>0</b><span>soundness violations in 4,286 fuzzed runs of 300 generated programs</span></div>

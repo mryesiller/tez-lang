@@ -1,0 +1,7 @@
+fn countdown(n: Int) -> List[Int]
+  requires n >= 0
+  ensures result.len() == n + 1
+  decreases n
+  = if n == 0 { [0] } else { [n].concat(countdown(n - 1)) }
+
+fn main() -> List[Int] = countdown(5)

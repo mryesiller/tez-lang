@@ -1,0 +1,21 @@
+type Op = Push(Int) | Add | Mul | Neg
+
+fn step(stack: List[Int], op: Op) -> List[Int] = match op {
+  Push(n) => [n].concat(stack)
+  Neg => match stack {
+    [] => stack
+    [top, ..rest] => [0 - top].concat(rest)
+  }
+  Add => match stack {
+    [a, b, ..rest] => [a + b].concat(rest)
+    _ => stack
+  }
+  Mul => match stack {
+    [a, b, ..rest] => [a * b].concat(rest)
+    _ => stack
+  }
+}
+
+fn run(ops: List[Op]) -> List[Int] = ops.fold([], (stack, op) => step(stack, op))
+
+fn main() -> List[Int] = run([Push(2), Push(3), Add, Push(4), Mul, Neg])

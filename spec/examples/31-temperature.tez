@@ -1,0 +1,5 @@
+fn toFahrenheit(c: Float) -> Float = c * 1.8 + 32.0
+
+fn describe(c: Float) -> Str = if c < 0.0 { "freezing" } else if c < 20.0 { "mild" } else { "warm" }
+
+fn main() -> (Float, Str) = (toFahrenheit(100.0), describe(12.5))

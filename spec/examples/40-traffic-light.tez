@@ -1,0 +1,21 @@
+type Light = Red | Green | Yellow
+
+fn next(l: Light) -> Light = match l {
+  Red => Green
+  Green => Yellow
+  Yellow => Red
+}
+
+fn seconds(l: Light) -> Int = match l {
+  Red => 30
+  Green => 25
+  Yellow => 5
+}
+
+fn cycle(l: Light) -> Int = seconds(l) + seconds(next(l)) + seconds(next(next(l)))
+
+test cycleIsSixty = cycle(Red) == 60
+
+test returnsToStart = next(next(next(Green))) == Green
+
+fn main() -> (Light, Int) = (next(Yellow), cycle(Green))

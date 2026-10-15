@@ -1,0 +1,11 @@
+fn encode(xs: List[Int]) -> List[(Int, Int)]
+  decreases xs.len()
+  = match xs {
+    [] => []
+    [x, ..rest] => {
+      let same = rest.count(y => y == x)
+      [(x, same + 1)].concat(encode(rest.filter(y => y != x)))
+    }
+  }
+
+fn main() -> List[(Int, Int)] = encode([3, 1, 3, 3, 2, 1])

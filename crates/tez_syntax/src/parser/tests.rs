@@ -376,3 +376,9 @@ fn never_panics_on_garbage() {
         let _ = parse(src, ParseOptions::default());
     }
 }
+
+#[test]
+fn one_element_tuple_pattern_is_rejected() {
+    // found by the mutation fuzzer: `(p,)` used to parse as a one-element tuple the formatter printed as `(p)`
+    assert!(!codes("fn f(x: Bool) -> Int = match x {\n  (true,) => 1\n  _ => 0\n}").is_empty());
+}

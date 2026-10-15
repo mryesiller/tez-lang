@@ -1,0 +1,8 @@
+fn lookup(xs: List[Int], i: Int) -> Option[Int] = if i >= 0 && i < xs.len() {
+  Some(xs.get(i))
+} else { None }
+
+fn firstOr(xs: List[Int], fallback: Int) -> Int = lookup(xs, 0).unwrapOr(fallback)
+
+fn main() -> (Option[Int], Option[Int], Int) =
+  (lookup([10, 20, 30], 1), lookup([10, 20, 30], 7), firstOr([], 99))

@@ -1580,6 +1580,10 @@ impl Parser<'_> {
                     elems.push(self.pattern()?);
                     if self.eat(&Tok::Comma) {
                         saw_comma = true;
+                        if elems.len() == 1 && self.at(&Tok::RParen) {
+                            // `(p,)` is not a tuple: tuples have at least two elements
+                            return Err(self.unexpected("a second tuple element"));
+                        }
                     } else {
                         break;
                     }

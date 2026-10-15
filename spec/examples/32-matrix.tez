@@ -1,0 +1,10 @@
+fn rowSums(m: List[List[Int]]) -> List[Int] = m.map(row => row.sum())
+
+fn total(m: List[List[Int]]) -> Int = rowSums(m).sum()
+
+fn flatten(m: List[List[Int]]) -> List[Int] = m.flatMap(row => row)
+
+fn main() -> (List[Int], Int, List[Int]) = {
+  let m = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+  (rowSums(m), total(m), flatten(m))
+}

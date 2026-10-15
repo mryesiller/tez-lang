@@ -1,0 +1,8 @@
+fn normalize(s: Str) -> Str = s.lower().trim()
+
+fn isPalindrome(s: Str) -> Bool = {
+  let cs = normalize(s).chars()
+  cs == cs.reverse()
+}
+
+fn main() -> (Bool, Bool) = (isPalindrome("Level"), isPalindrome("Tez"))

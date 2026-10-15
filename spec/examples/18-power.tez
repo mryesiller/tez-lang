@@ -1,0 +1,6 @@
+fn power(base: Int, exp: Int) -> Int
+  requires exp >= 0
+  decreases exp
+  = if exp == 0 { 1 } else { base * power(base, exp - 1) }
+
+fn main() -> (Int, Int) = (power(2, 10), power(3, 40))

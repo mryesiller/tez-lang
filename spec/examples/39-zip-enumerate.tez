@@ -1,0 +1,5 @@
+fn dot(a: List[Int], b: List[Int]) -> Int = a.zip(b).map(p => p.0 * p.1).sum()
+
+fn labelled(xs: List[Str]) -> List[Str] = xs.enumerate().map(p => p.0.toStr() ++ ": " ++ p.1)
+
+fn main() -> (Int, List[Str]) = (dot([1, 2, 3], [4, 5, 6]), labelled(["a", "b", "c"]))
