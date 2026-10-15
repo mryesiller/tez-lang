@@ -1,0 +1,51 @@
+type Light = Red | Green | Yellow
+
+type Model = { light: Light, cycles: Int where it >= 0 }
+
+type Msg = Next | Reset
+
+fn init() -> Model = Model { light: Red, cycles: 0 }
+
+fn next(l: Light) -> Light = match l {
+  Red => Green
+  Green => Yellow
+  Yellow => Red
+}
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Next =>
+    Model { light: next(m.light), cycles: if m.light == Yellow { m.cycles + 1 } else { m.cycles } }
+  Reset => init()
+}
+
+fn colour(l: Light) -> Str = match l {
+  Red => "red"
+  Green => "green"
+  Yellow => "yellow"
+}
+
+fn lamp(m: Model, l: Light) -> Html[Msg] =
+  Html.node(
+    "div",
+    [UiProp("class", if m.light == l { "lamp on " ++ colour(l) } else { "lamp" })],
+    []
+  )
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.node(
+        "div",
+        [UiProp("class", "signal")],
+        [lamp(m, Red), lamp(m, Yellow), lamp(m, Green)]
+      ),
+      Html.paragraph("Now: " ++ colour(m.light) ++ ", full cycles: " ++ m.cycles.toStr()),
+      Html.row([Html.button("Next", Next), Html.button("Reset", Reset)])
+    ]
+  )
+
+test cyclesBack = next(next(next(Red))) == Red
+
+test countsCycles = update(update(update(init(), Next), Next), Next).cycles == 1
+
+fn main() -> (Str, Int) = (colour(update(init(), Next).light), update(init(), Next).cycles)

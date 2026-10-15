@@ -1,0 +1,78 @@
+type Question = { text: Str, choices: List[Str], answer: Int }
+
+type Model = { index: Int where it >= 0, score: Int where it >= 0, picked: Option[Int] }
+
+type Msg = Pick(Int) | Next | Again
+
+fn questions() -> List[Question] =
+  [
+    Question { text: "2 + 2 = ?", choices: ["3", "4", "5"], answer: 1 },
+    Question { text: "Capital of France?", choices: ["Paris", "Rome", "Oslo"], answer: 0 },
+    Question { text: "Tez compiles to?", choices: ["JVM", "WebAssembly", "Lua"], answer: 1 }
+  ]
+
+fn init() -> Model = Model { index: 0, score: 0, picked: None }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Again => init()
+  Next => if m.index >= questions().len() || m.picked.isNone() { m } else {
+    Model { index: m.index + 1, score: m.score, picked: None }
+  }
+  Pick(c) => if m.index >= questions().len() || m.picked.isSome() { m } else {
+    Model {
+      index: m.index,
+      score: m.score + (if c == questions().get(m.index).answer { 1 } else { 0 }),
+      picked: Some(c)
+    }
+  }
+}
+
+fn choiceButton(i: Int, label: Str, m: Model, answer: Int) -> Html[Msg] =
+  Html.node(
+    "button",
+    [
+      UiClick(Pick(i)),
+      UiProp(
+        "class",
+        match m.picked {
+          None => "choice"
+          Some(p) => if i == answer { "choice good" } else if i == p { "choice bad" } else {
+            "choice"
+          }
+        }
+      )
+    ],
+    [Html.text(label)]
+  )
+
+fn view(m: Model) -> Html[Msg] = if m.index >= questions().len() {
+  Html.col(
+    [
+      Html.heading("Score: " ++ m.score.toStr() ++ " / " ++ questions().len().toStr()),
+      Html.button("Play again", Again)
+    ]
+  )
+} else {
+  Html.col(
+    [
+      Html.paragraph("Question " ++ (m.index + 1).toStr() ++ " of " ++ questions().len().toStr()),
+      Html.heading(questions().get(m.index).text),
+      Html.col(
+        questions().get(m.index).choices
+          .enumerate()
+          .map(p => choiceButton(p.0, p.1, m, questions().get(m.index).answer))
+      ),
+      Html.button("Next", Next)
+    ]
+  )
+}
+
+test rightAnswerScores = update(init(), Pick(1)).score == 1
+
+test wrongAnswerDoesNot = update(init(), Pick(0)).score == 0
+
+test cannotAnswerTwice = update(update(init(), Pick(1)), Pick(1)).score == 1
+
+test mustAnswerBeforeNext = update(init(), Next).index == 0
+
+fn main() -> Int = update(update(update(update(init(), Pick(1)), Next), Pick(0)), Next).score

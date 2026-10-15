@@ -1,0 +1,54 @@
+type Item = { title: Str, done: Bool }
+
+type Model = { draft: Str, items: List[Item] }
+
+type Msg = Draft(Str) | Add | Toggle(Int) | ClearDone
+
+fn init() -> Model = Model { draft: "", items: [] }
+
+fn flip(items: List[Item], i: Int) -> List[Item] =
+  items
+    .enumerate()
+    .map(p => if p.0 == i { Item { title: p.1.title, done: !p.1.done } } else { p.1 })
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Draft(s) => m with { draft: s }
+  Add => if m.draft.trim().isEmpty() { m } else {
+    Model { draft: "", items: m.items.append(Item { title: m.draft.trim(), done: false }) }
+  }
+  Toggle(i) => m with { items: flip(m.items, i) }
+  ClearDone => m with { items: m.items.filter(it => !it.done) }
+}
+
+fn row(p: (Int, Item)) -> Html[Msg] =
+  Html.node(
+    "li",
+    [UiClick(Toggle(p.0)), UiProp("class", if p.1.done { "done" } else { "todo" })],
+    [Html.text(if p.1.done { "[x] " ++ p.1.title } else { "[ ] " ++ p.1.title })]
+  )
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Todo (" ++ m.items.filter(i => !i.done).len().toStr() ++ " left)"),
+      Html.row(
+        [
+          Html.input(m.draft, s => Draft(s)),
+          Html.button("Add", Add),
+          Html.button("Clear done", ClearDone)
+        ]
+      ),
+      Html.node("ul", [], m.items.enumerate().map(row)),
+      Html.paragraph("Click an item to tick it off.")
+    ]
+  )
+
+test addsTrimmed = update(update(init(), Draft("  milk ")), Add).items.len() == 1
+
+test ignoresBlank = update(update(init(), Draft("   ")), Add).items.len() == 0
+
+test togglesAndClears =
+  update(update(update(update(init(), Draft("a")), Add), Toggle(0)), ClearDone).items.len() == 0
+
+fn main() -> Int =
+  update(update(update(init(), Draft("a")), Add), Toggle(0)).items.filter(i => i.done).len()

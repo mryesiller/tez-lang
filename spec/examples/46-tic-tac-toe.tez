@@ -1,0 +1,73 @@
+type Model = { cells: List[Str], turn: Str }
+
+type Msg = Play(Int) | Restart
+
+fn init() -> Model = Model { cells: List.repeat("", 9), turn: "X" }
+
+type Line = { a: Int, b: Int, c: Int }
+
+fn lines() -> List[Line] =
+  [
+    Line { a: 0, b: 1, c: 2 },
+    Line { a: 3, b: 4, c: 5 },
+    Line { a: 6, b: 7, c: 8 },
+    Line { a: 0, b: 3, c: 6 },
+    Line { a: 1, b: 4, c: 7 },
+    Line { a: 2, b: 5, c: 8 },
+    Line { a: 0, b: 4, c: 8 },
+    Line { a: 2, b: 4, c: 6 }
+  ]
+
+fn at(cells: List[Str], i: Int) -> Str = if i >= 0 && i < cells.len() { cells.get(i) } else { "" }
+
+fn lineOwner(cells: List[Str], l: Line) -> Str = if at(cells, l.a) != ""
+  && at(cells, l.a) == at(cells, l.b)
+  && at(cells, l.b) == at(cells, l.c) { at(cells, l.a) } else { "" }
+
+fn winner(cells: List[Str]) -> Str =
+  lines().map(l => lineOwner(cells, l)).fold("", (best, w) => if best != "" { best } else { w })
+
+fn put(cells: List[Str], i: Int, who: Str) -> List[Str] =
+  cells.enumerate().map(p => if p.0 == i { who } else { p.1 })
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Restart => init()
+  Play(i) => if i < 0 || i >= m.cells.len() || at(m.cells, i) != "" || winner(m.cells) != "" {
+    m
+  } else { Model { cells: put(m.cells, i, m.turn), turn: if m.turn == "X" { "O" } else { "X" } } }
+}
+
+fn status(m: Model) -> Str = if winner(m.cells) != "" {
+  winner(m.cells) ++ " wins!"
+} else if m.cells.all(c => c != "") { "Draw" } else { "Turn: " ++ m.turn }
+
+fn cell(p: (Int, Str)) -> Html[Msg] =
+  Html.node(
+    "div",
+    [UiClick(Play(p.0)), UiProp("class", if p.1 == "" { "cell" } else { "cell taken" })],
+    [Html.text(if p.1 == "" { "." } else { p.1 })]
+  )
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading(status(m)),
+      Html.node("div", [UiProp("class", "grid")], m.cells.enumerate().map(cell)),
+      Html.button("Restart", Restart)
+    ]
+  )
+
+test xGoesFirst = update(init(), Play(4)).cells.get(4) == "X"
+
+test cannotOverwrite = update(update(init(), Play(4)), Play(4)).turn == "O"
+
+test xWins =
+  winner(
+    update(
+      update(update(update(update(init(), Play(0)), Play(3)), Play(1)), Play(4)),
+      Play(2)
+    ).cells
+  ) ==
+    "X"
+
+fn main() -> (Str, Str) = (status(update(init(), Play(0))), status(init()))

@@ -1,0 +1,42 @@
+type Model = { text: Str, limit: Int }
+
+type Msg = Typed(Str) | Clear
+
+fn init() -> Model = Model { text: "", limit: 40 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Typed(s) => m with { text: s }
+  Clear => m with { text: "" }
+}
+
+fn words(s: Str) -> Int = s.split(" ").filter(w => w.len() > 0).len()
+
+fn remaining(m: Model) -> Int = m.limit - m.text.len()
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.input(m.text, s => Typed(s)),
+      Html.paragraph(m.text.len().toStr() ++ " characters, " ++ words(m.text).toStr() ++ " words"),
+      Html.node(
+        "p",
+        [UiProp("class", if remaining(m) < 0 { "bad" } else { "good" })],
+        [
+          Html.text(
+            if remaining(m) < 0 { (0 - remaining(m)).toStr() ++ " over the limit" } else {
+              remaining(m).toStr() ++ " left"
+            }
+          )
+        ]
+      ),
+      Html.button("Clear", Clear)
+    ]
+  )
+
+test countsWords = words("  the quick  brown fox ") == 4
+
+test emptyHasNoWords = words("") == 0
+
+test limitWarns = remaining(update(init(), Typed("x".repeat(45)))) == -5
+
+fn main() -> (Int, Int) = (words("one two three"), remaining(update(init(), Typed("hello"))))

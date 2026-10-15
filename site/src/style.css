@@ -115,3 +115,23 @@ footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8p
   #side nav { position: static; flex-direction: row; flex-wrap: wrap; }
   section { padding: 40px 0; }
 }
+
+/* classes the example apps use (UiProp("class", ...)) */
+.app-root .card { padding: 14px; border: 1px solid var(--border, #dcd9cf); border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.app-root .card.dark { background: #1b2420; color: #e6ece8; }
+.app-root .good { color: #1a7f4b; } .app-root .bad { color: #c0392b; }
+.app-root ul { margin: 0; padding-left: 20px; } .app-root li { cursor: pointer; }
+.app-root li.done { text-decoration: line-through; opacity: .6; }
+.app-root .tab { padding: 6px 14px; border-radius: 8px 8px 0 0; cursor: pointer; }
+.app-root .tab.active { background: #0b6b57; color: #fff; }
+.app-root .grid { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; }
+.app-root .cell { width: 64px; height: 64px; display: grid; place-items: center; font: 700 26px system-ui; border: 1px solid #8884; border-radius: 8px; cursor: pointer; user-select: none; }
+.app-root .cell.taken { cursor: default; background: #8881; }
+.app-root .signal { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #222; border-radius: 14px; width: 70px; align-items: center; }
+.app-root .lamp { width: 44px; height: 44px; border-radius: 50%; background: #444; }
+.app-root .lamp.on.red { background: #ff4d4d; box-shadow: 0 0 18px #ff4d4d; }
+.app-root .lamp.on.yellow { background: #ffd24d; box-shadow: 0 0 18px #ffd24d; }
+.app-root .lamp.on.green { background: #3ddc84; box-shadow: 0 0 18px #3ddc84; }
+.app-root .choice { text-align: left; }
+.app-root .choice.good { background: #3ddc8433; } .app-root .choice.bad { background: #ff4d4d33; }
+.app-root .bar { background: #c0392b; transition: width .2s; } .app-root .bar.ok { background: #e0a100; } .app-root .bar.strong { background: #1a7f4b; }

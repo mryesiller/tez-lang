@@ -61,7 +61,7 @@ fn accepted_examples_check_format_and_run() {
         assert_eq!(s(&run.stdout).trim(), want.trim(), "{name}: wrong output");
         n += 1;
     }
-    assert!(n >= 30, "expected at least 30 accepted examples, found {n}");
+    assert!(n >= 40, "expected at least 40 accepted examples, found {n}");
 }
 
 #[test]

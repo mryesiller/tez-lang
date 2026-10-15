@@ -1,0 +1,59 @@
+type Tab = Home | Docs | About
+
+type Model = { tab: Tab, visits: Int where it >= 0 }
+
+type Msg = Go(Tab)
+
+fn init() -> Model = Model { tab: Home, visits: 0 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Go(t) => Model { tab: t, visits: m.visits + 1 }
+}
+
+fn name(t: Tab) -> Str = match t {
+  Home => "Home"
+  Docs => "Docs"
+  About => "About"
+}
+
+fn body(t: Tab) -> Html[Msg] = match t {
+  Home => Html.paragraph("Welcome. Pick a tab above.")
+  Docs =>
+    Html.node(
+      "ul",
+      [],
+      [
+        Html.node("li", [], [Html.text("Types")]),
+        Html.node("li", [], [Html.text("Contracts")]),
+        Html.node("li", [], [Html.text("Apps")])
+      ]
+    )
+  About =>
+    Html.node(
+      "p",
+      [UiProp("class", "good")],
+      [Html.text("Tez: proven programs, small enough for small models.")]
+    )
+}
+
+fn tabButton(current: Tab, t: Tab) -> Html[Msg] =
+  Html.node(
+    "button",
+    [UiClick(Go(t)), UiProp("class", if current == t { "tab active" } else { "tab" })],
+    [Html.text(name(t))]
+  )
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.row([tabButton(m.tab, Home), tabButton(m.tab, Docs), tabButton(m.tab, About)]),
+      body(m.tab),
+      Html.paragraph("Tab switches: " ++ m.visits.toStr())
+    ]
+  )
+
+test switches = update(init(), Go(Docs)).tab == Docs
+
+test countsVisits = update(update(init(), Go(Docs)), Go(About)).visits == 2
+
+fn main() -> (Str, Int) = (name(update(init(), Go(About)).tab), update(init(), Go(About)).visits)

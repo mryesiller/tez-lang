@@ -1,0 +1,38 @@
+type Model = { text: Str }
+
+type Msg = Typed(Str)
+
+fn init() -> Model = Model { text: "20" }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Typed(s) => Model { text: s }
+}
+
+fn fahrenheit(c: Int) -> Int = c * 9 / 5 + 32
+
+fn verdict(c: Int) -> Str = if c < 0 { "freezing" } else if c < 25 { "pleasant" } else { "hot" }
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Celsius to Fahrenheit"),
+      Html.input(m.text, s => Typed(s)),
+      match m.text.toInt() {
+        None => Html.node("p", [UiProp("class", "bad")], [Html.text("Type a whole number")])
+        Some(c) =>
+          Html.node(
+            "p",
+            [UiProp("class", "good")],
+            [Html.text(c.toStr() ++ " C = " ++ fahrenheit(c).toStr() ++ " F, " ++ verdict(c))]
+          )
+      }
+    ]
+  )
+
+test boiling = fahrenheit(100) == 212
+
+test freezingPoint = fahrenheit(0) == 32
+
+test classifies = verdict(-3) == "freezing" && verdict(30) == "hot"
+
+fn main() -> (Int, Str) = (fahrenheit(37), verdict(37))

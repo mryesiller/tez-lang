@@ -1,0 +1,61 @@
+type Product = { name: Str, price: Int }
+
+type Model = { cart: List[Int] }
+
+type Msg = Add(Int) | Remove(Int) | Empty
+
+fn catalog() -> List[Product] =
+  [
+    Product { name: "Pen", price: 3 },
+    Product { name: "Book", price: 12 },
+    Product { name: "Lamp", price: 25 }
+  ]
+
+fn init() -> Model = Model { cart: [] }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Add(i) => if i >= 0 && i < catalog().len() { m with { cart: m.cart.append(i) } } else { m }
+  Remove(i) => match m.cart.indexOf(i) {
+    None => m
+    Some(at) => m with { cart: m.cart.take(at).concat(m.cart.drop(at + 1)) }
+  }
+  Empty => init()
+}
+
+fn priceOf(i: Int) -> Int = if i >= 0 && i < catalog().len() { catalog().get(i).price } else { 0 }
+
+fn total(m: Model) -> Int = m.cart.map(priceOf).sum()
+
+fn countOf(m: Model, i: Int) -> Int = m.cart.count(x => x == i)
+
+fn line(p: (Int, Product), m: Model) -> Html[Msg] =
+  Html.row(
+    [
+      Html.text(p.1.name ++ " $" ++ p.1.price.toStr() ++ "  x" ++ countOf(m, p.0).toStr()),
+      Html.button("+", Add(p.0)),
+      Html.button("-", Remove(p.0))
+    ]
+  )
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    catalog()
+      .enumerate()
+      .map(p => line(p, m))
+      .append(
+        Html.node(
+          "p",
+          [UiProp("class", if total(m) > 30 { "bad" } else { "good" })],
+          [Html.text("Total: $" ++ total(m).toStr())]
+        )
+      )
+      .append(Html.button("Empty cart", Empty))
+  )
+
+test addsUp = total(update(update(init(), Add(0)), Add(1))) == 15
+
+test removeOne = countOf(update(update(update(init(), Add(1)), Add(1)), Remove(1)), 1) == 1
+
+test removeMissingIsNoop = total(update(init(), Remove(2))) == 0
+
+fn main() -> Int = total(update(update(update(init(), Add(2)), Add(0)), Add(0)))

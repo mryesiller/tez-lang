@@ -1,0 +1,35 @@
+type Model = { query: Str, fruits: List[Str] }
+
+type Msg = Query(Str) | Remove(Str)
+
+fn init() -> Model =
+  Model { query: "", fruits: ["apple", "apricot", "banana", "blueberry", "cherry", "grape"] }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Query(q) => m with { query: q }
+  Remove(f) => m with { fruits: m.fruits.filter(x => x != f) }
+}
+
+fn visible(m: Model) -> List[Str] = m.fruits.filter(f => f.lower().contains(m.query.lower()))
+
+fn item(f: Str) -> Html[Msg] =
+  Html.node("li", [UiClick(Remove(f))], [Html.text(f ++ "  (click to remove)")])
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Fruit filter"),
+      Html.input(m.query, s => Query(s)),
+      Html.paragraph(visible(m).len().toStr() ++ " of " ++ m.fruits.len().toStr() ++ " shown"),
+      Html.node("ul", [], visible(m).map(item))
+    ]
+  )
+
+test filtersByText =
+  update(init(), Query("ap")).fruits.len() == 6 && visible(update(init(), Query("ap"))).len() == 3
+
+test ignoresCase = visible(update(init(), Query("BAN"))) == ["banana"]
+
+test removes = visible(update(init(), Remove("grape"))).len() == 5
+
+fn main() -> List[Str] = visible(update(init(), Query("b")))

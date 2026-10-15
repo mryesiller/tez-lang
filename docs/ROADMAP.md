@@ -44,6 +44,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Referans model: **Gemma 4 E4B** (Apache-2.0) → [ARCHITECTURE §9.0](ARCHITECTURE.md)
 - [x] `spec/grammar.ebnf` (normatif), `spec/language.md` (anlam), `spec/errors.md` (61 hata kodu, testle senkron)
 - [x] Örnek programlar: 14 kabul edilen + 10 reddedilen (`spec/examples/`, testle zorlanır)
+- [x] 13 etkileşimli uygulama örneği (15, 16, 41–53): sayaç, yankı, geri sayım, aç/kapa panel + tema, todo listesi, sıcaklık çevirici, sekmeler, XOX, alışveriş sepeti, sınav, trafik ışığı (sınıf değişimi), renk karıştırıcı (`style` özniteliği), parola gücü, canlı süzgeç, kelime sayacı — hepsi doğrulanıyor ve testli
 - [x] 30 kabul edilen örneğe tamamlandı (+10 reddedilen); her biri için TypeScript karşılığı `bench/ts/` (uygulama örnekleri hariç)
 - [x] `bench/tokens`: Gemma 4 tokenizer (indirildi, sürüm sabit) + ölçüm aracı; **36/38 anahtar kelime/operatör tek token**, Tez/TS token oranı **0,88** (28 eşli program; kanıt satırları hariç 0,84; ilk 14 programda 0,82 idi, örnek sayısı artınca yükseldi — kısa programlarda sözleşme satırları ağır basıyor)
 - [x] `spec/card.md`: **930 token** (bütçe 1.200); örnekleri doğrulanıyor, metot listesi prelude ile testle senkron

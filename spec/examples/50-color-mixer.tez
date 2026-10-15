@@ -1,0 +1,73 @@
+type Model = {
+  r: Int where it >= 0 && it <= 255,
+  g: Int where it >= 0 && it <= 255,
+  b: Int where it >= 0 && it <= 255
+}
+
+type Msg = RedUp | RedDown | GreenUp | GreenDown | BlueUp | BlueDown | Reset
+
+fn init() -> Model = Model { r: 128, g: 128, b: 128 }
+
+fn up(n: Int) -> Int = if n + 32 > 255 { 255 } else { n + 32 }
+
+fn down(n: Int) -> Int = if n - 32 < 0 { 0 } else { n - 32 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  RedUp => m with { r: up(m.r) }
+  RedDown => m with { r: down(m.r) }
+  GreenUp => m with { g: up(m.g) }
+  GreenDown => m with { g: down(m.g) }
+  BlueUp => m with { b: up(m.b) }
+  BlueDown => m with { b: down(m.b) }
+  Reset => init()
+}
+
+fn css(m: Model) -> Str =
+  "background: rgb(" ++
+    m.r.toStr() ++
+    ", " ++
+    m.g.toStr() ++
+    ", " ++
+    m.b.toStr() ++
+    "); height: 80px; border-radius: 8px;"
+
+fn channel(name: Str, value: Int, less: Msg, more: Msg) -> Html[Msg] =
+  Html.row(
+    [Html.button("-", less), Html.text(name ++ ": " ++ value.toStr()), Html.button("+", more)]
+  )
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.node("div", [UiProp("style", css(m))], []),
+      channel("Red", m.r, RedDown, RedUp),
+      channel("Green", m.g, GreenDown, GreenUp),
+      channel("Blue", m.b, BlueDown, BlueUp),
+      Html.button("Reset", Reset)
+    ]
+  )
+
+test saturatesHigh =
+  update(
+    update(
+      update(
+        update(update(update(update(update(init(), RedUp), RedUp), RedUp), RedUp), RedUp),
+        RedUp
+      ),
+      RedUp
+    ),
+    RedUp
+  ).r ==
+    255
+
+test saturatesLow =
+  update(
+    update(update(update(update(init(), GreenDown), GreenDown), GreenDown), GreenDown),
+    GreenDown
+  ).g ==
+    0
+
+fn main() -> (Int, Int, Int) = {
+  let m = update(update(init(), RedUp), BlueDown)
+  (m.r, m.g, m.b)
+}

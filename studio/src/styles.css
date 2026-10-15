@@ -48,3 +48,23 @@ body { background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans
 .ai { margin: 8px 0 12px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
 .ai input, .ai textarea { display: block; width: 100%; margin: 6px 0; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: inherit; font: 13px ui-monospace, Menlo, monospace; }
 .ai summary { cursor: pointer; font-weight: 600; }
+
+/* classes the example apps use (UiProp("class", ...)) */
+.app .card { padding: 14px; border: 1px solid var(--border, #dcd9cf); border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.app .card.dark { background: #1b2420; color: #e6ece8; }
+.app .good { color: #1a7f4b; } .app .bad { color: #c0392b; }
+.app ul { margin: 0; padding-left: 20px; } .app li { cursor: pointer; }
+.app li.done { text-decoration: line-through; opacity: .6; }
+.app .tab { padding: 6px 14px; border-radius: 8px 8px 0 0; cursor: pointer; }
+.app .tab.active { background: #0b6b57; color: #fff; }
+.app .grid { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; }
+.app .cell { width: 64px; height: 64px; display: grid; place-items: center; font: 700 26px system-ui; border: 1px solid #8884; border-radius: 8px; cursor: pointer; user-select: none; }
+.app .cell.taken { cursor: default; background: #8881; }
+.app .signal { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #222; border-radius: 14px; width: 70px; align-items: center; }
+.app .lamp { width: 44px; height: 44px; border-radius: 50%; background: #444; }
+.app .lamp.on.red { background: #ff4d4d; box-shadow: 0 0 18px #ff4d4d; }
+.app .lamp.on.yellow { background: #ffd24d; box-shadow: 0 0 18px #ffd24d; }
+.app .lamp.on.green { background: #3ddc84; box-shadow: 0 0 18px #3ddc84; }
+.app .choice { text-align: left; }
+.app .choice.good { background: #3ddc8433; } .app .choice.bad { background: #ff4d4d33; }
+.app .bar { background: #c0392b; transition: width .2s; } .app .bar.ok { background: #e0a100; } .app .bar.strong { background: #1a7f4b; }

@@ -1,0 +1,37 @@
+type Model = { open: Bool, dark: Bool }
+
+type Msg = TogglePanel | ToggleTheme
+
+fn init() -> Model = Model { open: false, dark: false }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  TogglePanel => m with { open: !m.open }
+  ToggleTheme => m with { dark: !m.dark }
+}
+
+fn panel(m: Model) -> List[Html[Msg]] = if m.open {
+  [Html.paragraph("Surprise! This element only exists while the panel is open.")]
+} else { [] }
+
+fn view(m: Model) -> Html[Msg] =
+  Html.node(
+    "section",
+    [UiProp("class", if m.dark { "card dark" } else { "card" })],
+    [
+      Html.heading(if m.open { "Panel: open" } else { "Panel: closed" }),
+      Html.row(
+        [
+          Html.button(if m.open { "Hide" } else { "Show" }, TogglePanel),
+          Html.button(if m.dark { "Light theme" } else { "Dark theme" }, ToggleTheme)
+        ]
+      )
+    ].concat(panel(m))
+  )
+
+test startsClosed = !init().open
+
+test togglesTwice = !update(update(init(), TogglePanel), TogglePanel).open
+
+test themeIsIndependent = update(init(), ToggleTheme).dark && !update(init(), ToggleTheme).open
+
+fn main() -> (Bool, Bool) = (update(init(), TogglePanel).open, update(init(), ToggleTheme).dark)
