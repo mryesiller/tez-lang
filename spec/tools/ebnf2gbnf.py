@@ -122,8 +122,9 @@ def generate(rules):
         out.append(f"{gname(name)} ::= {emit(node)}")
     for name in ("LOWER", "UPPER", "INT", "FLOAT", "STRING"):
         out.append(f"{gname(name)} ::= {LEXICAL[name][0]}")
-    out.append(f'nl ::= "\\n" ws')
-    return "\n".join(out).replace("nl ::= \"\\n\" ws", "nl ::= \"\\n\" ws") + "\n"
+    # newlines separate items in Tez, but whitespace is interchangeable here (a superset): `nl` is just whitespace
+    out.append("nl ::= ws")
+    return "\n".join(out) + "\n"
 
 
 # ---- recognizer over the EBNF itself (the same relation the GBNF encodes) ----
@@ -198,6 +199,20 @@ def main():
     if GBNF.read_text() != text:
         sys.exit("spec/grammar.gbnf is stale: run python3 spec/tools/ebnf2gbnf.py")
     sys.setrecursionlimit(20000)
+    # the generated GBNF itself must derive every accepted example (checked with an independent Earley parser)
+    sys.path.insert(0, str(ROOT / "tools" / "gbnf"))
+    from earley import Grammar, State
+
+    gram = Grammar(text)
+    gbad = []
+    for p in sorted((ROOT / "spec" / "examples").glob("*.tez")):
+        if p.name.endswith(".reject.tez"):
+            continue
+        st = State.initial(gram).advance(p.read_text())
+        if st is None or not st.complete():
+            gbad.append(p.name)
+    if gbad:
+        sys.exit("spec/grammar.gbnf does not derive: " + ", ".join(gbad))
     bad = []
     n = 0
     for p in sorted((ROOT / "spec" / "examples").glob("*.tez")):

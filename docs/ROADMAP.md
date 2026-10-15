@@ -144,7 +144,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 ## Faz 6 — Tarayıcı içi model (2 hafta)
 
 - [ ] 🔒 Kuantize Tez-Coder (q4) + WebGPU çalışma zamanı — eğitilmiş model gerekir
-- [ ] 🔒 GBNF kısıtlı üretim tarayıcıda — `spec/grammar.gbnf` hazır; tarayıcı içi model çalışma zamanı gerekir
+- [ ] 🔒 GBNF kısıtlı üretim **tarayıcıda** — tarayıcı içi model çalışma zamanı gerekir. Yerelde yapılabilen kısım tamam: `tools/gbnf/` (karakter düzeyinde Earley tanıyıcı + mlx-lm mantıksal işlemcisi; `spec/tools/ebnf2gbnf.py --check` artık üretilen GBNF'nin kendisini bu tanıyıcıyla 44 örnekte doğruluyor). Bu doğrulama **gerçek bir hatayı yakaladı**: üretilen GBNF blok içinde yeni satırı zorunlu kılıyordu (`{ 1 }` türetilemiyordu) ve eski kontrol EBNF'yi sınadığı için fark edilmemişti; düzeltildi.
+  Kısıtlı çözümleme ölçümü (Gemma 4 E4B, greedy, TezBench 20 görev): ince ayarlı + kart yok: geçerli sözdizimi %80 → **%95**, geçer %70 → %70; ince ayarlı + kart: %100 / %50 (değişmedi); ince ayarsız + kart: %100 / %55. Sonuç: dilbilgisi sözdizimini neredeyse bedavaya düzeltiyor ama başarıyı artırmıyor — darboğaz tür/sözleşme anlamı, sözdizimi değil
 - [ ] 🔒 İnternetsiz uçtan uca demo — yukarıdakilere bağlı (Studio zaten çevrimdışı derler, çalıştırır, doğrular)
 
 ## Faz 7 — Etkiler (sonra)
