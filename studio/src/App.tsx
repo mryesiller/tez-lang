@@ -5,6 +5,7 @@ import { Compiler, type Diagnostic, type Fix } from "./compiler";
 import { load } from "../../runtime/tez-runtime.mjs";
 import card from "../../spec/card.md?raw";
 import { solve } from "../../tools/agent/loop.mjs";
+import { inBrowserModel, webGpuAvailable } from "./localModel";
 import { openAICompatible } from "../../tools/agent/providers.mjs";
 import { isApp, mountApp, type AppHandle } from "../../runtime/tez-app.mjs";
 import "./monaco";
@@ -53,6 +54,7 @@ export default function App() {
     }
   });
   const [aiTask, setAiTask] = useState("");
+  const [aiLocal, setAiLocal] = useState(false);
   const [aiLog, setAiLog] = useState("");
 
   const publish = useCallback((ds: Diagnostic[]) => {
@@ -156,8 +158,8 @@ export default function App() {
   }, [source, compiler]);
 
   const askAi = async () => {
-    if (!ai.baseUrl || !ai.model || !aiTask.trim()) {
-      setAiLog("Fill in the server URL, the model and a task.");
+    if ((!aiLocal && (!ai.baseUrl || !ai.model)) || !aiTask.trim()) {
+      setAiLog(aiLocal ? "Write a task." : "Fill in the server URL, the model and a task.");
       return;
     }
     try {
@@ -171,7 +173,7 @@ export default function App() {
       const r = await solve({
         task: aiTask,
         card,
-        generate: openAICompatible({ baseUrl: ai.baseUrl, model: ai.model, apiKey: ai.apiKey }),
+        generate: aiLocal ? inBrowserModel((t) => setAiLog(t)) : openAICompatible({ baseUrl: ai.baseUrl ?? "", model: ai.model ?? "", apiKey: ai.apiKey }),
         check: async (code) => (await compiler.check(code)).report.diagnostics,
         onTurn: (t, i) => setAiLog((l) => `${l}\nturn ${i + 1}: ${t.diagnostics.length ? `${t.diagnostics.length} problem(s), first ${t.diagnostics[0]?.code}` : "accepted"}`),
       });
@@ -318,6 +320,10 @@ export default function App() {
               Any OpenAI-compatible server (Ollama, llama.cpp, vLLM, a hosted API). The language card is sent with the task,
               and compiler errors are fed back for up to 3 turns. Settings stay in this browser.
             </p>
+            <label className="muted">
+              <input type="checkbox" checked={aiLocal} disabled={!webGpuAvailable()} onChange={(e) => setAiLocal(e.target.checked)} /> Run the model in this browser (WebGPU
+              {webGpuAvailable() ? "" : ": not available here"}; experimental, downloads about 4.9 GB the first time)
+            </label>
             <input aria-label="Server URL" placeholder="http://localhost:11434/v1" value={ai.baseUrl ?? ""} onChange={(e) => setAi({ ...ai, baseUrl: e.target.value })} />
             <input aria-label="Model" placeholder="model name" value={ai.model ?? ""} onChange={(e) => setAi({ ...ai, model: e.target.value })} />
             <input aria-label="API key" type="password" placeholder="API key (if the server needs one)" value={ai.apiKey ?? ""} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} />

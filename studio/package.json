@@ -12,6 +12,7 @@
     "prebuild": "node scripts/copy-z3.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
     "@monaco-editor/react": "^4.7.0",
     "monaco-editor": "^0.57.0",
     "react": "^19.3.0",
