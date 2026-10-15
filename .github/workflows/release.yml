@@ -1,0 +1,98 @@
+name: Release
+
+# Builds the `tez` binaries and the npm package for a version tag and attaches them to a DRAFT GitHub release.
+# Nothing is published from here: review the draft, then publish it (and `npm publish` the tarball) by hand.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14, target: aarch64-apple-darwin, name: tez-macos-arm64 }
+          - { os: macos-13, target: x86_64-apple-darwin, name: tez-macos-x64 }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, name: tez-linux-x64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, name: tez-linux-arm64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: tez-windows-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p tez-lang
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist/${{ matrix.name }}
+          cp target/release/tez LICENSE-MIT LICENSE-APACHE README.md dist/${{ matrix.name }}/
+          tar -C dist -czf dist/${{ matrix.name }}.tar.gz ${{ matrix.name }}
+          cd dist && (shasum -a 256 ${{ matrix.name }}.tar.gz > ${{ matrix.name }}.tar.gz.sha256)
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/${{ matrix.name }} | Out-Null
+          Copy-Item target/release/tez.exe, LICENSE-MIT, LICENSE-APACHE, README.md dist/${{ matrix.name }}/
+          Compress-Archive -Path dist/${{ matrix.name }} -DestinationPath dist/${{ matrix.name }}.zip
+          (Get-FileHash dist/${{ matrix.name }}.zip -Algorithm SHA256).Hash.ToLower() + "  ${{ matrix.name }}.zip" | Out-File -Encoding ascii dist/${{ matrix.name }}.zip.sha256
+      - name: Smoke test the binary
+        shell: bash
+        run: |
+          BIN=target/release/tez; [ -f "$BIN.exe" ] && BIN="$BIN.exe"
+          "$BIN" --version
+          "$BIN" check --no-verify spec/examples/projects/shop/main.tez
+          "$BIN" run --no-verify spec/examples/projects/shop/main.tez
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
+
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned toolchain (wasm32)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install wasm-bindgen CLI, binaryen and Z3
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.129 --locked
+          sudo apt-get update && sudo apt-get install -y binaryen z3
+      - run: node npm/build.mjs
+      - run: cd npm/tez-lang && npm test
+      - run: cd npm/tez-lang && npm pack --pack-destination ../../dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tez-lang-npm
+          path: dist/*.tgz
+
+  draft-release:
+    needs: [binaries, npm]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create a draft release with all files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* --repo "${{ github.repository }}" --draft \
+            --title "Tez ${{ github.ref_name }}" \
+            --notes "Binaries need the \`z3\` solver on PATH to prove programs (\`--no-verify\` runs without). Checksums are the .sha256 files."

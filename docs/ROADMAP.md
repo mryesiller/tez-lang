@@ -160,10 +160,20 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 Terminalde Tez ile geliştirme yapmak isteyen biri için eksikler; sırayla:
 
 - [x] **Çok dosya / `use`**: `use "dosya.tez"` ile bağımlılıklar tek programa katılır; yollar göreli ve proje içinde kalır (`E_USE_NOT_FOUND`/`E_USE_CYCLE`/`E_USE_BAD_PATH`), dosya bir kez yüklenir, ortak ad alanı (gölgeleme yok). Tüm dosyalar birlikte doğrulanır; tanılar `file` alanıyla doğru dosyayı gösterir. Örnek: `spec/examples/projects/shop`
-- [ ] Hazır ikililer (GitHub Releases) + gerçek `tez-lang` npm paketi (şu an yalnız ad rezervasyonu)
+- [x] Hazır ikililer + npm paketi **hazırlandı, yayımlanmadı**: `release.yml` (v* etiketinde 5 platform + npm tarball → TASLAK release), `npm/tez-lang` (WASM derleyici, `tez` komutu, çok dosyalı, Z3: sistem `z3` ya da `z3-solver` WASM). Yayın = kullanıcı onayı (etiket + `npm publish`)
 - [ ] VS Code eklentisi (renklendirme + `tez check --json` ile canlı hata), sonra dil sunucusu (LSP)
 - [ ] `tez --help` çıkış kodu, `tez check --watch`, `tez new`
 - [ ] Studio'da çok dosyalı proje (tarayıcı sanal dosya sistemi; `tez_web` şu an tek dosya)
+
+## Faz 9 — Birinci hedef: tarayıcıda canlı web siteleri (2026-10-15 hatırlatması)
+
+Asıl amaç: tarayıcıdaki bir LLM Tez yazar, kod aynı tarayıcıda derlenip çalışır, site zamanlayıcı/tetikleyicilerle (cron benzeri) kendini günceller; tüm yapı web'e ait. Faz 8 bu hedefi destekler, onun yerine geçmez. Sırayla:
+
+- [ ] Studio'da çok dosyalı proje (`tez_web` proje API'si hazır: `check_project`, `verify_project_step`, `run_project`, `test_project`, `build_project`)
+- [ ] Siteyi yayınla: Studio'dan tek dosyalık (HTML + wasm + runtime) çıktı / paylaşılabilir bağlantı
+- [ ] Tetikleyiciler: zamanlayıcı (`Sub.every` var), takvim/cron ifadesi, sayfa görünürlüğü/çevrimiçi olayları, `Sub.on(...)`
+- [ ] Kalıcılık ve ağ efektleri (yerel depolama, `Http.get`), sözleşmeli ve sandbox'lı
+- [ ] Tarayıcıda LLM → derle → doğrula → çalıştır döngüsü uçtan uca (WebGPU model, tamir döngüsü)
 
 ## Sürekli kurallar
 

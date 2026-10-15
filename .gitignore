@@ -23,3 +23,9 @@ dist
 *.safetensors
 /studio/public/z3
 /data/lora/adapters
+
+# Built by `node npm/build.mjs`
+/npm/tez-lang/wasm
+/npm/tez-lang/runtime
+/npm/tez-lang/grammar.ebnf
+/npm/tez-lang/LICENSE-*

@@ -3,7 +3,7 @@
 RUSTUP_BIN := $(shell brew --prefix rustup 2>/dev/null)/bin
 export PATH := $(RUSTUP_BIN):$(HOME)/.cargo/bin:$(PATH)
 
-.PHONY: agent-test bench-check gbnf site-dev site-build help check fmt fmt-check lint test wasm studio-wasm studio-install studio-dev studio-build doctor link-agents
+.PHONY: npm-build npm-test agent-test bench-check gbnf site-dev site-build help check fmt fmt-check lint test wasm studio-wasm studio-install studio-dev studio-build doctor link-agents
 
 help: ## List commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -35,6 +35,12 @@ test: ## Run Rust tests
 
 wasm: ## Build the portable crates for wasm32
 	cargo build --target wasm32-unknown-unknown -p tez_diag -p tez_syntax -p tez_types
+
+npm-build: ## Build the npm package (compiler as WebAssembly + runtime) into npm/tez-lang
+	node npm/build.mjs
+
+npm-test: npm-build ## Test the npm package CLI
+	cd npm/tez-lang && npm test
 
 studio-wasm: ## Build the compiler for the browser into studio/src/tez-wasm
 	cargo build --release --target wasm32-unknown-unknown -p tez_web
