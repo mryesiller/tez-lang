@@ -1,6 +1,6 @@
 // Bundle Monaco locally: no CDN, so Studio works offline and under COEP.
 import { loader } from "@monaco-editor/react";
-import * as monaco from "monaco-editor";
+import * as monaco from "./monaco-lite.js";
 import editorWorker from "monaco-editor/editor/editor.worker?worker";
 
 self.MonacoEnvironment = {

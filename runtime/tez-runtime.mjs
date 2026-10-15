@@ -302,7 +302,7 @@ export async function load(bytes) {
 
   const MAP = [
     [/divide by zero|remainder by zero/i, "E_DIV_ZERO"],
-    [/call stack|stack overflow/i, "E_RESOURCE"],
+    [/call stack|stack overflow|out of memory|invalid array length|allocation failed|too large/i, "E_RESOURCE"],
   ];
 
   /** Calls the zero-argument Tez function `name` and renders its value like the interpreter. */

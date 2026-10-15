@@ -75,8 +75,9 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Hot-swap: olay günlüğü (event sourcing) — kod değişince yeni `init()` ile başlayıp kullanıcı olayları yeniden oynatılır; Studio'da ve sitede çalışır
 - [x] `site/`: açılış sayfası + dokümantasyon (Tour, referans, hata kataloğu, örnekler, mimari, yol haritası); çalıştırılabilir örnekler tarayıcıda derlenir; GitHub Pages iş akışı (`.github/workflows/pages.yml`)
 - [x] Hot-swap: durum serileştirme yerine olay günlüğü yeniden oynatma (yapısal göç gerekmez: program saftır, model her seferinde yeniden hesaplanır)
-- [ ] Worker + fuel (sonsuz döngü koruması; doğrulanmamış programlar için) ve bellek tavanı
-- [ ] Studio paketini küçült (Monaco tüm dil tanımlarıyla 4,2 MB) ve tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)
+- [x] Çalıştırma sınırları: derleyici Worker'da; çalıştırma/test 10 sn'yi aşarsa worker öldürülüp yeniden başlatılır (`E_RESOURCE`), liste/üs/büyük sayı tavanları ve bellek hataları `E_RESOURCE`'a eşlenir. Yakıt sayacı yerine duvar saati seçildi (derlenmiş koda sayaç eklemek her çağrıyı yavaşlatır). Sınır: TEA uygulamalarının `update`/`view` çağrıları ana iş parçacığında koşar
+- [x] Studio paketi küçültüldü: Monaco çekirdeği + yalnız gerekli katkılar (`studio/src/monaco-lite.js`); ilk yüklenen JS 4,3 MB → 3,45 MB (gzip 1,08 → 0,89 MB), `dist` ≈ 13 MB → 5 MB (ts/css/html çalışanları çıktı)
+- [ ] Tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)
 - [ ] Artımlı derleme: fonksiyon başına önbellek
 - [ ] Kod üretimi: yerel Float/Int fast path, nullary ADT singleton, kuyruk çağrıları (`return_call`)
 
