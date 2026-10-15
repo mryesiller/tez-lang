@@ -61,6 +61,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
   | Tez, kart (yöntem-öncelikli cümle eklendi) | %85 | %65 |
   | TypeScript (karşılaştırma) | — | %100 |
 
+  İkinci ~4B model (`microsoft/phi-4-mini-reasoning`, kart, ilk sürüm): geçerli sözdizimi %75, doğrulanır+geçer **%5** — sonuç modele çok bağlı; Gemma 4 E4B'nin %30'u Tez'e özgü bir üst sınır değil, Gemma'ya özgü.
+
   Yorum: kart olmadan model Tez'i hiç yazamıyor; kart + geri bildirim ince ayar olmadan %55–65'e çıkarıyor, TypeScript'in hâlâ çok gerisinde — ince ayar gerçekten gerekli (Faz 5). Baskın hata: listeler için yöntem yerine elle özyineleme yazıp `decreases` unutmak. Karta tek genel cümle (`Before writing recursion over a list, use these methods`) %30 → %65. **Uyarı:** bu cümle TezBench hatalarına bakıldıktan sonra eklendi (kart tasarımına hafif sızıntı); yeni ölçümler için TezBench'in yanında ayrı bir dışlanmış görev kümesi gerekir. Tek örnekleme, 20 görev: ±%10 belirsizlik
 
 ## Faz 1 — Çekirdek derleyici ✅

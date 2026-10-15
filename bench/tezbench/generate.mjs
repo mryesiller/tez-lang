@@ -21,7 +21,7 @@ if (!baseUrl || !model || !out) {
   process.exit(2);
 }
 const modes = opt("--modes", "tez-nocard,tez-card,tez-repair,ts").split(",");
-const generate = openAICompatible({ baseUrl, model, apiKey: process.env.TEZ_LLM_KEY, temperature: Number(opt("--temp", "0")), maxTokens: 1500 });
+const generate = openAICompatible({ baseUrl, model, apiKey: process.env.TEZ_LLM_KEY, temperature: Number(opt("--temp", "0")), maxTokens: Number(opt("--max-tokens", "1500")) });
 const card = readFileSync(`${root}spec/card.md`, "utf8");
 const check = cliChecker();
 
