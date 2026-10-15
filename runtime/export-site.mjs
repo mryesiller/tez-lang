@@ -15,11 +15,13 @@ function inline(src) {
 }
 
 /**
- * @param {{title: string, wasm: string, runtime: string, app: string, css?: string}} p
- *   `wasm` is base64; `runtime`/`app` are the texts of tez-runtime.mjs / tez-app.mjs; `css` styles the page.
+ * @param {{title: string, wasm: string, runtime: string, app: string, css?: string, allow?: string[]}} p
+ *   `wasm` is base64; `runtime`/`app` are the texts of tez-runtime.mjs / tez-app.mjs; `css` styles the page;
+ *   `allow` lists the extra origins the program may fetch from (the page's own origin is always allowed).
  */
-export function siteHtml({ title, wasm, runtime, app, css = "" }) {
-  const csp = "default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: https:; media-src data: https:";
+export function siteHtml({ title, wasm, runtime, app, css = "", allow = [] }) {
+  const origins = allow.map((o) => new URL(o).origin);
+  const csp = `default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: https:; media-src data: https:; connect-src 'self'${origins.map((o) => ` ${o}`).join("")}`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -44,7 +46,15 @@ const root = document.getElementById("app");
 try {
   const rt = await load(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
   if (isApp(rt)) {
-    mountApp(rt, root, { onError: (e) => { root.textContent = "The program stopped: " + e.message; } });
+    let storage = null;
+    try { storage = window.localStorage; } catch { /* storage is blocked: nothing is remembered */ }
+    mountApp(rt, root, {
+      onError: (e) => { root.textContent = "The program stopped: " + e.message; },
+      storage,
+      storageKey: ${JSON.stringify(`tez-site:${title}`)},
+      fetch: window.fetch.bind(window),
+      allow: [location.origin, ...${JSON.stringify(origins)}],
+    });
   } else {
     const pre = document.createElement("pre");
     pre.id = "out";

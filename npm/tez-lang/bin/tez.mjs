@@ -16,7 +16,7 @@ USAGE:
     tez build <file> [-o out.wasm] [--no-verify]
                                             compile to a WebAssembly (WasmGC) module
     tez fmt <file> [--check | --write]      print / check / rewrite canonical formatting
-    tez site <file> [-o index.html] [--no-verify]
+    tez site <file> [-o index.html] [--allow=https://origin]... [--no-verify]
                                             write one self-contained web page (program + runtime)
     tez grammar                             print the normative grammar (EBNF)
     tez --version
@@ -28,6 +28,7 @@ Verification needs an SMT solver: the \`z3\` executable if present, else the bun
 
 const argv = process.argv.slice(2);
 const flags = new Set(argv.filter((a) => a.startsWith("--")));
+const allow = argv.filter((a) => a.startsWith("--allow=")).map((a) => a.slice(8));
 const pos = [];
 let out = null;
 for (let i = 0; i < argv.length; i++) {
@@ -148,7 +149,7 @@ async function main() {
       if (!b.ok) return b.report ? reject(b) : fail(`code generation failed: ${b.error}`, 1);
       const here = (f) => readFileSync(new URL(`../runtime/${f}`, import.meta.url), "utf8");
       const target = out ?? "index.html";
-      writeFileSync(target, siteHtml({ title: basename(file, ".tez"), wasm: b.wasm, runtime: here("tez-runtime.mjs"), app: here("tez-app.mjs") }));
+      writeFileSync(target, siteHtml({ title: basename(file, ".tez"), wasm: b.wasm, runtime: here("tez-runtime.mjs"), app: here("tez-app.mjs"), allow }));
       console.log(`wrote ${target}: one self-contained page; serve it from any static host`);
       return 0;
     }

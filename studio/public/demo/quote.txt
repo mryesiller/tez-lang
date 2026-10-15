@@ -1,0 +1,1 @@
+Tez: the program is proven before it runs.

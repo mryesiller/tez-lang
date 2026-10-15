@@ -1,0 +1,66 @@
+type Model = { loads: Int where it >= 0, quote: Str, status: Str, wanted: Bool }
+
+type Msg = Load | Got(Str) | Failed(Str) | Forget
+
+fn init() -> Model = Model { loads: 0, quote: "", status: "Nothing loaded yet.", wanted: false }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Load => m with { wanted: true, status: "Loading…" }
+  Got(text) => m with { loads: m.loads + 1, quote: text, status: "Loaded.", wanted: false }
+  Failed(why) => m with { status: "Could not load: " ++ why, wanted: false }
+  Forget => init()
+}
+
+// the network is declared, like time: while `wanted`, the host fetches this page-relative file once
+fn fetches(m: Model) -> List[Fetch[Msg]] = if m.wanted {
+  [Fetch.get("demo/quote.txt", t => Got(t), e => Failed(e))]
+} else { [] }
+
+// the program decides what is kept in this browser and how it comes back
+fn save(m: Model) -> Str = m.loads.toStr() ++ "\n" ++ m.quote
+
+fn restore(s: Str) -> Option[Model] = {
+  let parts = s.split("\n")
+  match parts.first() {
+    Some(n) => match n.toInt() {
+      Some(k) => if k >= 0 {
+        Some(
+          Model {
+            loads: k,
+            quote: parts.drop(1).join("\n"),
+            status: "Restored from this browser.",
+            wanted: false
+          }
+        )
+      } else { None }
+      None => None
+    }
+    None => None
+  }
+}
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Saved quote"),
+      Html.paragraph(m.status),
+      Html.paragraph(if m.quote == "" { "(no quote)" } else { m.quote }),
+      Html.paragraph(
+        "Loaded " ++ m.loads.toStr() ++ " time(s); reload the page and the count stays."
+      ),
+      Html.row([Html.button("Load quote", Load), Html.button("Forget", Forget)])
+    ]
+  )
+
+test restoresWhatItSaved =
+  restore(save(update(update(init(), Load), Got("hi")))).map(m => m.loads) == Some(1)
+
+test rejectsGarbage = restore("not a number").isNone()
+
+test negativeCountIsRejected = restore("-3\nx").isNone()
+
+test failureStopsWaiting = !update(update(init(), Load), Failed("404")).wanted
+
+test fetchesOnlyWhenWanted = fetches(init()).isEmpty() && fetches(update(init(), Load)).len() == 1
+
+fn main() -> (Int, Bool) = (update(update(init(), Load), Got("x")).loads, restore("2\nq").isSome())

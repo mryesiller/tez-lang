@@ -266,3 +266,11 @@ fn Sub.online[M](toMsg: (Bool) -> M) -> Sub[M] = UiOnline(toMsg)
 fn Sub.visible[M](toMsg: (Bool) -> M) -> Sub[M] = UiVisible(toMsg)
 
 fn Html.col[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", "col")], kids)
+
+// ------------------------------------------------------------------ Fetch (declared like subscriptions)
+
+type Fetch[M] = UiGet(Str, (Str) -> M, (Str) -> M)
+
+// Listed by an optional `fn fetches(m: Model) -> List[Fetch[Msg]]`. The host performs one GET each time `url` newly
+// appears in the list and sends `onOk(body)` or `onErr(reason)`. Only origins the page's owner allowed can be reached.
+fn Fetch.get[M](url: Str, onOk: (Str) -> M, onErr: (Str) -> M) -> Fetch[M] = UiGet(url, onOk, onErr)

@@ -43,6 +43,29 @@ export function subMessage(rt, sub, value) {
   return rt.exports.__apply1(sub.fn, sub.kind === "clock" ? wasmInt(value) : value ? 1 : 0);
 }
 
+/** The active fetches of a model, from the optional `fetches(model)` function: `[{url, ok, err}]`. */
+export function readFetches(rt, model) {
+  if (!rt.meta.fns.fetches || rt.meta.fns.fetches.params !== 1) return [];
+  const ex = rt.exports;
+  return ex.f_fetches(model).map((f) => ({ url: ex.__get0(f), ok: ex.__get1(f), err: ex.__get2(f) }));
+}
+
+const MAX_BODY = 1_000_000;
+const MAX_SAVED = 65_536;
+
+/**
+ * The absolute URL a program may fetch, or `null`: http(s) only, and only from an origin the page's owner listed.
+ * Relative URLs resolve against `base` (the page).
+ */
+export function fetchAllowed(url, allow, base) {
+  try {
+    const u = new URL(url, base);
+    return (u.protocol === "https:" || u.protocol === "http:") && allow.includes(u.origin) ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Reads an `Html[Msg]` value out of WebAssembly into `{text}` / `{tag, props, click, input, kids}` vnodes. */
 export function readHtml(rt, v) {
   const ex = rt.exports;
@@ -159,13 +182,20 @@ const MAX_LOG = 20000;
 
 /**
  * Starts the app in `root`. Returns `{ model, dispatch, swap, stop }`.
+ * Options: `storage` (an object with getItem/setItem, e.g. localStorage) enables the program's optional
+ * `save(model) -> Str` / `restore(Str) -> Option[Model]`; `fetch` and `allow` (a list of origins) enable its
+ * optional `fetches(model)`: a program can reach nothing that is not in `allow`.
  * Runtime failures inside `update`/`view` are reported through `onError` (a `TezError`) and stop the loop.
  *
  * Hot-swap is event sourcing: every UI event is logged as (path in the vnode tree, kind, value). `swap` loads
  * a new program, starts it from its own `init()` and replays the log. The program is pure, so the replay yields
  * exactly the state the user would have reached; events whose target no longer exists end the replay there.
  */
-export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
+export function mountApp(
+  rt0,
+  root,
+  { onError = (e) => { throw e; }, storage = null, storageKey = "tez-app", fetch: fetchFn = null, allow = [] } = {},
+) {
   if (!isApp(rt0)) throw new TezError("E_INTERNAL", "an app needs `init()`, `update(model, msg)` and `view(model)`");
   const doc = root.ownerDocument;
   let rt = rt0;
@@ -222,6 +252,8 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
       return;
     }
     syncTimers();
+    syncFetches();
+    persist();
   };
 
   const stopTimers = () => {
@@ -272,6 +304,91 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
     schedule();
   }
 
+  let fetchesActive = new Set();
+  let fetchesNow = [];
+
+  /** Performs a GET for every fetch that newly appears in `fetches(model)`. */
+  const syncFetches = () => {
+    if (dead) return;
+    try {
+      fetchesNow = readFetches(rt, model);
+    } catch (e) {
+      fail(e);
+      return;
+    }
+    const next = new Set(fetchesNow.map((f) => f.url));
+    for (const f of fetchesNow) if (!fetchesActive.has(f.url)) startFetch(f.url);
+    fetchesActive = next;
+  };
+
+  function startFetch(url) {
+    const reply = (ok, text) => queueMicrotask(() => deliverFetch(url, ok, text));
+    const target = fetchFn ? fetchAllowed(url, allow, doc.baseURI) : null;
+    if (!target) {
+      reply(false, allow.length ? "blocked: this origin is not allowed" : "blocked: this page may not use the network");
+      return;
+    }
+    const signal = AbortSignal.timeout(10_000);
+    Promise.resolve()
+      .then(() => fetchFn(target, { credentials: "omit", referrerPolicy: "no-referrer", redirect: "error", signal }))
+      .then(async (r) => {
+        const text = await r.text();
+        if (!r.ok) return reply(false, `HTTP ${r.status}`);
+        if (text.length > MAX_BODY) return reply(false, "response too large");
+        reply(true, text);
+      })
+      .catch((e) => reply(false, String(e && e.name === "TimeoutError" ? "timed out" : "request failed")));
+  }
+
+  function deliverFetch(url, ok, text) {
+    if (dead || replaying) return;
+    const f = fetchesNow.find((x) => x.url === url);
+    if (!f) return; // the program no longer wants it
+    try {
+      model = rt.exports.f_update(model, rt.exports.__apply1(ok ? f.ok : f.err, text));
+      if (log.length < MAX_LOG) log.push({ kind: "fetch", url, ok, value: text });
+    } catch (e) {
+      fail(e);
+      return;
+    }
+    schedule();
+  }
+
+  /** Saves the model after each change through the program's own `save`; a failed save never stops the app. */
+  let saved = null;
+  const persist = () => {
+    if (!storage || !rt.meta.fns.save || rt.meta.fns.save.params !== 1) return;
+    try {
+      const s = rt.exports.f_save(model);
+      if (typeof s === "string" && s !== saved && s.length <= MAX_SAVED) {
+        storage.setItem(storageKey, s);
+        saved = s;
+      }
+    } catch {
+      /* quota, private mode, or a runtime error in `save`: keep running unsaved */
+    }
+  };
+
+  /** The model to start from: the saved one when the program can restore it, else `init()`. */
+  const startModel = () => {
+    const f = rt.meta.fns;
+    if (storage && f.save?.params === 1 && f.restore?.params === 1) {
+      try {
+        const s = storage.getItem(storageKey);
+        if (typeof s === "string") {
+          const opt = rt.exports.f_restore(s);
+          if (rt.exports.__tag(opt) === 1) {
+            saved = s;
+            return rt.exports.__get0(opt);
+          }
+        }
+      } catch {
+        /* unreadable state: start fresh */
+      }
+    }
+    return rt.exports.f_init();
+  };
+
   function schedule() {
     if (!queued) {
       queued = true;
@@ -293,7 +410,7 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
     schedule();
   }
 
-  model = rt.exports.f_init();
+  model = startModel();
   render();
 
   return {
@@ -338,6 +455,14 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
             replayed++;
             continue;
           }
+          if (ev.kind === "fetch") {
+            const f = readFetches(rt, model).find((x) => x.url === ev.url);
+            if (!f) break;
+            model = rt.exports.f_update(model, rt.exports.__apply1(ev.ok ? f.ok : f.err, ev.value));
+            cur = readHtml(rt, rt.exports.f_view(model));
+            replayed++;
+            continue;
+          }
           let vn = cur;
           for (const i of ev.path) vn = vn?.kids?.[i];
           if (!vn || vn.text !== undefined || !step(vn, ev.kind, ev.value)) break;
@@ -354,6 +479,9 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
         tree = nextTree;
         replaying = false;
         syncTimers();
+        fetchesNow = readFetches(rt, model);
+        fetchesActive = new Set(fetchesNow.map((f) => f.url));
+        persist();
         return { replayed, dropped };
       } catch (e) {
         // the new program failed while replaying: restore the old one untouched

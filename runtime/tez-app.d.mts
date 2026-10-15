@@ -12,4 +12,16 @@ export interface AppHandle {
 export function isApp(rt: TezRuntime): boolean;
 
 /** Runs the program as an Elm-architecture app inside `root`. */
-export function mountApp(rt: TezRuntime, root: HTMLElement, opts?: { onError?: (e: Error) => void }): AppHandle;
+export function mountApp(
+  rt: TezRuntime,
+  root: HTMLElement,
+  opts?: {
+    onError?: (e: Error) => void;
+    /** enables the program's `save`/`restore` (e.g. localStorage) */
+    storage?: { getItem(k: string): string | null; setItem(k: string, v: string): void } | null;
+    storageKey?: string;
+    /** enables the program's `fetches`, for the origins in `allow` only */
+    fetch?: typeof fetch | null;
+    allow?: string[];
+  },
+): AppHandle;

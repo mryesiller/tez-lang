@@ -188,6 +188,10 @@ export default function App() {
       } else {
         setAppOn(true);
         app.current = mountApp(rt, appRoot.current, {
+          storage: (() => { try { return window.localStorage; } catch { return null; } })(),
+          storageKey: "tez-app:studio",
+          fetch: window.fetch.bind(window),
+          allow: [location.origin],
           onError: (e) => setOutput({ kind: "error", text: `app stopped: ${e.message}` }),
         });
         setOutput({ kind: "ok", text: "App running. Each click calls update(model, msg), then view(model); only changed DOM is touched." });
