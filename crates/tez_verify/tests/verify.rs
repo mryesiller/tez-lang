@@ -596,8 +596,22 @@ fn structural_measures_are_inferred_and_proved() {
         "fn sum(xs: List[Int]) -> Int = match xs {\n  [] => 0\n  [h, ..t] => h + sum(t)\n}\n",
         "type T = Leaf | Node(T, Int, T)\n\nfn size(t: T) -> Int = match t {\n  Leaf => 0\n  Node(l, _, r) => size(l) + 1 + size(r)\n}\n",
         "fn pairs(xs: List[Int]) -> Int = match xs {\n  [a, b, ..rest] => a * b + pairs(rest)\n  _ => 0\n}\n",
+        "fn sumTo(n: Int) -> Int\n  requires n >= 0\n  = if n == 0 { 0 } else { n + sumTo(n - 1) }\n",
+        "fn zipSum(a: List[Int], b: List[Int]) -> List[Int] = match (a, b) {\n  ([], _) => []\n  (_, []) => []\n  ([x, ..xs], [y, ..ys]) => [x + y].concat(zipSum(xs, ys))\n}\n",
     ];
     for src in ok {
         assert!(run(src).is_empty(), "{src}");
     }
+}
+
+#[test]
+fn inferred_measures_are_still_proved() {
+    need_z3!();
+    // countdown without a lower bound diverges for negative n: the inferred measure must not be trusted
+    let ps = run("fn down(n: Int) -> Int = if n == 0 { 0 } else { down(n - 1) }\n");
+    assert!(
+        ps.iter()
+            .any(|p| p.code == Code::Termination && p.message.contains("no `decreases`")),
+        "{ps:?}"
+    );
 }

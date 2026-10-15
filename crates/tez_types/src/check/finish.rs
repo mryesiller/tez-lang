@@ -5,7 +5,7 @@ use tez_syntax::{ByteSpan, Problem};
 
 use super::{Checker, Pending};
 use crate::exhaust::{self, ArmInfo, Issue};
-use crate::hir::{Expr, ExprKind, Pat, PatKind, Stmt, TypeKind};
+use crate::hir::{BinOp, Expr, ExprKind, Pat, PatKind, Stmt, TypeKind};
 use crate::ty::Ty;
 
 impl Checker<'_> {
@@ -167,6 +167,7 @@ impl Checker<'_> {
                     && let Some(m) = self.infer_measure(f)
                 {
                     self.program.fns[f].decreases = Some(m);
+                    self.program.fns[f].decreases_inferred = true;
                 }
                 if self.program.fns[f].decreases.is_none() && !self.program.fns[f].is_prelude {
                     let span = self.fn_srcs[f]
@@ -192,6 +193,33 @@ impl Checker<'_> {
     fn infer_measure(&self, f: usize) -> Option<Expr> {
         let def = &self.program.fns[f];
         let body = def.body.as_ref()?;
+        // `f(.., n - k, ..)` with a positive literal `k` in every recursive call: measure `n`
+        for (at, p) in def.params.iter().enumerate() {
+            if p.ty != Ty::Int {
+                continue;
+            }
+            let mut calls = 0usize;
+            let mut all_down = true;
+            body.walk(&mut |e| {
+                if let ExprKind::Call { f: g, args, .. } = &e.kind
+                    && *g == f
+                {
+                    calls += 1;
+                    let down = matches!(args.get(at).map(|a| &a.kind),
+                        Some(ExprKind::Binary(BinOp::Sub, l, r))
+                            if matches!(l.kind, ExprKind::Local(x) if x == p.local)
+                                && matches!(&r.kind, ExprKind::Int(k) if k.sign() == num_bigint::Sign::Plus));
+                    all_down &= down;
+                }
+            });
+            if calls > 0 && all_down {
+                return Some(Expr {
+                    kind: ExprKind::Local(p.local),
+                    ty: Ty::Int,
+                    span: def.span,
+                });
+            }
+        }
         for p in &def.params {
             let is_list = matches!(p.ty, Ty::List(_));
             let is_sum = matches!(&p.ty, Ty::Adt(id, _) if matches!(self.program.types[*id].kind, TypeKind::Adt(_)));
@@ -204,13 +232,31 @@ impl Checker<'_> {
             loop {
                 let before = smaller.len();
                 body.walk(&mut |e| {
-                    if let ExprKind::Match(scrut, arms) = &e.kind
-                        && let ExprKind::Local(s) = scrut.kind
-                        && (origin.contains(&s))
-                    {
-                        for arm in arms {
-                            collect_parts(&arm.pat, is_list, &p.ty, &mut smaller);
+                    let ExprKind::Match(scrut, arms) = &e.kind else {
+                        return;
+                    };
+                    match &scrut.kind {
+                        ExprKind::Local(s) if origin.contains(s) => {
+                            for arm in arms {
+                                collect_parts(&arm.pat, is_list, &p.ty, &mut smaller);
+                            }
                         }
+                        // `match (a, b) { ([h, ..t], ..) => .. }`: each component on its own
+                        ExprKind::Tuple(items) => {
+                            for (k, it) in items.iter().enumerate() {
+                                if !matches!(it.kind, ExprKind::Local(s) if origin.contains(&s)) {
+                                    continue;
+                                }
+                                for arm in arms {
+                                    if let PatKind::Tuple(ps) = &arm.pat.kind
+                                        && let Some(sub) = ps.get(k)
+                                    {
+                                        collect_parts(sub, is_list, &p.ty, &mut smaller);
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 });
                 for s in &smaller {

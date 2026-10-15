@@ -1,4 +1,4 @@
 // expect: E_TERMINATION_MISSING
-fn countdown(n: Int) -> Int = if n <= 0 { 0 } else { countdown(n - 1) }
+fn countUp(n: Int) -> Int = if n >= 100 { n } else { countUp(n + 1) }
 
-fn main() -> Int = countdown(5)
+fn main() -> Int = countUp(5)

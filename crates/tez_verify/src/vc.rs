@@ -1203,20 +1203,28 @@ impl<'p> Vc<'p> {
             self.obligation(
                 Kind::Termination,
                 span,
-                format!(
-                    "the `decreases` measure of `{}` may be negative here",
-                    def.name
-                ),
+                if def.decreases_inferred {
+                    format!(
+                        "`{}` has no `decreases`; the measure inferred from its recursion may be negative here (add a `requires` that bounds it, or write `decreases`)",
+                        def.name
+                    )
+                } else {
+                    format!("the `decreases` measure of `{}` may be negative here", def.name)
+                },
                 Some("a non-negative measure".into()),
                 format!("(>= {m_new} 0)"),
             );
             self.obligation(
                 Kind::Termination,
                 span,
-                format!(
-                    "the `decreases` measure may not decrease in this call to `{}`",
-                    def.name
-                ),
+                if def.decreases_inferred {
+                    format!(
+                        "`{}` has no `decreases`; the measure inferred from its recursion may not decrease in this call (write `decreases`)",
+                        def.name
+                    )
+                } else {
+                    format!("the `decreases` measure may not decrease in this call to `{}`", def.name)
+                },
                 Some("a strictly smaller measure".into()),
                 format!("(< {m_new} {m_cur})"),
             );

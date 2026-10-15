@@ -185,6 +185,8 @@ pub struct FnDef {
     pub result_local: LocalId,
     /// Termination measure.
     pub decreases: Option<Expr>,
+    /// `decreases` was not written but inferred from structural or countdown recursion.
+    pub decreases_inferred: bool,
     /// Body; `None` for `extern fn`.
     pub body: Option<Expr>,
     /// Implemented by the runtime.
