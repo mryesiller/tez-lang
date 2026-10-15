@@ -1,0 +1,113 @@
+type Filter = All | Active | Done
+
+type Item = { id: Int, title: Str, done: Bool }
+
+type Model = { draft: Str, items: List[Item], filter: Filter, nextId: Int where it >= 0 }
+
+type Msg = Draft(Str) | Add | Toggle(Int) | Delete(Int) | SetFilter(Filter) | ToggleAll | ClearDone
+
+fn init() -> Model = Model { draft: "", items: [], filter: All, nextId: 0 }
+
+fn remaining(items: List[Item]) -> Int = items.count(i => !i.done)
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Draft(s) => m with { draft: s }
+  Add => if m.draft.trim().isEmpty() { m } else {
+    Model {
+      draft: "",
+      items: m.items.append(Item { id: m.nextId, title: m.draft.trim(), done: false }),
+      filter: m.filter,
+      nextId: m.nextId + 1
+    }
+  }
+  Toggle(id) =>
+    m with {
+      items: m.items.map(
+        i => if i.id == id { Item { id: i.id, title: i.title, done: !i.done } } else { i }
+      )
+    }
+  Delete(id) => m with { items: m.items.filter(i => i.id != id) }
+  SetFilter(f) => m with { filter: f }
+  ToggleAll => {
+    let target = remaining(m.items) > 0
+    m with { items: m.items.map(i => Item { id: i.id, title: i.title, done: target }) }
+  }
+  ClearDone => m with { items: m.items.filter(i => !i.done) }
+}
+
+fn shown(m: Model) -> List[Item] = match m.filter {
+  All => m.items
+  Active => m.items.filter(i => !i.done)
+  Done => m.items.filter(i => i.done)
+}
+
+fn filterButton(m: Model, f: Filter, label: Str) -> Html[Msg] =
+  Html.node(
+    "button",
+    [UiClick(SetFilter(f)), UiProp("class", if m.filter == f { "tab active" } else { "tab" })],
+    [Html.text(label)]
+  )
+
+fn itemView(i: Item) -> Html[Msg] =
+  Html.node(
+    "li",
+    [UiProp("class", if i.done { "done" } else { "todo" })],
+    [
+      Html.node(
+        "span",
+        [UiClick(Toggle(i.id))],
+        [Html.text((if i.done { "[x] " } else { "[ ] " }) ++ i.title)]
+      ),
+      Html.text("  "),
+      Html.button("delete", Delete(i.id))
+    ]
+  )
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Todo"),
+      Html.row([Html.input(m.draft, s => Draft(s)), Html.button("Add", Add)]),
+      Html.row(
+        [
+          filterButton(m, All, "All"),
+          filterButton(m, Active, "Active"),
+          filterButton(m, Done, "Done")
+        ]
+      ),
+      if shown(m).isEmpty() { Html.paragraph("Nothing here.") } else {
+        Html.node("ul", [], shown(m).map(itemView))
+      },
+      Html.row(
+        [
+          Html.text(remaining(m.items).toStr() ++ " left"),
+          Html.button("Toggle all", ToggleAll),
+          Html.button("Clear done", ClearDone)
+        ]
+      )
+    ]
+  )
+
+fn withTwo() -> Model =
+  update(update(update(update(init(), Draft("write")), Add), Draft("test")), Add)
+
+test idsAreUnique = withTwo().items.map(i => i.id) == [0, 1]
+
+test blankIsIgnored = update(update(init(), Draft("  ")), Add).items.isEmpty()
+
+test togglingOneLeavesTheOther = remaining(update(withTwo(), Toggle(0)).items) == 1
+
+test toggleAllFinishesEverything = remaining(update(withTwo(), ToggleAll).items) == 0
+
+test toggleAllTwiceReopens = remaining(update(update(withTwo(), ToggleAll), ToggleAll).items) == 2
+
+test deleteRemovesOnlyThatItem = update(withTwo(), Delete(0)).items.map(i => i.title) == ["test"]
+
+test filtersShowTheRightItems =
+  shown(update(update(withTwo(), Toggle(1)), SetFilter(Done))).map(i => i.title) == ["test"]
+
+fn main() -> (Int, List[Str]) =
+  (
+    remaining(update(withTwo(), Toggle(0)).items),
+    shown(update(update(withTwo(), Toggle(0)), SetFilter(Active))).map(i => i.title)
+  )
