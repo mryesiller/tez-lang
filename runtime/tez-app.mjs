@@ -12,6 +12,13 @@ export function isApp(rt) {
   return Boolean(f.init && f.update && f.view && f.init.params === 0 && f.update.params === 2 && f.view.params === 1);
 }
 
+/** The active subscriptions of a model: `[{ms, msg}]` from the optional `subs(model)` function. */
+export function readSubs(rt, model) {
+  if (!rt.meta.fns.subs || rt.meta.fns.subs.params !== 1) return [];
+  const ex = rt.exports;
+  return ex.f_subs(model).map((s) => ({ ms: Math.max(50, Number(ex.__get0(s))), msg: ex.__get1(s) }));
+}
+
 /** Reads an `Html[Msg]` value out of WebAssembly into `{text}` / `{tag, props, click, input, kids}` vnodes. */
 export function readHtml(rt, v) {
   const ex = rt.exports;
@@ -110,6 +117,9 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
   let queued = false;
   let log = [];
   let replaying = false;
+  /** running timers, by position in the subscription list */
+  let timers = [];
+  let subsNow = [];
 
   const fail = (e) => {
     dead = true;
@@ -150,8 +160,51 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
       draw();
     } catch (e) {
       fail(e);
+      return;
     }
+    syncTimers();
   };
+
+  const stopTimers = () => {
+    for (const t of timers) clearInterval(t.id);
+    timers = [];
+  };
+
+  /** Starts, keeps or stops timers so that they match `subs(model)`; messages are always the latest ones. */
+  const syncTimers = () => {
+    if (dead) return;
+    try {
+      subsNow = readSubs(rt, model);
+    } catch (e) {
+      fail(e);
+      return;
+    }
+    while (timers.length > subsNow.length) clearInterval(timers.pop().id);
+    subsNow.forEach((sub, i) => {
+      if (timers[i] && timers[i].ms === sub.ms) return;
+      if (timers[i]) clearInterval(timers[i].id);
+      timers[i] = { ms: sub.ms, id: setInterval(() => tick(i), sub.ms) };
+    });
+  };
+
+  function tick(i) {
+    if (dead || replaying || !subsNow[i]) return;
+    try {
+      model = rt.exports.f_update(model, subsNow[i].msg);
+      if (log.length < MAX_LOG) log.push({ kind: "tick", path: [i] });
+    } catch (e) {
+      fail(e);
+      return;
+    }
+    schedule();
+  }
+
+  function schedule() {
+    if (!queued) {
+      queued = true;
+      queueMicrotask(render);
+    }
+  }
 
   function fire(node, kind, value) {
     if (dead || replaying) return;
@@ -164,10 +217,7 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
       return;
     }
     // several events in one tick render once
-    if (!queued) {
-      queued = true;
-      queueMicrotask(render);
-    }
+    schedule();
   }
 
   model = rt.exports.f_init();
@@ -206,6 +256,15 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
         // replay against virtual trees only; the DOM is patched once at the end
         let cur = readHtml(rt, rt.exports.f_view(model));
         for (const ev of log) {
+          if (ev.kind === "tick") {
+            const subs = readSubs(rt, model);
+            const sub = subs[ev.path[0]];
+            if (!sub) break;
+            model = rt.exports.f_update(model, sub.msg);
+            cur = readHtml(rt, rt.exports.f_view(model));
+            replayed++;
+            continue;
+          }
           let vn = cur;
           for (const i of ev.path) vn = vn?.kids?.[i];
           if (!vn || vn.text !== undefined || !step(vn, ev.kind, ev.value)) break;
@@ -221,6 +280,7 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
         patch(doc, root, el, tree, nextTree, fire);
         tree = nextTree;
         replaying = false;
+        syncTimers();
         return { replayed, dropped };
       } catch (e) {
         // the new program failed while replaying: restore the old one untouched
@@ -233,6 +293,7 @@ export function mountApp(rt0, root, { onError = (e) => { throw e; } } = {}) {
     },
     stop() {
       dead = true;
+      stopTimers();
       root.textContent = "";
     },
   };

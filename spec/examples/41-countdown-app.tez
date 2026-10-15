@@ -1,13 +1,17 @@
-type Model = { left: Int where it >= 0 }
+type Model = { left: Int where it >= 0, running: Bool }
 
-type Msg = Tick | Reset
+type Msg = Tick | Toggle | Reset
 
-fn init() -> Model = Model { left: 10 }
+fn init() -> Model = Model { left: 10, running: false }
 
 fn update(m: Model, msg: Msg) -> Model = match msg {
-  Tick => if m.left > 0 { m with { left: m.left - 1 } } else { m }
+  Tick => if m.left > 1 { m with { left: m.left - 1 } } else { Model { left: 0, running: false } }
+  Toggle => if m.left == 0 { m } else { m with { running: !m.running } }
   Reset => init()
 }
+
+// every second while running
+fn subs(m: Model) -> List[Sub[Msg]] = if m.running { [Sub.every(1000, Tick)] } else { [] }
 
 fn view(m: Model) -> Html[Msg] =
   Html.node(
@@ -20,12 +24,22 @@ fn view(m: Model) -> Html[Msg] =
         [],
         List.range(0, m.left).map(i => Html.node("li", [], [Html.text("#" ++ i.toStr())]))
       ),
-      Html.row([Html.button("tick", Tick), Html.button("reset", Reset)])
+      Html.row(
+        [
+          Html.button(if m.running { "Pause" } else { "Start" }, Toggle),
+          Html.button("Reset", Reset)
+        ]
+      )
     ]
   )
 
 test countsDown = update(init(), Tick).left == 9
 
-test stopsAtZero = update(Model { left: 0 }, Tick).left == 0
+test stopsAtZero = update(Model { left: 1, running: true }, Tick).left == 0
 
-fn main() -> Int = update(update(init(), Tick), Tick).left
+test stopsTheClockAtZero = subs(update(Model { left: 1, running: true }, Tick)).isEmpty()
+
+test startsPaused = subs(init()).isEmpty()
+
+fn main() -> (Int, Int) =
+  (update(update(init(), Tick), Tick).left, subs(update(init(), Toggle)).len())

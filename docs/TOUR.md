@@ -158,6 +158,8 @@ fn view(m: Model) -> Html[Msg] =
   Html.row([Html.button("-", Dec), Html.paragraph(m.count.toStr()), Html.button("+", Inc)])
 ```
 
+Time is an input too. An app may define `fn subs(m: Model) -> List[Sub[Msg]]`; `Sub.every(1000, Tick)` makes the runtime send `Tick` every second for as long as the model lists it. So a timer is just another event for the pure `update`, and the compiler proves the interval is at least 50 ms. Example 49 (a traffic light that changes colour by itself, with different durations per light) and 41 (a countdown with Start/Pause) are written this way.
+
 Edit an app while it runs in the playground and the running session is kept: the runtime replays your clicks into the new program.
 
 ## 11. What gets rejected

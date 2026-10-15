@@ -249,4 +249,10 @@ fn Html.input[M](value: Str, onInput: (Str) -> M) -> Html[M] =
 
 fn Html.row[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", "row")], kids)
 
+// ------------------------------------------------------------------ Sub (time as an input, not an effect)
+
+type Sub[M] = UiEvery(Int, M)
+
+fn Sub.every[M](ms: Int where it >= 50, msg: M) -> Sub[M] = UiEvery(ms, msg)
+
 fn Html.col[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", "col")], kids)

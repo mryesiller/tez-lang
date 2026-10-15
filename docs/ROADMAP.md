@@ -141,7 +141,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 
 ## Faz 7 — Etkiler (sonra)
 
-- [ ] ⏸ `Cmd`/`Sub`, HTTP, depolama; yetki (capability) modeli — kullanıcı kararı: ilk aşamada yok
+- [x] `Sub.every(ms, msg)` + isteğe bağlı `subs(model)`: zaman saf `update`'e bir olay olarak girer; süre ≥ 50 ms derleyicide kanıtlanır; ana bilgisayar zamanlayıcıları modele göre başlatır/durdurur/yeniden kurar; hot-swap tik olaylarını da yeniden oynatır (trafik ışığı ve geri sayım örnekleri, tarayıcıda doğrulandı)
+- [ ] ⏸ `Cmd` (HTTP, depolama) ve yetki (capability) modeli — kullanıcı kararı: ilk aşamada yok
 
 ---
 

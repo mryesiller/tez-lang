@@ -1,10 +1,10 @@
 type Light = Red | Green | Yellow
 
-type Model = { light: Light, cycles: Int where it >= 0 }
+type Model = { light: Light, running: Bool, cycles: Int where it >= 0 }
 
-type Msg = Next | Reset
+type Msg = Next | Toggle | Reset
 
-fn init() -> Model = Model { light: Red, cycles: 0 }
+fn init() -> Model = Model { light: Red, running: true, cycles: 0 }
 
 fn next(l: Light) -> Light = match l {
   Red => Green
@@ -14,9 +14,25 @@ fn next(l: Light) -> Light = match l {
 
 fn update(m: Model, msg: Msg) -> Model = match msg {
   Next =>
-    Model { light: next(m.light), cycles: if m.light == Yellow { m.cycles + 1 } else { m.cycles } }
+    Model {
+      light: next(m.light),
+      running: m.running,
+      cycles: if m.light == Yellow { m.cycles + 1 } else { m.cycles }
+    }
+  Toggle => m with { running: !m.running }
   Reset => init()
 }
+
+fn seconds(l: Light) -> Int = match l {
+  Red => 3
+  Green => 3
+  Yellow => 1
+}
+
+// time enters the program as a subscription: while running, send Next after the current light's duration
+fn subs(m: Model) -> List[Sub[Msg]] = if m.running {
+  [Sub.every(seconds(m.light) * 1000, Next)]
+} else { [] }
 
 fn colour(l: Light) -> Str = match l {
   Red => "red"
@@ -39,8 +55,21 @@ fn view(m: Model) -> Html[Msg] =
         [UiProp("class", "signal")],
         [lamp(m, Red), lamp(m, Yellow), lamp(m, Green)]
       ),
-      Html.paragraph("Now: " ++ colour(m.light) ++ ", full cycles: " ++ m.cycles.toStr()),
-      Html.row([Html.button("Next", Next), Html.button("Reset", Reset)])
+      Html.paragraph(
+        "Now: " ++
+          colour(m.light) ++
+          " for " ++
+          seconds(m.light).toStr() ++
+          " s, full cycles: " ++
+          m.cycles.toStr()
+      ),
+      Html.row(
+        [
+          Html.button(if m.running { "Pause" } else { "Start" }, Toggle),
+          Html.button("Next now", Next),
+          Html.button("Reset", Reset)
+        ]
+      )
     ]
   )
 
@@ -48,4 +77,9 @@ test cyclesBack = next(next(next(Red))) == Red
 
 test countsCycles = update(update(update(init(), Next), Next), Next).cycles == 1
 
-fn main() -> (Str, Int) = (colour(update(init(), Next).light), update(init(), Next).cycles)
+test pausingStopsTheClock = subs(update(init(), Toggle)).isEmpty()
+
+test runningHasOneSubscription = subs(init()).len() == 1
+
+fn main() -> (Str, Int, Int) =
+  (colour(update(init(), Next).light), update(init(), Next).cycles, subs(init()).len())

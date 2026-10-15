@@ -44,6 +44,7 @@ There are no loops. Before writing recursion over a list, use these methods: `xs
 - Str `len slice chars toInt contains startsWith endsWith trim upper lower split repeat isEmpty`
 - List `len get map filter fold flatMap append concat reverse take drop any all count contains indexOf first last zip enumerate sort sortBy sum min max join isEmpty` · static `List.range(lo, hi)` `List.repeat(x, n)`
 - Option `isSome isNone unwrapOr map andThen` · Result `isOk unwrapOr map mapErr toOption`
+- Time: an app may define `fn subs(m: Model) -> List[Sub[Msg]]`; `Sub.every(ms, msg)` (ms >= 50) sends `msg` every `ms` milliseconds while it is listed.
 - UI view: `Html[Msg]` built with `Html.text(s)` `Html.heading(s)` `Html.paragraph(s)` `Html.button(label, msg)` `Html.input(value, f)` `Html.row(kids)` `Html.col(kids)` `Html.node(tag, attrs, kids)`
 
 ## What the compiler proves (else it rejects with a code and a counterexample)

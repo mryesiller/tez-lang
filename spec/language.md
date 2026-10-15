@@ -105,7 +105,7 @@ If `tez check` reports no diagnostics, then at run time none of these can happen
 
 ## 8.1 Apps (UI)
 
-A program with `fn init() -> Model`, `fn update(m: Model, msg: Msg) -> Model` and `fn view(m: Model) -> Html[Msg]` is an app. The host (`runtime/tez-app.mjs`) calls `view` after every `update` and patches only the DOM that changed. `Html[Msg]` is built with `Html.text`, `Html.heading`, `Html.paragraph`, `Html.button(label, msg)`, `Html.input(value, f)`, `Html.row`, `Html.col` and `Html.node`. Constructors are not functions, so write `s => Typed(s)`, not `Typed`. `update` and `view` are ordinary verified functions: refinements on `Model` hold in every state.
+A program with `fn init() -> Model`, `fn update(m: Model, msg: Msg) -> Model` and `fn view(m: Model) -> Html[Msg]` is an app. The host (`runtime/tez-app.mjs`) calls `view` after every `update` and patches only the DOM that changed. `Html[Msg]` is built with `Html.text`, `Html.heading`, `Html.paragraph`, `Html.button(label, msg)`, `Html.input(value, f)`, `Html.row`, `Html.col` and `Html.node`. `Sub.every(ms, msg)` is how time enters an app: an optional `fn subs(m: Model) -> List[Sub[Msg]]` lists the subscriptions that are active for a model, and the host sends `msg` every `ms` milliseconds (at least 50) while the subscription is listed; when the model changes so that it is no longer listed, the timer stops. Time is therefore just another event for the pure `update`. Constructors are not functions, so write `s => Typed(s)`, not `Typed`. `update` and `view` are ordinary verified functions: refinements on `Model` hold in every state.
 
 ## 9. What the verifier knows
 
