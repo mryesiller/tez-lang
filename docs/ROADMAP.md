@@ -49,7 +49,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] `spec/card.md`: **930 token** (bütçe 1.200); örnekleri doğrulanıyor, metot listesi prelude ile testle senkron
 - [x] `spec/grammar.gbnf`: `spec/tools/ebnf2gbnf.py` ile EBNF'den üretilir; `--check` güncelliği ve 30 örneğin türetilebilirliğini doğrular (üst küme: boşluk/yeni satır serbest, anahtar sözcükler tanımlayıcıdan dışlanmaz)
 - [x] TezBench iskeleti: `bench/tezbench/` — 20 görev, Tez + TypeScript referansları, dört düzeyli yargıç (ayrıştırır, tür denetler, doğrular, vakaları geçer), `--self-check`, `--prompts`
-- [ ] 🔒 `q4f16` ONNX boyutlarını ölç; küçük deneme LoRA — model ağırlığı indirme (GB) ve GPU gerekir; indirme onayı bekliyor
+- [x] `q4f16` ONNX boyutları ölçüldü (yalnız HF üst verisi, ağırlık indirilmedi; `bench/onnx-sizes.mjs`): **metin-only q4f16 = 4,9 GB** (kod çözücü 2,9 + gömme 2,0), q4 5,6 GB, fp16 16,5 GB. Sonuç: Mod C "isteğe bağlı indirme" olmalı (ARCHITECTURE §9 riski doğrulandı); ince ayarlı daha küçük bir model hedefi anlamlı
+- [ ] 🔒 Küçük deneme LoRA — GPU ve temel model ağırlığı indirme onayı gerekir
 - [ ] 🔒 İlk ölçüm: Gemma 4 E4B, kartla → sözdizimi geçerliliği. Token oranı ölçüldü (0,88); geçerlilik için bir model sunucusu gerekir. Hazır araç: `node bench/tezbench/run.mjs --prompts DIR --card` + `tools/agent/solve.mjs` (OpenAI uyumlu herhangi bir sunucu: Ollama, llama.cpp, vLLM)
 
 ## Faz 1 — Çekirdek derleyici ✅

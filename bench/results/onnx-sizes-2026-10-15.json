@@ -1,0 +1,38 @@
+{
+  "repo": "onnx-community/gemma-4-E4B-it-ONNX",
+  "date": "2026-10-15",
+  "rows": [
+    {
+      "quant": "q4f16",
+      "decoderMB": 2888,
+      "embedMB": 2017,
+      "textOnlyMB": 4905,
+      "visionMB": 101,
+      "audioMB": 172
+    },
+    {
+      "quant": "q4",
+      "decoderMB": 3381,
+      "embedMB": 2236,
+      "textOnlyMB": 5616,
+      "visionMB": 115,
+      "audioMB": 191
+    },
+    {
+      "quant": "quantized",
+      "decoderMB": 5775,
+      "embedMB": 4035,
+      "textOnlyMB": 9810,
+      "visionMB": 202,
+      "audioMB": 344
+    },
+    {
+      "quant": "fp16",
+      "decoderMB": 9491,
+      "embedMB": 6979,
+      "textOnlyMB": 16470,
+      "visionMB": 339,
+      "audioMB": 593
+    }
+  ]
+}

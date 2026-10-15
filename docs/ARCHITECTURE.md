@@ -251,7 +251,7 @@ Sonuçları ve tasarım etkileri:
 - **Kart bütçesi** (1.200 token) bağlam sınırından değil, küçük modelde dikkat kalitesinden ve tarayıcıda ilk dolum (prefill) gecikmesinden gelir; 128K bağlam bunu değiştirmez.
 - **Benchmark protokolü:** her ölçüm hem *greedy* hem önerilen örneklemeyle, düşünme modu kapalı **ve** açık raporlanır. Mod C varsayılanı gecikme için düşünme kapalıdır.
 - **İnce ayar riski (Faz 5):** model çok kipli sarmalayıcıyla geliyor (`Gemma4ForConditionalGeneration`) ve PLE tabloları var; LoRA yalnızca metin çözücüsüne uygulanacak. Araç desteği (ör. Unsloth sürümleri) mevcut görünüyor ama **Faz 0'da küçük bir deneme ince ayarıyla doğrulanmalı**.
-- **Mod C riski:** 8B toplam ağırlık tarayıcıda indirme boyutunu belirler; `q4f16` dosya boyutları Faz 0'da ölçülmeli. Çok büyükse Mod C "isteğe bağlı indirme" olarak sunulur.
+- **Mod C riski (ölçüldü, 2026-10-15):** `onnx-community/gemma-4-E4B-it-ONNX` metin-only `q4f16` = **4,9 GB** (kod çözücü 2,9 + `embed_tokens` 2,0; görüntü +0,1, ses +0,17); q4 5,6 GB; fp16 16,5 GB (`bench/onnx-sizes.mjs`). Bu, tarayıcı için ağır: Mod C "isteğe bağlı indirme" (bir kez indir, Cache Storage'da tut) olarak sunulur; daha küçük bir ince ayarlı model (ör. ≤1–2 GB) Faz 5/6'da hedef.
 - Diğer 3–4B modeller **desteklenir ama hedeflenmez**: kart ve sözdizimi Gemma 4'e göre ayarlanır, diğerleri regresyon göstergesidir.
 
 ### 9.1 Kullanım modları
