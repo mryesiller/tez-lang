@@ -3,6 +3,8 @@
 //! Deterministic mutation fuzzing over the example programs (a seeded generator, so failures reproduce).
 //! `TEZ_FUZZ_N` sets the mutations per file (default 300).
 
+#![allow(clippy::unwrap_used)]
+
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 
@@ -128,8 +130,8 @@ fn mutated_programs_never_crash_the_front_end() {
                 // full front end without the solver
                 let _ = compile(&m, &CompileOptions { verify: false });
                 let ok = parse(&m, ParseOptions::default()).problems.is_empty();
-                if ok {
-                    if let Ok(once) = format_source(&m, ParseOptions::default()) {
+                if ok && let Ok(once) = format_source(&m, ParseOptions::default()) {
+                    {
                         let twice =
                             format_source(&once, ParseOptions::default()).unwrap_or_else(|e| {
                                 panic!("formatted output no longer formats: {e:?}\n{once}")
