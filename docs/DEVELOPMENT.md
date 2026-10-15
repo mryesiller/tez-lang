@@ -1,6 +1,6 @@
 # Tez — Geliştirme Notları
 
-> Güncelleme: 2026-10-15 (inceleme + ölçüm turu) · Durum: tüm Rust/Node testleri, gramer kontrolü ve TezBench referansları yeşil
+> Güncelleme: 2026-10-15 (inceleme + ölçüm turu; Faz 8/9 altyapı eklendi, bkz. §7) · Durum: tüm Rust/Node testleri, gramer kontrolü ve TezBench referansları yeşil
 > Kaynaklar: `docs/ROADMAP.md`, `spec/`, `bench/results/`. Bu belge analiz ve öneri özetidir; iş durumunun kaynağı `ROADMAP.md` kalır.
 > Kural: buradaki her sayı bir komutla yeniden üretilebilir olmalı (komutlar her başlıkta).
 
@@ -102,3 +102,17 @@ Hepsi **dili değiştirmeyen** tanı/düzeltme iyileştirmeleri; tamir döngüs�
 ## 6. Ortam notu
 
 `make check` wasm32 hedefinde `E0463: can't find crate for std/core` ile düşerse: Homebrew sade `rust` formülü rustup shim'lerini gölgeliyordur. Düzeltme: `brew unlink rust && brew link --force rustup` (geri alma: `brew link rust`). `rust-toolchain.toml` (1.99.0 + wasm32) doğru.
+
+## 7. Altyapı turu (2026-10-15): birinci hedef "tarayıcıda canlı siteler"
+
+Yapılanlar (ayrıntı ve durum: `docs/ROADMAP.md` Faz 8–9):
+- **Çok dosyalı programlar** (`use "x.tez"`), CLI + `tez_web` proje API'si + Studio dosya sekmeleri (proje tarayıcıda saklanır).
+- **npm paketi `tez-lang`** (`npm/tez-lang`): derleyici WebAssembly olarak, `tez check|run|test|build|site|fmt`; kanıt için sistem `z3` ya da `z3-solver` WASM. **Hazır ama yayımlanmadı**; `release.yml` etiketle TASLAK release üretir (5 platform).
+- **Siteyi dışa aktarma**: Studio *Publish* ve `tez site` → tek dosya (wasm + runtime + host gömülü, sıkı CSP).
+- **Tetikleyiciler**: `Sub.every/clock/online/visible` (cron benzeri zamanlama saf kod). **Kalıcılık**: `save`/`restore`. **Ağ**: `fetches` → `Fetch.get`, yalnız izinli kökenler.
+- Studio model döngüsü kanıt hatalarını da modele geri verir.
+
+Dikkat: dil kartı tam **1.200/1.200 token** (yeni `Sub` cümlesi 1.148 → 1.200); `Fetch`/`save`/`restore` kartta yok (gelişmiş özellik; `language.md`'de). Kart değiştiği için TezBench karşılaştırmaları (§3.2) yeniden ölçülmeli; şu anki sayılar eski kartla.
+
+Açık: gerçek WebGPU model denemesi, `tez_web` ile `Fetch` için POST/başlık, yayın/barındırma bağlantısı, VS Code eklentisi/LSP, `tez check --watch`/`tez new`.
+
