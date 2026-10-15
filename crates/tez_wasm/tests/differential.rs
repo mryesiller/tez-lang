@@ -387,3 +387,50 @@ fn every_example_program_agrees() {
     }
     assert!(n >= 14, "found only {n} examples");
 }
+
+#[test]
+fn tail_calls_run_in_constant_stack() {
+    if !node_available() {
+        eprintln!("node not installed: skipping");
+        return;
+    }
+    // 5 million tail calls: far deeper than any stack; only `return_call` can run this.
+    // (the interpreter would hit its depth limit, so this checks the compiled result against the known sum)
+    let src = "fn sumTo(n: Int, acc: Int) -> Int
+  requires n >= 0
+  decreases n
+  = if n == 0 { acc } else { sumTo(n - 1, acc + n) }
+
+fn isEven(n: Int) -> Bool
+  requires n >= 0
+  decreases n
+  = if n == 0 { true } else { isOdd(n - 1) }
+
+fn isOdd(n: Int) -> Bool
+  requires n >= 0
+  decreases n
+  = if n == 0 { false } else { isEven(n - 1) }
+
+fn viaMatch(n: Int, acc: Int) -> Int
+  requires n >= 0
+  decreases n
+  = match n {
+    0 => acc
+    _ => viaMatch(n - 1, acc + 1)
+  }
+
+fn a() -> Int = sumTo(5000000, 0)
+fn b() -> Bool = isEven(3000001)
+fn c() -> Int = viaMatch(4000000, 0)
+";
+    let prog = compile(src);
+    let got = run_wasm(&prog, &["a".into(), "b".into(), "c".into()], "tailcalls");
+    assert_eq!(
+        got,
+        vec![
+            ("a".to_string(), "12500002500000".to_string()),
+            ("b".to_string(), "false".to_string()),
+            ("c".to_string(), "4000000".to_string()),
+        ]
+    );
+}

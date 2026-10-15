@@ -79,7 +79,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Studio paketi küçültüldü: Monaco çekirdeği + yalnız gerekli katkılar (`studio/src/monaco-lite.js`); ilk yüklenen JS 4,3 MB → 3,45 MB (gzip 1,08 → 0,89 MB), `dist` ≈ 13 MB → 5 MB (ts/css/html çalışanları çıktı)
 - [ ] Tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)
 - [ ] Artımlı derleme: fonksiyon başına önbellek
-- [ ] Kod üretimi: yerel Float/Int fast path, nullary ADT singleton, kuyruk çağrıları (`return_call`)
+- [x] Kod üretimi: kuyruk çağrıları (`return_call`/`return_call_ref`; `if`/`match` kollarında da; 5 milyon derinlikli özyineleme sabit yığında çalışır; gereksinim: Chrome 112+/Firefox 121+/Safari 18.2+/Node 20+), nullary ADT singleton (kullanım başına ayırma yok)
+- [ ] Kod üretimi: yerel Float/Int fast path (kutusuz yerel değişkenler; tür-bilgili yerel tipler gerektirir, ayrı bir yeniden düzenleme)
 
 **Çıkış kriteri:** TEA uygulaması (sayaç) tarayıcıda canlı; ARCHITECTURE §7 bütçeleri.
 

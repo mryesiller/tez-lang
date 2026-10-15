@@ -131,6 +131,10 @@ struct FnState {
     nparams: u32,
     slots: HashMap<u32, u32>,
     depth: u32,
+    /// Compiling a user function or lambda body (result type `anyref`): calls may become tail calls.
+    tail_ok: bool,
+    /// Indices in `code` of `call` / `call_ref` instructions that may be tail calls.
+    tail_cands: Vec<usize>,
 }
 
 impl FnState {
@@ -141,10 +145,76 @@ impl FnState {
             nparams,
             slots: HashMap::new(),
             depth: 0,
+            tail_ok: false,
+            tail_cands: Vec::new(),
         }
     }
 
-    fn finish(self) -> Function {
+    /// True when nothing but block ends follows instruction `i` (so its value is the function's result).
+    fn only_ends_after(&self, i: usize) -> bool {
+        let mut j = i + 1;
+        while j < self.code.len() {
+            match self.code[j] {
+                I::End => {
+                    if j + 1 == self.code.len() {
+                        return true;
+                    }
+                    j += 1;
+                }
+                I::Br(d) => {
+                    // a `match` arm jumps to the end of its enclosing block with the arm's value
+                    let mut left = d;
+                    let mut nest = 0usize;
+                    let mut k = j + 1;
+                    loop {
+                        match self.code.get(k) {
+                            Some(I::Block(_) | I::Loop(_) | I::If(_)) => nest += 1,
+                            Some(I::End) if nest > 0 => nest -= 1,
+                            Some(I::End) if left == 0 => break,
+                            Some(I::End) => left -= 1,
+                            Some(_) => {}
+                            None => return false,
+                        }
+                        k += 1;
+                    }
+                    j = k;
+                }
+                I::Else => {
+                    // skip the else branch: it is followed by its own tail-or-not fate at the matching `end`
+                    let mut depth = 0usize;
+                    let mut k = j + 1;
+                    loop {
+                        match self.code.get(k) {
+                            Some(I::Block(_) | I::Loop(_) | I::If(_)) => depth += 1,
+                            Some(I::End) if depth == 0 => break,
+                            Some(I::End) => depth -= 1,
+                            Some(_) => {}
+                            None => return false,
+                        }
+                        k += 1;
+                    }
+                    j = k;
+                }
+                _ => return false,
+            }
+        }
+        false
+    }
+
+    fn finish(mut self) -> Function {
+        let cands = std::mem::take(&mut self.tail_cands);
+        for i in cands {
+            if self.only_ends_after(i) {
+                let swapped = match self.code[i] {
+                    I::Call(f) => Some(I::ReturnCall(f)),
+                    I::CallRef(t) => Some(I::ReturnCallRef(t)),
+                    _ => None,
+                };
+                if let Some(t) = swapped {
+                    self.code[i] = t;
+                }
+            }
+        }
         let mut f = Function::new(self.extra.iter().map(|t| (1, *t)));
         for i in &self.code {
             f.instruction(i);
@@ -170,6 +240,8 @@ struct Gen<'p> {
     str_g: HashMap<String, u32>,
     bigs: Vec<String>,
     big_g: HashMap<String, u32>,
+    /// One shared object per nullary variant tag (`None`, `Red`, ...): no allocation at each use.
+    nullary_g: HashMap<i32, u32>,
     n_globals: u32,
     const_g: Vec<u32>,
     cur: FnState,
@@ -214,6 +286,7 @@ impl<'p> Gen<'p> {
             str_g: HashMap::new(),
             bigs: Vec::new(),
             big_g: HashMap::new(),
+            nullary_g: HashMap::new(),
             n_globals: 0,
             const_g: Vec::new(),
             cur: FnState::new(0),
@@ -648,6 +721,7 @@ impl<'p> Gen<'p> {
             &mut self.cur,
             FnState::new(u32::try_from(def.params.len()).unwrap_or(0)),
         );
+        self.cur.tail_ok = true;
         for (i, p) in def.params.iter().enumerate() {
             self.cur
                 .slots
@@ -701,6 +775,9 @@ impl<'p> Gen<'p> {
                 } else {
                     self.fn_ix[f]
                 };
+                if self.cur.tail_ok && !d.is_extern {
+                    self.cur.tail_cands.push(self.cur.code.len());
+                }
                 self.ins(I::Call(idx));
             }
             ExprKind::CallValue { callee, args } => self.call_value(callee, args)?,
@@ -805,6 +882,19 @@ impl<'p> Gen<'p> {
     }
 
     fn object(&mut self, tag: i32, fields: &'p [Expr]) -> Result<(), CompileError> {
+        if fields.is_empty() {
+            let g = match self.nullary_g.get(&tag) {
+                Some(g) => *g,
+                None => {
+                    let g = self.n_globals;
+                    self.n_globals += 1;
+                    self.nullary_g.insert(tag, g);
+                    g
+                }
+            };
+            self.ins(I::GlobalGet(g));
+            return Ok(());
+        }
         let n = u32::try_from(fields.len()).unwrap_or(0);
         self.ins(I::I32Const(tag));
         self.ins(I::I32Const(i32::try_from(n).unwrap_or(0)));
@@ -1194,6 +1284,9 @@ impl<'p> Gen<'p> {
             struct_type_index: tclo,
             field_index: 0,
         });
+        if self.cur.tail_ok {
+            self.cur.tail_cands.push(self.cur.code.len());
+        }
         self.ins(I::CallRef(tfn));
         Ok(())
     }
@@ -1276,6 +1369,7 @@ impl<'p> Gen<'p> {
         let free = Self::free_vars(e);
         // the lambda's own function
         let saved = std::mem::replace(&mut self.cur, FnState::new(1 + k));
+        self.cur.tail_ok = true;
         for (i, slot) in params.iter().enumerate() {
             self.cur
                 .slots
@@ -1342,6 +1436,15 @@ impl<'p> Gen<'p> {
             let g = self.big_g[s];
             init.push(I::I32Const(i32::try_from(i).unwrap_or(0)));
             init.push(I::Call(big_lit));
+            init.push(I::GlobalSet(g));
+        }
+        let t0 = self.t_obj(0);
+        let mut nullary: Vec<(i32, u32)> = self.nullary_g.iter().map(|(t, g)| (*t, *g)).collect();
+        nullary.sort_unstable();
+        for (tag, g) in nullary {
+            init.push(I::I32Const(tag));
+            init.push(I::I32Const(0));
+            init.push(I::StructNew(t0));
             init.push(I::GlobalSet(g));
         }
         init.append(&mut body);
