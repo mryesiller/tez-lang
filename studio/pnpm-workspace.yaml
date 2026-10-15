@@ -1,0 +1,4 @@
+# Studio runs in the browser: native postinstall steps of these server-side packages are not needed.
+allowBuilds:
+  onnxruntime-node: false
+  protobufjs: false
