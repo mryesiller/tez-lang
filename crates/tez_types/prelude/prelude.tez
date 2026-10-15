@@ -82,11 +82,11 @@ extern fn Str.endsWith(self: Str, suffix: Str) -> Bool
 extern fn Str.trim(self: Str) -> Str
   ensures result.len() <= self.len()
 
+// no length contract: case mapping can change the length ("ß".upper() == "SS", "İ".lower() has 2 characters)
 extern fn Str.upper(self: Str) -> Str
-  ensures result.len() == self.len()
 
+// no length contract: case mapping can change the length ("ß".upper() == "SS", "İ".lower() has 2 characters)
 extern fn Str.lower(self: Str) -> Str
-  ensures result.len() == self.len()
 
 extern fn Str.split(self: Str, sep: Str where it.len() > 0) -> List[Str]
   ensures result.len() >= 1

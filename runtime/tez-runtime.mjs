@@ -243,6 +243,9 @@ export async function load(bytes) {
     },
     list_slice: (l, n) => l.slice(n),
     deep_eq: (a, b) => (deepEq(a, b) ? 1 : 0),
+    float_overflow: () => {
+      throw new TezError("E_RESOURCE", "float overflow");
+    },
     fail: (code) => {
       throw new TezError(code === 0 ? "E_ASSERT" : "E_INTERNAL", code === 0 ? "assertion failed" : "internal failure");
     },

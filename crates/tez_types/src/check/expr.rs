@@ -235,7 +235,13 @@ impl<'a> Checker<'a> {
                 mk(H::Int(v), Ty::Int, span)
             }
             A::Float(s) => {
-                let v = s.parse::<f64>().unwrap_or(0.0);
+                let v = s.parse::<f64>().unwrap_or(f64::INFINITY);
+                if !v.is_finite() {
+                    self.err(
+                        Problem::new(Code::LexBadNumber, "this Float literal is too large", span)
+                            .expected("a literal below 1.8e308"),
+                    );
+                }
                 mk(H::Float(v), Ty::Float, span)
             }
             A::Str(s) => mk(H::Str(s.clone()), Ty::Str, span),
@@ -767,14 +773,43 @@ impl<'a> Checker<'a> {
                 ),
                 other => {
                     let t = self.show(&other);
-                    self.err(Problem::new(
-                        Code::NameUnknownMethod,
-                        format!(
-                            "values of type `{t}` have no methods; `.{}` is not available",
-                            name.name
-                        ),
-                        name.span,
-                    ));
+                    // `b.f(x)` where `f` is a function-typed field: the call needs the field in parentheses
+                    let fn_field = match &other {
+                        Ty::Adt(id, _) => self
+                            .record_fields(*id)
+                            .iter()
+                            .any(|(n, ty)| n == &name.name && matches!(ty, Ty::Fn(..))),
+                        _ => false,
+                    };
+                    if fn_field {
+                        let whole = ByteSpan::new(recv_span.start, name.span.end);
+                        let text = self
+                            .src
+                            .get(whole.start..whole.end)
+                            .unwrap_or_default()
+                            .to_string();
+                        self.err(
+                            Problem::new(
+                                Code::NameUnknownMethod,
+                                format!(
+                                    "`{}` is a field holding a function, not a method; call it as `({text})(..)`",
+                                    name.name
+                                ),
+                                name.span,
+                            )
+                            .expected(format!("`({text})(..)`"))
+                            .fix("parenthesize the field", whole, format!("({text})")),
+                        );
+                    } else {
+                        self.err(Problem::new(
+                            Code::NameUnknownMethod,
+                            format!(
+                                "values of type `{t}` have no methods; `.{}` is not available",
+                                name.name
+                            ),
+                            name.span,
+                        ));
+                    }
                 }
             }
             return error_expr(span);

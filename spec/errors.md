@@ -87,7 +87,7 @@ A refuted obligation carries a `counterexample` (concrete values). An `E_UNPROVE
 
 | Code | Meaning |
 |---|---|
-| `E_RESOURCE` | Fuel, memory or stack limit hit (the only run-time failure verified programs can have) |
+| `E_RESOURCE` | A run-time limit: fuel, memory, stack, a list or string too large, an exponent too large, a `Float` result too large to represent (overflow), or an `Int` too large for `toFloat`. The only run-time failure verified programs can have |
 | `E_TEST_FAILED` | A `test` evaluated to `false` (`tez test`) |
 | `E_INTERNAL` | Compiler bug. Never a user error; report it |
 

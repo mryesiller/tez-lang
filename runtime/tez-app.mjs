@@ -42,9 +42,41 @@ export function readHtml(rt, v) {
   return { tag, props, click, input, kids: ex.__get2(v).map((k) => readHtml(rt, k)) };
 }
 
+// ------------------------------------------------------------------ sandbox
+// A Tez program may come from a model or a stranger, and it must not reach the page's JavaScript: only inert
+// elements and attributes are rendered. Anything else is dropped (an unknown tag becomes a <div>).
+const SAFE_TAGS = new Set(
+  ("div span p h1 h2 h3 h4 h5 h6 ul ol li button input textarea select option label section article header footer " +
+    "nav main aside strong em b i u s small sub sup code pre blockquote table thead tbody tfoot tr td th caption " +
+    "img a br hr details summary figure figcaption progress meter time mark abbr dl dt dd").split(" "),
+);
+const URL_ATTRS = new Set(["href", "src", "poster", "cite", "action", "formaction", "xlink:href", "srcset", "background"]);
+
+/** The tag actually created for a Tez tag name. */
+export function safeTag(tag) {
+  const t = String(tag).toLowerCase();
+  return SAFE_TAGS.has(t) ? t : "div";
+}
+
+/** The attribute value to set, or `null` to drop the attribute. */
+export function safeAttr(name, value) {
+  const n = String(name).toLowerCase();
+  const v = String(value);
+  if (!/^[a-z][a-z0-9-]*$/.test(n)) return null; // also rejects `xlink:href`, namespaced tricks
+  if (n.startsWith("on") || n === "srcdoc" || n === "formaction" || n === "action" || n === "srcset") return null;
+  if (URL_ATTRS.has(n)) {
+    // only web, mail and page-relative links: no javascript:, data:, vbscript: ...
+    const bare = v.replace(/[\u0000-\u0020\u007f]+/g, "");
+    const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(bare);
+    if (scheme && !["http", "https", "mailto"].includes(scheme[1].toLowerCase())) return null;
+  }
+  if (n === "style" && /url\s*\(|expression\s*\(|@import|javascript:/i.test(v)) return null;
+  return v;
+}
+
 function create(doc, vn, fire) {
   if (vn.text !== undefined) return doc.createTextNode(vn.text);
-  const el = doc.createElement(vn.tag);
+  const el = doc.createElement(safeTag(vn.tag));
   setProps(el, {}, vn);
   bind(el, vn, fire);
   for (const k of vn.kids) el.appendChild(create(doc, k, fire));
@@ -53,14 +85,17 @@ function create(doc, vn, fire) {
 
 function setProps(el, old, vn) {
   for (const k of Object.keys(old.props ?? {})) {
-    if (!(k in vn.props)) el.removeAttribute(k);
+    if (!(k in vn.props) && safeAttr(k, "") !== null) el.removeAttribute(k);
   }
   for (const [k, v] of Object.entries(vn.props)) {
     if (old.props?.[k] === v) continue;
+    const ok = safeAttr(k, v);
     if (k === "value" && "value" in el) {
       if (el.value !== v) el.value = v;
+    } else if (ok === null) {
+      el.removeAttribute(k);
     } else {
-      el.setAttribute(k, v);
+      el.setAttribute(k, ok);
     }
   }
 }
@@ -79,7 +114,7 @@ function patch(doc, parent, el, old, vn, fire) {
     parent.appendChild(create(doc, vn, fire));
     return;
   }
-  const same = old.text !== undefined ? vn.text !== undefined : vn.text === undefined && old.tag === vn.tag;
+  const same = old.text !== undefined ? vn.text !== undefined : vn.text === undefined && safeTag(old.tag) === safeTag(vn.tag);
   if (!same) {
     parent.replaceChild(create(doc, vn, fire), el);
     return;

@@ -393,3 +393,25 @@ fn display_of_values() {
     assert_eq!(ev("(Bool, Float)", "(true, 1.0)"), "(true, 1.0)");
     assert_eq!(ev("Option[List[Int]]", "Some([1])"), "Some([1])");
 }
+
+#[test]
+fn float_overflow_stops_the_program_instead_of_producing_infinity_or_nan() {
+    let big = format!("1{}.0", "0".repeat(200));
+    assert_eq!(err("Float", &format!("{big} * {big}")), Code::Resource);
+    assert_eq!(
+        err("Float", &format!("{big} * {big} - {big} * {big}")),
+        Code::Resource
+    );
+    let tiny = format!("0.{}1", "0".repeat(200));
+    assert_eq!(err("Float", &format!("{big} / {tiny}")), Code::Resource);
+    assert_eq!(ev("Float", "1.5 * 2.0"), "3.0");
+}
+
+#[test]
+fn case_mapping_can_change_the_length() {
+    // the reason Str.upper/lower carry no length contract
+    assert_eq!(ev("Int", "\"ß\".upper().len()"), "2");
+    assert_eq!(ev("Int", "\"İ\".lower().len()"), "2");
+    assert_eq!(ev("Int", "\"😀é\".len()"), "2");
+    assert_eq!(ev("Int", "\"😀é\".chars().len()"), "2");
+}

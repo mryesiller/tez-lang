@@ -574,19 +574,26 @@ impl<'p> Interp<'p> {
 
 fn arith<'p>(op: BinOp, a: &Value<'p>, b: &Value<'p>, span: ByteSpan) -> R<Value<'p>> {
     match (a, b) {
-        (Value::Float(x), Value::Float(y)) => match op {
-            BinOp::Add => Ok(Value::Float(x + y)),
-            BinOp::Sub => Ok(Value::Float(x - y)),
-            BinOp::Mul => Ok(Value::Float(x * y)),
-            BinOp::Div => {
-                if *y == 0.0 {
-                    Err(rt(Code::FloatDomain, "division by 0.0", span))
-                } else {
-                    Ok(Value::Float(x / y))
+        (Value::Float(x), Value::Float(y)) => {
+            let r = match op {
+                BinOp::Add => x + y,
+                BinOp::Sub => x - y,
+                BinOp::Mul => x * y,
+                BinOp::Div => {
+                    if *y == 0.0 {
+                        return Err(rt(Code::FloatDomain, "division by 0.0", span));
+                    }
+                    x / y
                 }
+                _ => return Err(rt(Code::Internal, "bad float operator", span)),
+            };
+            // Floats never become infinite or NaN: overflow stops the program like any other resource limit.
+            if r.is_finite() {
+                Ok(Value::Float(r))
+            } else {
+                Err(rt(Code::Resource, "float overflow", span))
             }
-            _ => Err(rt(Code::Internal, "bad float operator", span)),
-        },
+        }
         (Value::Int(x), Value::Int(y)) => {
             let fast = match op {
                 BinOp::Add => x.checked_add(*y),

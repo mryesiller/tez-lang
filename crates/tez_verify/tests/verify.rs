@@ -574,3 +574,17 @@ fn proofs_are_cached_and_refutations_never_are() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Programs found by review (2026-10-15) that used to verify and then failed at run time.
+#[test]
+fn review_regressions_are_rejected() {
+    need_z3!();
+    // Str.upper/lower used to promise `result.len() == self.len()`, false for "ß" and "İ"
+    for f in ["upper", "lower"] {
+        let src = format!(
+            "fn f(s: Str) -> Int\n  requires s.{f}().len() == 2\n  = 10 / (s.len() - 1)\n\nfn main() -> Int = {{\n  let c = \"aß\".chars().get(1)\n  if c.{f}().len() == 2 {{ f(c) }} else {{ 0 }}\n}}\n"
+        );
+        let ps = run(&src);
+        assert!(ps.iter().any(|p| p.code == Code::DivZero), "{f}: {ps:?}");
+    }
+}

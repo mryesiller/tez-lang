@@ -543,3 +543,27 @@ fn hir_types_are_fully_resolved() {
         )
     });
 }
+
+#[test]
+fn float_literals_must_be_finite() {
+    let big = format!("1{}.0", "0".repeat(400));
+    let src = format!("fn f() -> Float = {big}\n");
+    let parsed = tez_syntax::parse(&src, tez_syntax::ParseOptions::default());
+    let out = tez_types::check(&parsed.file, &src);
+    assert!(
+        out.problems
+            .iter()
+            .any(|p| p.code == tez_diag::Code::LexBadNumber),
+        "{:?}",
+        out.problems
+    );
+}
+
+#[test]
+fn calling_a_function_field_suggests_parentheses() {
+    let src = "type Box = { f: (Int) -> Int }\n\nfn use(b: Box) -> Int = b.f(0)\n";
+    let parsed = tez_syntax::parse(src, tez_syntax::ParseOptions::default());
+    let out = tez_types::check(&parsed.file, src);
+    let p = out.problems.first().expect("a problem");
+    assert!(p.message.contains("(b.f)(..)"), "{}", p.message);
+}

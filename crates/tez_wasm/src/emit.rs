@@ -106,6 +106,7 @@ fn fixed_imports() -> Vec<(&'static str, Sig)> {
         ("list_slice", Sig::AnyI32Any),
         ("deep_eq", Sig::AnyToI32(2)),
         ("fail", Sig::FailI32),
+        ("float_overflow", Sig::FailI32),
     ]
 }
 
@@ -1088,6 +1089,19 @@ impl<'p> Gen<'p> {
                 BinOp::Mul => I::F64Mul,
                 _ => I::F64Div,
             });
+            // a non-finite result stops the program (x - x is 0 only for finite x)
+            let t = self.new_local(ValType::F64);
+            let ovf = self.imp("float_overflow");
+            self.ins(I::LocalTee(t));
+            self.ins(I::LocalGet(t));
+            self.ins(I::F64Sub);
+            self.ins(I::F64Const(0.0.into()));
+            self.ins(I::F64Ne);
+            self.ins(I::If(BlockType::Empty));
+            self.ins(I::I32Const(0));
+            self.ins(I::Call(ovf));
+            self.ins(I::End);
+            self.ins(I::LocalGet(t));
             self.box_f64();
             return Ok(());
         }
