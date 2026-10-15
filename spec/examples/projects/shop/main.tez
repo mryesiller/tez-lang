@@ -1,0 +1,10 @@
+use "cart.tez"
+use "util/money.tez"
+
+fn main() -> (Str, Int) = {
+  let c = add(add(empty(), Item { name: "pen", cents: 150 }), Item { name: "book", cents: 1250 })
+  (format(total(c)), count(c))
+}
+
+test totalOfTwo =
+  total(add(add(empty(), Item { name: "a", cents: 100 }), Item { name: "b", cents: 250 })) == 350

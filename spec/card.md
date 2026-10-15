@@ -38,6 +38,8 @@ Generic: `fn first[T](xs: List[T]) -> Option[T]`.
 - `a ++ b` joins Str · `&&` and `||` need parentheses when mixed · comparisons do not chain
 - `/` and `%` truncate toward zero · patterns: `_` `n` `0` `Some(x)` `(a, b)` `[]` `[h, ..t]`, guard `n if n > 0`
 
+- Several files: `use "other.tez"` at the top (relative path); all names share one namespace.
+
 ## Methods: always `value.method(args)`, never `List.map(xs, f)`
 There are no loops. Before writing recursion over a list, use these methods: `xs.map(f)`, `xs.filter(f)`, `xs.sum()`, `xs.count(f)`, `xs.fold(init, f)`. A method call needs no `decreases`.
 - Int `abs min max clamp pow isEven isOdd toStr toFloat` · Float `sqrt floor ceil round abs min max toStr`

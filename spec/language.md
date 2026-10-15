@@ -7,7 +7,7 @@ Companion to [`grammar.ebnf`](grammar.ebnf) (syntax) and [`errors.md`](errors.md
 - Source is UTF-8. Whitespace is spaces and newlines; tabs are an error (`E_LEX_UNEXPECTED_CHAR`).
 - `// comment` runs to the end of the line.
 - Names: `lowerCamel` for values, functions, fields, parameters; `UpperCamel` for types, variants, type parameters and built-in modules.
-- Keywords (reserved): `fn type const test let match if else where with requires ensures decreases assert extern true false`. `it` and `result` are not keywords: they are bound only inside refinements and `ensures`.
+- Keywords (reserved): `fn type const test use let match if else where with requires ensures decreases assert extern true false`. `it` and `result` are not keywords: they are bound only inside refinements and `ensures`.
 - Int: `123`, `1_000` (arbitrary precision). Float: `1.5` (digits both sides of the dot). Str: `"text"` with escapes `\n \t \r \\ \" \0 \u{1F600}`.
 - Newlines separate items, statements and match arms. They are ignored inside `( )` and `[ ]`. A line continues if it begins with `.`, `&&` or `||`, or the previous line ends with a binary operator, `(`, `[`, `{`, `,` or `=>`.
 
@@ -51,6 +51,16 @@ test areaWorks = area(Rect(2, 3)) == 6          // checked by `tez test`, exclud
 - A binding may not reuse a name already in scope (`E_NAME_SHADOWING`), including parameters, `let`, lambda parameters and pattern bindings.
 - Recursive and mutually recursive functions require `decreases` (§7), with one exception: a self-recursive function whose every recursive call passes, for one parameter, the tail of a `[h, ..t]` match on it (or a same-typed part of a matched constructor) gets the measure `p.len()` (or `p`) inferred; the verifier still proves it. Constants may not be recursive.
 - `fn f(..) -> T { .. }` is accepted as `fn f(..) -> T = { .. }`; `tez fmt` writes the `=`.
+
+### 3.1 Files and `use`
+
+A program may span several files. `use "geometry.tez"` (a top-level item, usually first) makes every item of that file part of this program, as if it were written here.
+
+- The path is relative to the file that contains the `use`, ends in `.tez`, uses `/` separators and must stay inside the directory of the entry file (no absolute paths, no `..` above it). Violations are `E_USE_BAD_PATH`; a missing file is `E_USE_NOT_FOUND`.
+- A file is loaded once however many files use it. Imports may not form a cycle (`E_USE_CYCLE`). Order does not matter.
+- There is no qualification and no visibility: all items of all files share one namespace, so a name defined twice is `E_NAME_DUPLICATE` and nothing can shadow anything (the same rules as inside one file). Only the entry file should define `main`.
+- `tez check`, `run`, `test` and `build` take the entry file and follow the imports; everything is verified together, so a contract in one file is proved against its uses in another. `tez test` runs the `test` items of every file. Diagnostics name the file they are in (`file` in the JSON report). `tez fmt` formats one file at a time.
+- `use` is not available where there are no other files (the single-file editor in a browser): it reports `E_USE_NOT_FOUND`.
 
 ## 4. Expressions
 

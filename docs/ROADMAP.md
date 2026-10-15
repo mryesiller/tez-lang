@@ -155,6 +155,16 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 
 ---
 
+## Faz 8 — Gerçek projeler için geliştirici altyapısı (2026-10-15 kararı)
+
+Terminalde Tez ile geliştirme yapmak isteyen biri için eksikler; sırayla:
+
+- [x] **Çok dosya / `use`**: `use "dosya.tez"` ile bağımlılıklar tek programa katılır; yollar göreli ve proje içinde kalır (`E_USE_NOT_FOUND`/`E_USE_CYCLE`/`E_USE_BAD_PATH`), dosya bir kez yüklenir, ortak ad alanı (gölgeleme yok). Tüm dosyalar birlikte doğrulanır; tanılar `file` alanıyla doğru dosyayı gösterir. Örnek: `spec/examples/projects/shop`
+- [ ] Hazır ikililer (GitHub Releases) + gerçek `tez-lang` npm paketi (şu an yalnız ad rezervasyonu)
+- [ ] VS Code eklentisi (renklendirme + `tez check --json` ile canlı hata), sonra dil sunucusu (LSP)
+- [ ] `tez --help` çıkış kodu, `tez check --watch`, `tez new`
+- [ ] Studio'da çok dosyalı proje (tarayıcı sanal dosya sistemi; `tez_web` şu an tek dosya)
+
 ## Sürekli kurallar
 
 - Her sözdizimi değişikliği: `spec/` → `tez_fmt` → `card.md` bütçesi → TezBench yeniden ölçümü ([`add-syntax-feature`](../.agents/skills/add-syntax-feature/SKILL.md) becerisi).

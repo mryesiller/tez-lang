@@ -14,7 +14,7 @@ loader.config({ monaco });
 monaco.languages.register({ id: "tez", extensions: [".tez"] });
 monaco.languages.setMonarchTokensProvider("tez", {
   keywords: [
-    "fn", "type", "let", "match", "if", "else", "where", "with",
+    "fn", "type", "use", "let", "match", "if", "else", "where", "with",
     "requires", "ensures", "decreases", "true", "false",
   ],
   tokenizer: {

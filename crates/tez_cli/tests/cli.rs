@@ -348,3 +348,122 @@ fn tour_snippets_are_real() {
     }
     assert!(seen >= 12, "the tour lost its code blocks");
 }
+
+fn project(files: &[(&str, &str)]) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "tez-proj-{}-{}",
+        std::process::id(),
+        files.iter().map(|(n, _)| n.len()).sum::<usize>()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    for (name, text) in files {
+        let p = dir.join(name);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, text).unwrap();
+    }
+    dir
+}
+
+#[test]
+fn the_shop_example_project_works() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/examples/projects/shop");
+    let main = dir.join("main.tez");
+    let main = main.to_str().unwrap();
+    assert!(tez(&["check", main]).status.success());
+    assert_eq!(s(&tez(&["run", main]).stdout).trim(), "(\"$14.00\", 2)");
+    let t = s(&tez(&["test", main]).stdout);
+    assert!(t.contains("4 passed, 0 failed"), "{t}");
+    for f in ["main.tez", "cart.tez", "util/money.tez"] {
+        let p = dir.join(f);
+        assert!(
+            tez(&["fmt", p.to_str().unwrap(), "--check"])
+                .status
+                .success(),
+            "{f} is not formatted"
+        );
+    }
+}
+
+#[test]
+fn project_errors_name_the_file_they_are_in() {
+    let dir = project(&[
+        (
+            "main.tez",
+            "use \"lib/a.tez\"\n\nfn main() -> Int = double(2)\n",
+        ),
+        ("lib/a.tez", "fn double(n: Int) -> Int = n * \"x\"\n"),
+    ]);
+    let out = tez(&["check", "--json", dir.join("main.tez").to_str().unwrap()]);
+    assert!(!out.status.success());
+    let v: serde_json::Value = serde_json::from_str(&s(&out.stdout)).unwrap();
+    assert_eq!(v["diagnostics"][0]["code"], "E_TYPE_MISMATCH");
+    assert_eq!(v["diagnostics"][0]["file"], "lib/a.tez");
+    assert_eq!(v["diagnostics"][0]["span"]["start"]["line"], 1);
+    // human output shows the file's own path and line
+    let human = tez(&["check", dir.join("main.tez").to_str().unwrap()]);
+    let text = s(&human.stderr);
+    assert!(text.contains("lib/a.tez:1:"), "{text}");
+    // a single-file program's JSON has no `file` field
+    let single = project(&[("one.tez", "fn main() -> Int = \"x\"\n")]);
+    let out = tez(&["check", "--json", single.join("one.tez").to_str().unwrap()]);
+    assert!(!s(&out.stdout).contains("\"file\""));
+}
+
+#[test]
+fn imports_are_checked() {
+    let cases: [(&[(&str, &str)], &str); 5] = [
+        (
+            &[("m.tez", "use \"missing.tez\"\nfn main() -> Int = 1\n")],
+            "E_USE_NOT_FOUND",
+        ),
+        (
+            &[("m.tez", "use \"/etc/passwd.tez\"\nfn main() -> Int = 1\n")],
+            "E_USE_BAD_PATH",
+        ),
+        (
+            &[("m.tez", "use \"../x.tez\"\nfn main() -> Int = 1\n")],
+            "E_USE_BAD_PATH",
+        ),
+        (
+            &[
+                ("m.tez", "use \"a.tez\"\nfn main() -> Int = 1\n"),
+                ("a.tez", "use \"m.tez\"\nfn f() -> Int = 1\n"),
+            ],
+            "E_USE_CYCLE",
+        ),
+        (
+            &[
+                (
+                    "m.tez",
+                    "use \"a.tez\"\nfn f() -> Int = 2\nfn main() -> Int = 1\n",
+                ),
+                ("a.tez", "fn f() -> Int = 1\n"),
+            ],
+            "E_NAME_DUPLICATE",
+        ),
+    ];
+    for (files, code) in cases {
+        let dir = project(files);
+        let out = tez(&["check", "--json", dir.join("m.tez").to_str().unwrap()]);
+        assert!(
+            s(&out.stdout).contains(code),
+            "expected {code}, got {}",
+            s(&out.stdout)
+        );
+    }
+}
+
+#[test]
+fn a_file_imported_twice_is_loaded_once() {
+    let dir = project(&[
+        (
+            "m.tez",
+            "use \"a.tez\"\nuse \"b.tez\"\nfn main() -> Int = fa() + fb()\n",
+        ),
+        ("a.tez", "use \"c.tez\"\nfn fa() -> Int = shared()\n"),
+        ("b.tez", "use \"c.tez\"\nfn fb() -> Int = shared()\n"),
+        ("c.tez", "fn shared() -> Int = 21\n"),
+    ]);
+    let out = tez(&["run", dir.join("m.tez").to_str().unwrap()]);
+    assert_eq!(s(&out.stdout).trim(), "42", "{}", s(&out.stderr));
+}

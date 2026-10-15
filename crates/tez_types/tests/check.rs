@@ -564,7 +564,7 @@ fn float_literals_must_be_finite() {
 
 #[test]
 fn calling_a_function_field_suggests_parentheses() {
-    let src = "type Box = { f: (Int) -> Int }\n\nfn use(b: Box) -> Int = b.f(0)\n";
+    let src = "type Box = { f: (Int) -> Int }\n\nfn apply(b: Box) -> Int = b.f(0)\n";
     let parsed = tez_syntax::parse(src, tez_syntax::ParseOptions::default());
     let out = tez_types::check(&parsed.file, src);
     let p = out.problems.first().expect("a problem");

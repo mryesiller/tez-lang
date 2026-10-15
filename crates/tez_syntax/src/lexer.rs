@@ -36,6 +36,8 @@ pub enum Kw {
     Assert,
     /// `extern`
     Extern,
+    /// `use`
+    Use,
     /// `true`
     True,
     /// `false`
@@ -62,6 +64,7 @@ impl Kw {
             Kw::Decreases => "decreases",
             Kw::Assert => "assert",
             Kw::Extern => "extern",
+            Kw::Use => "use",
             Kw::True => "true",
             Kw::False => "false",
         }
@@ -84,6 +87,7 @@ impl Kw {
             "decreases" => Kw::Decreases,
             "assert" => Kw::Assert,
             "extern" => Kw::Extern,
+            "use" => Kw::Use,
             "true" => Kw::True,
             "false" => Kw::False,
             _ => return None,

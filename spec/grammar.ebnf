@@ -8,7 +8,8 @@
    or if the previous line ends with a binary operator or an opening bracket. *)
 
 file        = { item } ;
-item        = typeDecl | fnDecl | constDecl | testDecl ;
+item        = useDecl | typeDecl | fnDecl | constDecl | testDecl ;
+useDecl     = "use" STRING ;                                (* the items of that file join this program; see language.md §3.1 *)
 
 (* ---------- declarations ---------- *)
 typeDecl    = "type" UPPER [ tparams ] "=" typeBody ;
@@ -77,4 +78,4 @@ pattern     = "_" | LOWER | INT | "-" INT | FLOAT | STRING | "true" | "false"
 (* ---------- lexical ---------- *)
 (* comment: "//" to end of line.  INT: digits with optional "_".  FLOAT: digits "." digits.
    STRING: '"' chars '"' with escapes \n \t \r \\ \" \0 \u{hex}. Keywords:
-   fn type const test let match if else where with requires ensures decreases assert extern true false *)
+   fn type const test use let match if else where with requires ensures decreases assert extern true false *)

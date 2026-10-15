@@ -1,0 +1,17 @@
+use "util/money.tez"
+
+type Item = { name: Str, cents: Int where it >= 0 }
+
+type Cart = { items: List[Item] }
+
+fn empty() -> Cart = Cart { items: [] }
+
+fn add(c: Cart, i: Item) -> Cart = c with { items: c.items.append(i) }
+
+fn count(c: Cart) -> Int = c.items.len()
+
+fn total(c: Cart) -> Int = c.items.map(i => i.cents).sum()
+
+test emptyIsFree = total(empty()) == 0
+
+test pricesAreSums = format(total(add(empty(), Item { name: "x", cents: 99 }))) == "$0.99"

@@ -5,7 +5,8 @@
 root ::= ws file
 ws ::= ([ \t\n\r] | "//" [^\n]*)*
 file ::= (item)*
-item ::= typedecl | fndecl | constdecl | testdecl
+item ::= usedecl | typedecl | fndecl | constdecl | testdecl
+usedecl ::= "use" ws string ws
 typedecl ::= "type" ws upper ws (tparams)? "=" ws typebody
 tparams ::= "[" ws upper ws ("," ws upper ws)* "]" ws
 typebody ::= recordbody | variants | type

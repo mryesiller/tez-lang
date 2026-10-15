@@ -69,7 +69,7 @@ export function appRunner(root: HTMLElement, onStatus: (text: string, ok: boolea
 
 // ---------------------------------------------------------------- syntax highlighting
 
-const KEYWORDS = new Set(["fn", "type", "const", "test", "let", "match", "if", "else", "where", "with", "requires", "ensures", "decreases", "true", "false", "it", "result", "extern"]);
+const KEYWORDS = new Set(["fn", "type", "const", "test", "use", "let", "match", "if", "else", "where", "with", "requires", "ensures", "decreases", "true", "false", "it", "result", "extern"]);
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

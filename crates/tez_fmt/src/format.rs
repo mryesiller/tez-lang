@@ -141,7 +141,10 @@ impl Fmt<'_> {
         for (i, item) in file.items.iter().enumerate() {
             if i > 0 {
                 parts.push(hard());
-                parts.push(hard());
+                // consecutive imports stay together; everything else is separated by a blank line
+                if !(matches!(item, Item::Use(_)) && matches!(file.items[i - 1], Item::Use(_))) {
+                    parts.push(hard());
+                }
             }
             let span = item.span();
             parts.extend(self.leading(span.start));
@@ -150,6 +153,7 @@ impl Fmt<'_> {
                 Item::Fn(f) => self.fn_decl(f),
                 Item::Const(c) => self.const_decl(c),
                 Item::Test(t) => self.test_decl(t),
+                Item::Use(u) => text(format!("use {}", escape(&u.path))),
             };
             parts.push(d);
             parts.push(self.trailing(span.end));

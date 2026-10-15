@@ -40,6 +40,9 @@ Every diagnostic has a **stable code**. Codes are never renamed or reused. All p
 | `E_NAME_SHADOWING` | A `let`, parameter or pattern binding reuses a name already in scope | pick a new name |
 | `E_NAME_PRELUDE` | Redefining a built-in type, constructor or module | rename |
 | `E_NAME_USE_METHOD_SYNTAX` | `List.map(xs, f)` written instead of `xs.map(f)` | the `fixes` entry rewrites it |
+| `E_USE_NOT_FOUND` | `use "x.tez"` names a file that does not exist (or no project is available, as in a single-file editor) | create the file or fix the path |
+| `E_USE_CYCLE` | Files import each other in a circle | move the shared items to a third file |
+| `E_USE_BAD_PATH` | The import path is absolute, leaves the project directory (`..`), or does not end in `.tez` | use a relative path inside the project |
 | `E_CONST_INIT` | A `const` initializer uses a user function or a later constant | use literals, constructors, earlier constants and prelude functions |
 | `E_CONTRACT_SCOPE` | `result` outside `ensures`, or `it` outside a refinement | move it |
 

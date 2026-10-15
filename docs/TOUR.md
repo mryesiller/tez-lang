@@ -27,7 +27,7 @@ fn area(s: Shape) -> Int = match s {
 fn main() -> Int = area(Rect(4, 5)) + area(Circle(2))
 ```
 
-`Shape` is a sum type. `match` must cover every variant: leave one out and the program is rejected (see section 11).
+`Shape` is a sum type. `match` must cover every variant: leave one out and the program is rejected (see section 12).
 
 ## 3. Records
 
@@ -162,7 +162,26 @@ Time is an input too. An app may define `fn subs(m: Model) -> List[Sub[Msg]]`; `
 
 Edit an app while it runs in the playground and the running session is kept: the runtime replays your clicks into the new program.
 
-## 11. What gets rejected
+## 11. More than one file
+
+Programs grow past one file. `use "other.tez"` at the top makes everything in that file part of yours; you give the command the entry file and it follows the imports (a project of three files is in `spec/examples/projects/shop`):
+
+```text
+shop/
+  main.tez          use "cart.tez"        use "util/money.tez"
+  cart.tez          use "util/money.tez"
+  util/money.tez
+```
+
+```bash
+tez check main.tez     # all files are checked and verified together
+tez run main.tez
+tez test main.tez      # runs the tests of every file
+```
+
+There are no namespaces and no private items: every name is global, defined once, and nothing shadows anything, exactly as inside a single file. Errors name the file they are in. The editor on this website works on one file, so `use` is for the command line.
+
+## 12. What gets rejected
 
 Mistakes a small model makes are stopped with a stable code and a precise message. Each snippet below is compiled by the website, and the test suite checks that it fails with exactly the named code.
 

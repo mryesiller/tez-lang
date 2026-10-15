@@ -9,7 +9,7 @@ use tez_diag::Code;
 use crate::ast::{
     Arm, BinOp, ConstDecl, Expr, ExprKind, FieldDecl, FieldInit, File, FnDecl, Ident, Item,
     LambdaParam, Lit, Param, Pat, PatKind, Stmt, TestDecl, TypeBody, TypeDecl, TypeExpr, TypeKind,
-    UnOp, Variant,
+    UnOp, UseDecl, Variant,
 };
 use crate::lexer::{Comment, Kw, Tok, Token, lex};
 use crate::names::{is_lower_camel, is_upper_camel, to_lower_camel, to_upper_camel};
@@ -351,7 +351,7 @@ impl Parser<'_> {
             }
             if matches!(
                 t.tok,
-                Tok::Kw(Kw::Fn | Kw::Type | Kw::Const | Kw::Test | Kw::Extern)
+                Tok::Kw(Kw::Fn | Kw::Type | Kw::Const | Kw::Test | Kw::Extern | Kw::Use)
             ) && self.line_start(t.span.start)
             {
                 break;
@@ -398,15 +398,16 @@ impl Parser<'_> {
             Tok::Kw(Kw::Fn | Kw::Extern) => self.fn_decl().map(Item::Fn),
             Tok::Kw(Kw::Const) => self.const_decl().map(Item::Const),
             Tok::Kw(Kw::Test) => self.test_decl().map(Item::Test),
+            Tok::Kw(Kw::Use) => self.use_decl().map(Item::Use),
             _ => {
                 let span = self.span();
                 let msg = format!(
-                    "expected `type`, `fn`, `const` or `test`, found {}",
+                    "expected `type`, `fn`, `const`, `test` or `use`, found {}",
                     self.tok().describe()
                 );
                 Err(self.abort(
                     Problem::new(Code::ParseBadItem, msg, span)
-                        .expected("`type`, `fn`, `const` or `test`"),
+                        .expected("`type`, `fn`, `const`, `test` or `use`"),
                 ))
             }
         }
@@ -621,6 +622,20 @@ impl Parser<'_> {
             is_extern,
             span: ByteSpan::new(start.start, end),
         })
+    }
+
+    fn use_decl(&mut self) -> PResult<UseDecl> {
+        let start = self.bump().span;
+        match self.tok().clone() {
+            Tok::Str(path) => {
+                let end = self.bump().span;
+                Ok(UseDecl {
+                    path,
+                    span: start.join(end),
+                })
+            }
+            _ => Err(self.unexpected("a quoted path, e.g. `use \"geometry.tez\"`")),
+        }
     }
 
     fn const_decl(&mut self) -> PResult<ConstDecl> {

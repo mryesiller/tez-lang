@@ -1,0 +1,5 @@
+fn pad(n: Int) -> Str = if n < 10 { "0" ++ n.toStr() } else { n.toStr() }
+
+fn format(cents: Int) -> Str = "$" ++ (cents / 100).toStr() ++ "." ++ pad(cents % 100)
+
+test formats = format(1250) == "$12.50" && format(5) == "$0.05"

@@ -30,6 +30,8 @@ pub enum Item {
     Const(ConstDecl),
     /// `test ..`
     Test(TestDecl),
+    /// `use "file.tez"`
+    Use(UseDecl),
 }
 
 impl Item {
@@ -41,8 +43,18 @@ impl Item {
             Item::Fn(d) => d.span,
             Item::Const(d) => d.span,
             Item::Test(d) => d.span,
+            Item::Use(d) => d.span,
         }
     }
+}
+
+/// `use "relative/path.tez"`: the items of that file become part of this program.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UseDecl {
+    /// The path as written (relative to the importing file).
+    pub path: String,
+    /// Whole declaration.
+    pub span: ByteSpan,
 }
 
 /// `type Name[Params] = body`

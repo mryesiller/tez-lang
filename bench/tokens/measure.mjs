@@ -17,7 +17,7 @@ const content = (text) => pieces(text).filter((t) => t.replace(/[▁\n\s]/g, "")
 
 // ------------------------------------------------------------------ keywords and operators
 const candidates = [
-  "fn", "type", "const", "test", "let", "match", "if", "else", "where", "with", "requires", "ensures",
+  "fn", "type", "const", "test", "use", "let", "match", "if", "else", "where", "with", "requires", "ensures",
   "decreases", "assert", "true", "false", "=>", "->", "==", "!=", "<=", ">=", "&&", "||", "++", "..",
   "List", "Option", "Result", "Some", "None", "Ok", "Err", "Int", "Float", "Bool", "Str", "Unit",
 ];
@@ -28,7 +28,7 @@ const contexts = {
   midLine: (k) => ` ${k}`,
 };
 const usedAt = (k) =>
-  ["fn", "type", "const", "test"].includes(k)
+  ["fn", "type", "const", "test", "use"].includes(k)
     ? ["lineStart"]
     : ["requires", "ensures", "decreases", "let", "assert"].includes(k)
       ? ["indented"]

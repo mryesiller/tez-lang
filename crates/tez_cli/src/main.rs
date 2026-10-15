@@ -3,10 +3,10 @@
 use std::process::ExitCode;
 
 use tez_diag::{Diagnostic, Report};
-use tez_driver::{CompileOptions, compile, render_human};
+use tez_driver::{CompileOptions, Compiled, compile_project, render_human, render_human_project};
 use tez_fmt::{FmtError, format_source};
 use tez_interp::{Options, run_function, run_tests, with_big_stack};
-use tez_syntax::{LineIndex, ParseOptions};
+use tez_syntax::{ByteSpan, LineIndex, ParseOptions, Problem};
 
 const USAGE: &str = "\
 tez: a fast, verified language for LLMs and the browser
@@ -124,12 +124,61 @@ fn main() -> ExitCode {
     }
 }
 
+/// Compiles `path` and the files it `use`s (read from its directory, never from outside it).
+fn compile_file(args: &Args, src: &str, path: &str) -> Compiled {
+    let p = std::path::Path::new(path);
+    let dir = p
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_default();
+    let name = p
+        .file_name()
+        .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned());
+    let load = |rel: &str| std::fs::read_to_string(dir.join(rel)).ok();
+    compile_project(&name, src, &load, &compile_options(args))
+}
+
+fn dir_prefix(path: &str) -> String {
+    std::path::Path::new(path)
+        .parent()
+        .filter(|d| !d.as_os_str().is_empty())
+        .map(|d| format!("{}/", d.display()))
+        .unwrap_or_default()
+}
+
+/// Prints the diagnostics of a compiled program (human text on stderr, or JSON on stdout).
+fn print_compiled(c: &Compiled, path: &str, json: bool) {
+    if json || c.files.len() <= 1 {
+        let src = c.files.last().map_or("", |f| f.text.as_str());
+        print_report(&c.report, src, path, json);
+    } else {
+        eprint!(
+            "{}",
+            render_human_project(&c.report, &c.files, &dir_prefix(path), path)
+        );
+    }
+}
+
+/// A runtime failure as a diagnostic positioned in the file it happened in.
+fn runtime_diagnostic(c: &Compiled, e: &tez_interp::RuntimeError) -> Diagnostic {
+    let (k, local) = c.locate(e.span.start);
+    let file = &c.files[k];
+    let len = e.span.end.saturating_sub(e.span.start);
+    let mut d = Problem::new(e.code, e.message.clone(), ByteSpan::new(local, local + len))
+        .to_diagnostic(&LineIndex::new(&file.text));
+    d.phase = tez_diag::Phase::Runtime;
+    if c.files.len() > 1 {
+        d.file = Some(file.name.clone());
+    }
+    d
+}
+
 fn cmd_check(args: &Args, src: &str, path: &str) -> ExitCode {
-    let c = compile(src, &compile_options(args));
+    let c = compile_file(args, src, path);
     let json = args.flag("--json");
     if c.report.diagnostics.is_empty() {
         if json {
-            print_report(&c.report, src, path, true);
+            print_compiled(&c, path, true);
         } else {
             if args.flag("--no-verify") {
                 println!("ok: {path} (NOT verified: --no-verify)");
@@ -139,7 +188,7 @@ fn cmd_check(args: &Args, src: &str, path: &str) -> ExitCode {
         }
         ExitCode::SUCCESS
     } else {
-        print_report(&c.report, src, path, json);
+        print_compiled(&c, path, json);
         ExitCode::from(1)
     }
 }
@@ -159,34 +208,40 @@ fn interp_options(args: &Args) -> Options {
 }
 
 fn cmd_run(args: &Args, src: &str, path: &str) -> ExitCode {
-    let c = compile(src, &compile_options(args));
-    let Some(prog) = c.program else {
-        print_report(&c.report, src, path, args.flag("--json"));
+    let c = compile_file(args, src, path);
+    let Some(prog) = &c.program else {
+        print_compiled(&c, path, args.flag("--json"));
         return ExitCode::from(1);
     };
     let name = args.positional.get(1).map_or("main", String::as_str);
     let opts = interp_options(args);
-    match with_big_stack(|| run_function(&prog, name, opts)) {
+    match with_big_stack(|| run_function(prog, name, opts)) {
         Ok(v) => {
             println!("{v}");
             ExitCode::SUCCESS
         }
         Err(e) => {
-            let index = LineIndex::new(src);
-            let d: Diagnostic = e.to_diagnostic(&index);
-            print_report(&Report::new(vec![d]), src, path, args.flag("--json"));
+            let d = runtime_diagnostic(&c, &e);
+            let one = Compiled {
+                report: Report::new(vec![d]),
+                program: None,
+                files: c.files.clone(),
+                merged: String::new(),
+                ranges: Vec::new(),
+            };
+            print_compiled(&one, path, args.flag("--json"));
             ExitCode::from(1)
         }
     }
 }
 
 fn cmd_build(args: &Args, src: &str, path: &str) -> ExitCode {
-    let c = compile(src, &compile_options(args));
-    let Some(prog) = c.program else {
-        print_report(&c.report, src, path, args.flag("--json"));
+    let c = compile_file(args, src, path);
+    let Some(prog) = &c.program else {
+        print_compiled(&c, path, args.flag("--json"));
         return ExitCode::from(1);
     };
-    let module = match tez_wasm::compile(&prog) {
+    let module = match tez_wasm::compile(prog) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("tez: code generation failed: {e}");
@@ -209,22 +264,27 @@ fn cmd_build(args: &Args, src: &str, path: &str) -> ExitCode {
 }
 
 fn cmd_test(args: &Args, src: &str, path: &str) -> ExitCode {
-    let c = compile(src, &compile_options(args));
-    let Some(prog) = c.program else {
-        print_report(&c.report, src, path, args.flag("--json"));
+    let c = compile_file(args, src, path);
+    let Some(prog) = &c.program else {
+        print_compiled(&c, path, args.flag("--json"));
         return ExitCode::from(1);
     };
     let opts = interp_options(args);
-    let results = with_big_stack(|| run_tests(&prog, &opts));
-    let index = LineIndex::new(src);
+    let results = with_big_stack(|| run_tests(prog, &opts));
     let mut failed = 0;
     for (r, t) in results.iter().zip(&prog.tests) {
         match &r.outcome {
             Ok(true) => println!("ok      {}", r.name),
             Ok(false) => {
                 failed += 1;
-                let pos = index.pos(t.span.start);
-                println!("FAILED  {}  ({path}:{}:{})", r.name, pos.line, pos.col);
+                let (k, local) = c.locate(t.span.start);
+                let pos = LineIndex::new(&c.files[k].text).pos(local);
+                let shown = if k + 1 == c.files.len() {
+                    path.to_string()
+                } else {
+                    format!("{}{}", dir_prefix(path), c.files[k].name)
+                };
+                println!("FAILED  {}  ({shown}:{}:{})", r.name, pos.line, pos.col);
             }
             Err(e) => {
                 failed += 1;

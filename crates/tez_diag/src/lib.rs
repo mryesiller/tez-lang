@@ -106,6 +106,9 @@ codes! {
     NameUseMethodSyntax => "E_NAME_USE_METHOD_SYNTAX", Resolve;
     ContractScope => "E_CONTRACT_SCOPE", Resolve;
     ConstInit => "E_CONST_INIT", Resolve;
+    UseNotFound => "E_USE_NOT_FOUND", Resolve;
+    UseCycle => "E_USE_CYCLE", Resolve;
+    UseBadPath => "E_USE_BAD_PATH", Resolve;
     TypeMismatch => "E_TYPE_MISMATCH", Types;
     TypeArity => "E_TYPE_ARITY", Types;
     TypeNotFunction => "E_TYPE_NOT_FUNCTION", Types;
@@ -168,6 +171,9 @@ pub struct Diagnostic {
     pub message: String,
     /// Where the problem is.
     pub span: Span,
+    /// The project file the span is in, when the program has more than one file (relative path, `/` separators).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
     /// What the compiler needed to see, if applicable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected: Option<String>,
@@ -188,6 +194,7 @@ impl Diagnostic {
             phase: code.phase(),
             message: message.into(),
             span,
+            file: None,
             expected: None,
             counterexample: None,
             fixes: Vec::new(),
@@ -277,6 +284,7 @@ mod tests {
                 start: pos(7, 14),
                 end: pos(7, 19),
             },
+            file: None,
             expected: Some("len(xs) != 0".into()),
             counterexample: Some(BTreeMap::from([("xs".to_string(), "[]".to_string())])),
             fixes: vec![Fix {
