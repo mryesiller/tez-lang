@@ -68,3 +68,14 @@ body { background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans
 .app .choice { text-align: left; }
 .app .choice.good { background: #3ddc8433; } .app .choice.bad { background: #ff4d4d33; }
 .app .bar { background: #c0392b; transition: width .2s; } .app .bar.ok { background: #e0a100; } .app .bar.strong { background: #1a7f4b; }
+
+/* project file tabs */
+.editor { display: flex; flex-direction: column; }
+.editor > div:last-child { flex: 1; min-height: 0; }
+.tabs { display: flex; gap: 2px; align-items: center; padding: 4px 8px 0; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tabs .tab { display: inline-flex; align-items: center; border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; }
+.tabs .tab.on { background: var(--bg); border-color: var(--border); }
+.tabs button { background: transparent; color: var(--text); border: 0; padding: 4px 8px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.tabs .x { color: var(--muted); padding: 4px 6px; }
+.tabs .add { color: var(--muted); margin-left: 6px; }
+.tabs button:focus-visible { outline: 2px solid #4c8dff; outline-offset: -2px; }

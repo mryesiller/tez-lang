@@ -1,7 +1,7 @@
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Compiler, type Diagnostic, type Fix } from "./compiler";
+import { Compiler, type Diagnostic, type Files, type Fix } from "./compiler";
 import { load } from "../../runtime/tez-runtime.mjs";
 import card from "../../spec/card.md?raw";
 import { solve } from "../../tools/agent/loop.mjs";
@@ -26,14 +26,55 @@ const rejects = Object.entries(exampleFiles)
   .filter((e) => e.name.endsWith(".reject.tez"))
   .sort((a, b) => a.name.localeCompare(b.name));
 
+// multi-file example projects: spec/examples/projects/<name>/**/*.tez (the entry is main.tez)
+const projectFiles = import.meta.glob("../../spec/examples/projects/**/*.tez", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+const projects: { name: string; files: Files }[] = Object.entries(
+  Object.entries(projectFiles).reduce<Record<string, Files>>((acc, [path, text]) => {
+    const rest = path.split("/projects/")[1] ?? "";
+    const [name, ...file] = rest.split("/");
+    if (name && file.length) (acc[name] ??= {})[file.join("/")] = text;
+    return acc;
+  }, {}),
+)
+  .map(([name, files]) => ({ name, files }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+const ENTRY = "main.tez";
 const FALLBACK = `fn main() -> Int = 6 * 7\n`;
+
+/** The project from the last visit (kept in this browser only), else the first example. */
+function initialProject(): Files {
+  try {
+    const saved = JSON.parse(localStorage.getItem("tez-project") ?? "null") as Files | null;
+    if (saved && typeof saved[ENTRY] === "string") return saved;
+  } catch {
+    /* no storage: start from the example */
+  }
+  return { [ENTRY]: examples[0]?.source ?? FALLBACK };
+}
+
+/** A new file name is a project-relative `.tez` path: no leading slash, no `..`, no backslash. */
+function validName(name: string, existing: Files): string | null {
+  if (!/^[A-Za-z0-9_][A-Za-z0-9_./-]*\.tez$/.test(name) || name.includes("..") || name.includes("//")) {
+    return "use a relative path ending in .tez, e.g. util/money.tez";
+  }
+  return name in existing ? "that file exists" : null;
+}
 
 type Monaco = Parameters<OnMount>[1];
 type EditorInstance = Parameters<OnMount>[0];
 
 export default function App() {
   const compiler = useMemo(() => new Compiler(), []);
-  const [source, setSource] = useState(examples[0]?.source ?? FALLBACK);
+  const [files, setFiles] = useState<Files>(initialProject);
+  const [active, setActive] = useState(ENTRY);
+  const source = files[active] ?? "";
+  const setSource = useCallback((text: string) => setFiles((f) => ({ ...f, [active]: text })), [active]);
   const [diags, setDiags] = useState<Diagnostic[]>([]);
   const [output, setOutput] = useState<{ kind: "idle" | "ok" | "error"; text: string }>({
     kind: "idle",
@@ -57,15 +98,19 @@ export default function App() {
   const [aiLocal, setAiLocal] = useState(false);
   const [aiLog, setAiLog] = useState("");
 
-  const publish = useCallback((ds: Diagnostic[]) => {
-    setDiags(ds);
+  const publish = useCallback((ds: Diagnostic[]) => setDiags(ds), []);
+
+  // squiggles for the file on screen (diagnostics of other files are listed on the right)
+  useEffect(() => {
     const monaco = monacoRef.current;
     const model = editorRef.current?.getModel();
     if (!monaco || !model) return;
     monaco.editor.setModelMarkers(
       model,
       "tez",
-      ds.map((d) => ({
+      diags
+        .filter((d) => (d.file ?? ENTRY) === active)
+        .map((d) => ({
         severity: monaco.MarkerSeverity.Error,
         message: `${d.code}: ${d.message}${d.expected ? `\nexpected: ${d.expected}` : ""}`,
         startLineNumber: d.span.start.line,
@@ -74,17 +119,29 @@ export default function App() {
         endColumn: Math.max(d.span.end.col, d.span.start.col + 1),
       })),
     );
-  }, []);
+  }, [diags, active, files]);
 
   // live diagnostics: debounce, and ignore answers to stale requests
   useEffect(() => {
     const mine = ++seq.current;
     const t = setTimeout(async () => {
-      const r = await compiler.check(source);
+      const r = await compiler.check(files);
       if (mine === seq.current) publish(r.report.diagnostics);
     }, 150);
     return () => clearTimeout(t);
-  }, [source, compiler, publish]);
+  }, [files, compiler, publish]);
+
+  // remember the project in this browser
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem("tez-project", JSON.stringify(files));
+      } catch {
+        /* private mode: the project just is not remembered */
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [files]);
 
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -95,11 +152,11 @@ export default function App() {
   const showReport = (r: { report?: { diagnostics: Diagnostic[] }; crash?: string }) =>
     r.crash
       ? `compiler crashed: ${r.crash}`
-      : (r.report?.diagnostics ?? []).map((d) => `${d.code}: ${d.message}`).join("\n");
+      : (r.report?.diagnostics ?? []).map((d) => `${d.file ? `${d.file}:` : ""}${d.span.start.line}:${d.span.start.col} ${d.code}: ${d.message}`).join("\n");
 
   const run = async () => {
     setBusy(true);
-    const r = await compiler.run(source, "main", false);
+    const r = await compiler.run(files, "main", false);
     setOutput(
       r.ok
         ? { kind: "ok", text: `${r.value ?? ""}\n\n(compiled to WebAssembly: ${Math.round(r.bytes ?? 0)} bytes, ran in ${r.ms ?? "?"} ms)` }
@@ -112,7 +169,7 @@ export default function App() {
     setBusy(true);
     app.current?.stop();
     app.current = null;
-    const built = await compiler.build(source);
+    const built = await compiler.build(files);
     if (!built.ok || !built.wasm) {
       setOutput({ kind: "error", text: showReport(built) });
       setBusy(false);
@@ -143,7 +200,7 @@ export default function App() {
   useEffect(() => {
     if (!app.current) return;
     const t = setTimeout(async () => {
-      const built = await compiler.build(source);
+      const built = await compiler.build(files);
       if (!built.ok || !built.wasm || !app.current) return;
       try {
         const rt = await load(Uint8Array.from(atob(built.wasm), (c) => c.charCodeAt(0)));
@@ -155,7 +212,7 @@ export default function App() {
       }
     }, 400);
     return () => clearTimeout(t);
-  }, [source, compiler]);
+  }, [files, compiler]);
 
   const askAi = async () => {
     if ((!aiLocal && (!ai.baseUrl || !ai.model)) || !aiTask.trim()) {
@@ -174,10 +231,11 @@ export default function App() {
         task: aiTask,
         card,
         generate: aiLocal ? inBrowserModel((t) => setAiLog(t)) : openAICompatible({ baseUrl: ai.baseUrl ?? "", model: ai.model ?? "", apiKey: ai.apiKey }),
-        check: async (code) => (await compiler.check(code)).report.diagnostics,
+        check: async (code) => (await compiler.check({ [ENTRY]: code })).report.diagnostics,
         onTurn: (t, i) => setAiLog((l) => `${l}\nturn ${i + 1}: ${t.diagnostics.length ? `${t.diagnostics.length} problem(s), first ${t.diagnostics[0]?.code}` : "accepted"}`),
       });
-      setSource(r.code);
+      setFiles({ [ENTRY]: r.code });
+      setActive(ENTRY);
       setAiLog((l) => `${l}\n${r.ok ? "Done: the program is accepted." : "Stopped after the last turn; the program still has problems."}`);
     } catch (e) {
       setAiLog(`failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -190,7 +248,7 @@ export default function App() {
     setOutput({ kind: "idle", text: "Loading Z3 (WebAssembly, 33 MB the first time)…" });
     try {
       const t0 = performance.now();
-      const r = await compiler.verify(source, (text) => setOutput({ kind: "idle", text }));
+      const r = await compiler.verify(files, (text) => setOutput({ kind: "idle", text }));
       publish(r.report.diagnostics);
       const secs = ((performance.now() - t0) / 1000).toFixed(1);
       setOutput(
@@ -206,13 +264,13 @@ export default function App() {
 
   const runTests = async () => {
     setBusy(true);
-    const r = await compiler.test(source, false);
+    const r = await compiler.test(files, false);
     if (!r.ok || !r.results) {
       setOutput({ kind: "error", text: showReport(r) });
     } else if (r.results.length === 0) {
       setOutput({ kind: "idle", text: "No `test` items in this program." });
     } else {
-      const lines = r.results.map((t) => `${t.outcome === "pass" ? "ok     " : "FAILED "} ${t.name}${t.message ? `: ${t.message}` : ""}`);
+      const lines = r.results.map((t) => `${t.outcome === "pass" ? "ok     " : "FAILED "} ${t.name}${t.message ? `: ${t.message}` : ""}${t.at ? `  (${t.at})` : ""}`);
       const failed = r.results.filter((t) => t.outcome !== "pass").length;
       setOutput({ kind: failed ? "error" : "ok", text: `${lines.join("\n")}\n${r.results.length - failed} passed, ${failed} failed` });
     }
@@ -245,9 +303,18 @@ export default function App() {
         <select
           aria-label="Load an example"
           onChange={(e) => {
-            const all = [...examples, ...rejects];
-            const found = all.find((x) => x.name === e.target.value);
-            if (found) setSource(found.source);
+            const project = projects.find((x) => `project:${x.name}` === e.target.value);
+            if (project) {
+              setFiles(project.files);
+              setActive(ENTRY);
+            } else {
+              const found = [...examples, ...rejects].find((x) => x.name === e.target.value);
+              if (found) {
+                setFiles({ [ENTRY]: found.source });
+                setActive(ENTRY);
+              }
+            }
+            e.target.value = "";
           }}
           defaultValue=""
         >
@@ -257,6 +324,13 @@ export default function App() {
           <optgroup label="Programs">
             {examples.map((x) => (
               <option key={x.name}>{x.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Multi-file projects">
+            {projects.map((x) => (
+              <option key={x.name} value={`project:${x.name}`}>
+                {x.name} ({Object.keys(x.files).length} files)
+              </option>
             ))}
           </optgroup>
           <optgroup label="Rejected on purpose">
@@ -283,8 +357,48 @@ export default function App() {
         </span>
       </header>
       <main className="panes">
-        <section className="pane" aria-label="Source editor">
+        <section className="pane editor" aria-label="Source editor">
+          <div className="tabs" role="tablist" aria-label="Project files">
+            {Object.keys(files)
+              .sort((a, b) => (a === ENTRY ? -1 : b === ENTRY ? 1 : a.localeCompare(b)))
+              .map((name) => (
+                <span key={name} className={`tab ${name === active ? "on" : ""}`}>
+                  <button role="tab" aria-selected={name === active} onClick={() => setActive(name)}>
+                    {name}
+                    {diags.some((d) => (d.file ?? ENTRY) === name) ? <span className="bad"> ●</span> : null}
+                  </button>
+                  {name !== ENTRY && (
+                    <button
+                      className="x"
+                      aria-label={`Delete ${name}`}
+                      onClick={() => {
+                        if (!confirm(`Delete ${name}?`)) return;
+                        setFiles((f) => Object.fromEntries(Object.entries(f).filter(([k]) => k !== name)));
+                        if (active === name) setActive(ENTRY);
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              ))}
+            <button
+              className="add"
+              title={'Add a file; use "name.tez" in another file pulls it in'}
+              onClick={() => {
+                const name = prompt("New file (relative path, e.g. util/money.tez)")?.trim();
+                if (!name) return;
+                const problem = validName(name, files);
+                if (problem) return alert(problem);
+                setFiles((f) => ({ ...f, [name]: "" }));
+                setActive(name);
+              }}
+            >
+              + file
+            </button>
+          </div>
           <Editor
+            path={active}
             language="tez"
             theme="vs-dark"
             value={source}
@@ -303,14 +417,20 @@ export default function App() {
                   <code className="code">{d.code}</code> {d.message}
                 </div>
                 <div className="muted">
-                  line {d.span.start.line}, column {d.span.start.col}
+                  {d.file ? `${d.file} · ` : ""}line {d.span.start.line}, column {d.span.start.col}
                   {d.expected ? ` · expected ${d.expected}` : ""}
                 </div>
-                {(d.fixes ?? []).map((f, j) => (
-                  <button key={j} className="fix" onClick={() => applyFix(f)}>
-                    Fix: {f.title}
+                {(d.file ?? ENTRY) !== active ? (
+                  <button className="fix" onClick={() => setActive(d.file ?? ENTRY)}>
+                    Open {d.file ?? ENTRY}
                   </button>
-                ))}
+                ) : (
+                  (d.fixes ?? []).map((f, j) => (
+                    <button key={j} className="fix" onClick={() => applyFix(f)}>
+                      Fix: {f.title}
+                    </button>
+                  ))
+                )}
               </li>
             ))}
           </ul>

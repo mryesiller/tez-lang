@@ -5,6 +5,8 @@ export type Span = { start: Pos; end: Pos };
 export type Edit = { span: Span; replace: string };
 export type Fix = { title: string; edits: Edit[] };
 export type Diagnostic = {
+  /** the file the problem is in (project-relative); absent = the entry file */
+  file?: string;
   code: string;
   phase: string;
   message: string;
@@ -15,12 +17,15 @@ export type Diagnostic = {
 };
 export type Report = { version: number; status: "ok" | "error"; diagnostics: Diagnostic[] };
 
+/** The files of a project by project-relative path; the entry file is always `main.tez`. */
+export type Files = Record<string, string>;
+
 export type CheckResult = { report: Report; verified: boolean };
 export type FormatResult = { ok: boolean; text?: string; report?: Report; comment?: Pos };
 export type RunResult = { ok: boolean; value?: string; report?: Report; crash?: string; ms?: number; bytes?: number };
 export type TestResult = {
   ok: boolean;
-  results?: { name: string; outcome: "pass" | "fail" | "error"; message?: string; code?: string }[];
+  results?: { name: string; outcome: "pass" | "fail" | "error"; message?: string; code?: string; at?: string }[];
   report?: Report;
 };
 
@@ -134,27 +139,27 @@ export class Compiler {
     });
   }
 
-  check(src: string) {
-    return this.call<CheckResult>("check", src);
+  check(files: Files) {
+    return this.call<CheckResult>("check", JSON.stringify(files));
   }
   format(src: string) {
     return this.call<FormatResult>("format", src);
   }
-  run(src: string, name = "main", contracts = false) {
-    return this.call<RunResult>("run", src, { name, contracts });
+  run(files: Files, name = "main", contracts = false) {
+    return this.call<RunResult>("run", JSON.stringify(files), { name, contracts });
   }
-  build(src: string) {
-    return this.call<{ ok: boolean; wasm?: string; report?: Report; error?: string }>("build", src);
+  build(files: Files) {
+    return this.call<{ ok: boolean; wasm?: string; report?: Report; error?: string }>("build", JSON.stringify(files));
   }
   /**
    * Proves the program's contracts in the browser. The verifier works in rounds (see `verify_step` in tez_web):
    * it reports which solver queries it still needs, Z3-WebAssembly answers them, and it runs again.
    */
-  async verify(src: string, onProgress: (text: string) => void = () => {}): Promise<VerifyResult> {
+  async verify(files: Files, onProgress: (text: string) => void = () => {}): Promise<VerifyResult> {
     const answers: Record<string, string> = {};
     let queries = 0;
     for (let round = 1; round <= 80; round++) {
-      const step = await this.call<VerifyStep>("verify_step", src, { answers: JSON.stringify(answers) });
+      const step = await this.call<VerifyStep>("verify_step", JSON.stringify(files), { answers: JSON.stringify(answers) });
       if (step.done) return { verified: step.verified, report: step.report, rounds: round, queries };
       onProgress(`round ${round}: solving ${step.missing.length} quer${step.missing.length === 1 ? "y" : "ies"} (${queries} so far)`);
       for (const m of step.missing) {
@@ -165,7 +170,7 @@ export class Compiler {
     throw new Error("verification did not converge in 80 rounds");
   }
 
-  test(src: string, contracts = false) {
-    return this.call<TestResult>("test", src, { contracts });
+  test(files: Files, contracts = false) {
+    return this.call<TestResult>("test", JSON.stringify(files), { contracts });
   }
 }

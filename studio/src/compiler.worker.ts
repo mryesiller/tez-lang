@@ -3,7 +3,16 @@
 import init, * as tez from "./tez-wasm/tez_web.js";
 import { load, TezError } from "../../runtime/tez-runtime.mjs";
 
-type Request = { id: number; op: "check" | "format" | "run" | "interpret" | "test" | "build" | "verify_step"; src: string; name?: string; contracts?: boolean; answers?: string };
+type Request = {
+  id: number;
+  op: "check" | "format" | "run" | "interpret" | "test" | "build" | "verify_step";
+  /** the project: `{"main.tez": "...", "lib/x.tez": "..."}` as JSON; for `format`, the text of one file */
+  src: string;
+  entry?: string;
+  name?: string;
+  contracts?: boolean;
+  answers?: string;
+};
 
 const ready = init();
 
@@ -15,8 +24,8 @@ function fromBase64(b64: string): Uint8Array {
 }
 
 /** Compiles to WebAssembly (GC) and runs the function there; the result mimics `tez.run`. */
-async function runCompiled(src: string, name: string): Promise<string> {
-  const built = JSON.parse(tez.build(src)) as { ok: boolean; wasm?: string; report?: unknown; error?: string };
+async function runCompiled(entry: string, src: string, name: string): Promise<string> {
+  const built = JSON.parse(tez.build_project(entry, src, "")) as { ok: boolean; wasm?: string; report?: unknown; error?: string; human?: string };
   if (!built.ok || !built.wasm) return JSON.stringify({ ok: false, report: built.report, crash: built.error });
   const t0 = performance.now();
   try {
@@ -39,30 +48,31 @@ async function runCompiled(src: string, name: string): Promise<string> {
 
 self.onmessage = async (ev: MessageEvent<Request>) => {
   const { id, op, src, name, contracts, answers } = ev.data;
+  const entry = ev.data.entry ?? "main.tez";
   await ready;
   let json: string;
   try {
     switch (op) {
       case "check":
-        json = tez.check(src);
+        json = tez.check_project(entry, src, "");
         break;
       case "format":
         json = tez.format(src);
         break;
       case "run":
-        json = contracts ? tez.run(src, name ?? "main", true) : await runCompiled(src, name ?? "main");
+        json = contracts ? tez.run_project(entry, src, name ?? "main", true, "") : await runCompiled(entry, src, name ?? "main");
         break;
       case "verify_step":
-        json = tez.verify_step(src, answers ?? "{}");
+        json = tez.verify_project_step(entry, src, answers ?? "{}", "");
         break;
       case "build":
-        json = tez.build(src);
+        json = tez.build_project(entry, src, "");
         break;
       case "interpret":
-        json = tez.run(src, name ?? "main", contracts ?? false);
+        json = tez.run_project(entry, src, name ?? "main", contracts ?? false, "");
         break;
       default:
-        json = tez.test(src, contracts ?? false);
+        json = tez.test_project(entry, src, contracts ?? false, "");
     }
   } catch (e) {
     json = JSON.stringify({ ok: false, crash: String(e) });
