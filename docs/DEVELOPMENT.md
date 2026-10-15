@@ -1,133 +1,104 @@
 # Tez — Geliştirme Notları
 
-> Analiz tarihi: 2026-10-15 · Durum: `make check` yeşil · Kaynaklar: `docs/ROADMAP.md`, `spec/`, `bench/results/`
-> Bu belge analiz ve özellik önerilerinin özetidir; iş durumunun kaynağı `ROADMAP.md` kalır.
+> Güncelleme: 2026-10-15 (inceleme + ölçüm turu) · Durum: tüm Rust/Node testleri, gramer kontrolü ve TezBench referansları yeşil
+> Kaynaklar: `docs/ROADMAP.md`, `spec/`, `bench/results/`. Bu belge analiz ve öneri özetidir; iş durumunun kaynağı `ROADMAP.md` kalır.
+> Kural: buradaki her sayı bir komutla yeniden üretilebilir olmalı (komutlar her başlıkta).
 
 ## 1. Proje durumu özeti
 
-- 11 crate'lik Rust derleyici hattı: `tez_syntax` → `tez_types` → (`tez_verify` | `tez_interp` | `tez_wasm`), destek katmanları `tez_diag` (61 kararlı hata kodu), `tez_fmt`, `tez_cli`, `tez_driver`, `tez_web`.
-- Faz 1 (çekirdek derleyici), Faz 2 (WasmGC + tarayıcı) ve Faz 4 (doğrulama) ✅. Faz 0/3/5 araçları hazır, model ölçümleri sürüyor.
-- Sağlamlık: kanıtlanamayan her şey reddedilir; ~4286 soundness fuzz koşusu, 0 ihlal.
-- Tarayıcı: derleyici 257 KB gzip, TEA hot-swap (olay günlüğü replay), Studio + site tamamlanmış.
+- 10 crate'lik Rust derleyici hattı: `tez_syntax` → `tez_types` → (`tez_verify` | `tez_interp` | `tez_wasm`), destek: `tez_diag` (61 kararlı hata kodu), `tez_fmt`, `tez_driver`, `tez_web`, `tez_cli` (paket `tez-lang`).
+- Faz 1, 2 ve 4 ✅; Faz 0/3/5 araçları hazır ve ilk model ölçümleri yapıldı; Faz 6 kodu yazıldı ama uçtan uca denenmedi; Faz 7'den yalnız `Sub.every` (zaman) var.
+- Doğrulama tarayıcıda da çalışıyor (Z3 WebAssembly + replay arka ucu). Kanıt önbelleği, kuyruk çağrıları, olay günlüğüyle hot-swap, HTML sandbox mevcut.
 
-## 2. Ölçümler (kanıtlar)
+## 2. İnceleme bulguları ve düzeltmeler (2026-10-15)
 
-### 2.1 Token ekonomisi — `bench/results/tokens-2026-10-15.json` (30 örnek, Gemma 4)
+Projenin 1 numaralı ilkesi ("kanıtlanamayan reddedilir") iki yerde **ihlal ediliyordu**; ikisi de düzeltildi ve regresyon testleri var.
+
+| Bulgu | Önem | Düzeltme |
+|---|---|---|
+| `Str.upper`/`lower` sözleşmesi `result.len() == self.len()` diyordu; `"ß".upper()` = `"SS"`. Doğrulanmış bir program sıfıra bölmeyle çöküyordu | kritik | Sözleşme kaldırıldı |
+| `Float` taşması ∞/NaN üretiyordu; doğrulayıcı tam sıralı float varsaydığı için doğrulanmış `assert x == x` çalışırken başarısız oluyordu | kritik | Taşma her yerde (yorumlayıcı, WASM, runtime) `E_RESOURCE`; sonlu olmayan float literali reddedilir; NaN/∞ hiç oluşmaz |
+| Bir Tez programı `Html.node("script")`, `on*` öznitelikleri ve `javascript:` bağlantılarıyla sayfada JS çalıştırabiliyordu (Studio'da API anahtarı aynı sayfada) | kritik (güvenlik) | `tez-app.mjs` sandbox: izinli etiketler, `on*`/`srcdoc` düşer, URL'ler yalnız http(s)/mailto/göreli |
+| Güvenilen `extern` sözleşmeleri zor girdilerle test edilmiyordu | orta | Her sözleşme Unicode/ZWJ/büyük sayılarla hem yorumlayıcıda hem WASM runtime'da test ediliyor; **bu test bir hata daha buldu**: `List.range` çok büyük sınırlarda kısa liste için bile `E_RESOURCE` veriyordu (düzeltildi) |
+| `b.f(0)` (fonksiyon tipli alan) yanıltıcı hata veriyordu | düşük | Mesaj ve otomatik düzeltme `(b.f)(..)` öneriyor |
+| Kanıt önbelleğine yazabilen biri sorguyu "kanıtlanmış" gösterebilir | not | Güven modeli `language.md`'de belgelendi; `TEZ_NO_CACHE` |
+
+Sağlam bulunanlar: ~45 karşı-örnek programda (indeks, bölme, `decreases` hileleri, fonksiyon değeri/lambda üzerinden özyineleme, kaçan lambdalar, sabitler) doğrulayıcı doğru reddetti; yorumlayıcı ile WASM 17 uç durumda birebir aynı.
+
+## 3. Ölçümler
+
+### 3.1 Token ekonomisi — `cd bench/tokens && node measure.mjs`
 
 | Metrik | Değer |
 |---|---|
-| Toplam Tez/TS oranı | 0,99 |
-| Kanıt satırları hariç | 0,95 |
-| 36/38 anahtar kelime/operatör tek token | yalnız `ensures`, `decreases` iki token |
-| Dil kartı | 930 / 1200 token |
-| En iyi örnekler | 06-shapes 0,59 · 05-primes 0,75 |
-| En kötü | 03-factorial 1,27 (sözleşme satırları; kod-hariç 0,88) |
+| Tez/TS oranı (28 eşli program) | **0,88** |
+| Kanıt satırları hariç | 0,84 |
+| Tek token anahtar kelime/operatör | 36/38 (`ensures`, `decreases` satır başında 2 token) |
+| Dil kartı | 1.123 / 1.200 token |
 
-Not: 14 örneklik ilk ölçümdeki 0,88 oranı, örnek sayısı 30'a çıkınca 0,99'a geriledi —
-"Tez her zaman belirgin ölçüde kısa" iddiası doğru değil; kazanç ADT/kayıt ağırlıklı kodda yoğunlaşıyor.
+Not: bu belgenin önceki sürümündeki 0,99 oranı ve 930 token kart güncel değil. Oran ilk 14 programda 0,82 idi; örnek arttıkça 0,88'e yükseldi. Kazanç ADT/kayıt ağırlıklı kodda, kayıp kısa ve sözleşmeli fonksiyonlarda (ör. `17-gcd` 1,43).
 
-### 2.2 TezBench — `bench/results/tezbench-*-2026-10-15.json` (20 görev, Gemma 4 E4B)
+### 3.2 TezBench — `node bench/tezbench/generate.mjs …` + `node bench/tezbench/run.mjs --candidates DIR`
 
-| Koşu | parses | passes |
+20 görev, Gemma 4 E4B (LM Studio), "geçer" = doğrulanır + bütün vakaları geçer.
+
+| Koşu | Örnekleme | sözdizimi geçerli | geçer |
+|---|---|---|---|
+| Tez, kart yok | greedy | %0 | %0 |
+| Tez, kart (ilk sürüm) | greedy, 1 örnek | %75 | %30 |
+| Tez, kart v2 | greedy, 1 örnek | %85 | %65 |
+| Tez, güncel kart | **T=0,7, 3 örnek** | %75 / %80 / %80 | **%50 / %50 / %50** |
+| Tez, kart + 3 tur derleyici geri bildirimi | greedy | %90 | %55 |
+| Phi-4-mini-reasoning, kart | greedy | %75 | %5 |
+| Gemma 4 E4B + küçük LoRA, kart yok | greedy | %80 | **%70** |
+| aynı, GBNF kısıtlı üretim | greedy | %95 | %70 |
+| TypeScript (aynı görevler) | greedy | — | %100 |
+
+**Ölçüm dersi:** tek greedy örnekle 20 görev ±%20 oynuyor. Kart v2'nin %65'i iyimser bir tek örnekti; 3 örnekli ölçüm %48–50. Bundan sonra karşılaştırmalar **en az 3 örnek, T=0,7** ile yapılmalı ve aynı adaylar eski/yeni derleyiciyle yeniden yargılanmalı (`TEZ_BIN=…`).
+
+### 3.3 Hız — `tez build` + `node runtime/run.mjs`
+
+`fib(35)`: derlenmiş Tez ≈ 0,09 s, düz JS 0,05 s (~2×). Kutusuz fast-path ertelendi.
+
+## 4. Öneriler: ne yapıldı, ne reddedildi
+
+Değerlendirme yöntemi: kayıtlı tüm model çıktılarının (~200 aday) **ilk hata kodu** dağılımı.
+
+### Benimsendi (2026-10-15)
+
+1. **`decreases` çıkarımı** (önceki B.4). Kendi kendini çağıran fonksiyonlarda ölçü çıkarılır: `[h, ..t]` kuyruğu → `p.len()`; toplam türün alt değeri → `p`; tuple eşleşmesindeki bileşenler; literalle geri sayım `f(n - k)` → `n`. Ölçüyü yine doğrulayıcı kanıtlar (sağlam); kanıtlanamazsa hata "`decreases` yazılmadı, çıkarılan ölçü…" der. Karşılıklı özyineleme ve yukarı sayma hâlâ `decreases` ister.
+   - Kartta **anlatılmıyor**: "çıkarılır" cümlesi eklenince model Int özyinelemesinde de `decreases`'i atladı ve sonuç düştü. Çıkarım sessiz bir emniyet ağı olarak kalıyor.
+   - Etki (aynı 60 aday, eski → yeni derleyici): %48,3 → %50,0. Küçük, çünkü bu kartla model çoğu zaman metot (`map/filter/sum`) yazıyor; kalan `decreases` hataları hatalı desenlerde (`[h, t]` = iki elemanlı liste).
+2. **`fn f() -> T { … }` gövdesi** kabul edilir ve `tez fmt` bunu `= { … }` yapar (tek kanonik biçim korunur). `return x;` için ayrı açıklayıcı hata ve otomatik düzeltme var. Kartsız çıktıların ana ayrıştırma hatası buydu; ama kartsız çıktılar `return`, `;`, `snake_case` da içerdiği için tek başına geçme oranını değiştirmedi.
+
+### Ölçüldü, reddedildi ya da ertelendi
+
+- **"GBNF kısıtlı üretim tek başına en büyük getiri"**: ölçüldü. Sözdizimi %80 → %95, geçme %70 → %70. Darboğaz anlam (tür/sözleşme), sözdizimi değil.
+- **Match kollarında `,`**: verideki sıklık ~1/60 → şimdilik hayır (hata + otomatik düzeltme zaten var).
+- **Dizgide `+`**: güncel ölçümde 2/60 (`E_TYPE_BAD_OPERAND`). İzlemede; lambdalarda tür belirsizliği riski yüzünden henüz değil.
+- **Interpolasyon, `?`, `is`**: veride sinyal yok; ölçmeden ekleme.
+- **`extern`'i kaldırma**: prelude kullanıyor; kalır.
+- **Kutusuz fast-path**: ölçüm darboğaz göstermiyor.
+
+### Yeni adaylar (güncel 60 adaydaki hatalar)
+
+| Hata | Adet | Olası çözüm |
 |---|---|---|
-| Tez, kart | 0,75 | 0,30 |
-| Tez, kart v2 | 0,85 | 0,65 |
-| Tez, kart + tamir döngüsü | 0,90 | 0,55 |
-| Phi-4-mini (karşılaştırma) | 0,75 | 0,05 |
-| TypeScript referansı | 1,00 | 1,00 |
+| `clamp(x, 0, 100)` (metodu fonksiyon gibi çağırma) | 3 | `E_NAME_UNKNOWN` yerine "`x.clamp(0, 100)` mı?" düzeltmesi (ucuz, dil değişmez) |
+| `'a'` tek tırnaklı karakter | 3 | Hata mesajı + otomatik `"a"` düzeltmesi |
+| `s[0]` dizgide indeks | 2 | Mesajda `s.slice(i, i + 1)` önerisi |
+| `[h, t]` ile cons deseni sanma | 2 | Uyarı yok; derleyici mesajında "`[h, ..t]` mi?" ipucu |
+| `\|x\| …` ve `_ > 0` lambda biçimleri | 2 | Önce ölç; `x => …` tek yol kalmalı |
 
-Okuma: TS %100 — eğitim verisi farkı. Tez'de ana darboğaz söz dizimi değil (parses 0,85),
-tür/kanıt gereksinimleri (typed 0,70). LoRA ince ayarı (Faz 5) henüz yok.
+Hepsi **dili değiştirmeyen** tanı/düzeltme iyileştirmeleri; tamir döngüsünün (+%25) etkisini artırır.
 
-## 3. Özellik önerileri (öncelik sırasına göre)
+## 5. Sıradaki somut adımlar
 
-Öncelikler AGENTS.md sırası: 1 hata payı · 2 LLM kavrama · 3 token ekonomisi · hız · WasmGC · tarayıcı.
-Her aday kart bütçesi (930/1200) ve gramer büyümesi maliyetiyle değerlendirilmeli.
+1. Yukarıdaki tanı/düzeltme adaylarını ekle, aynı 60 adayı ve tamir döngüsünü yeniden ölç.
+2. TezBench'in yanında **ayrı, dışlanmış bir görev kümesi** (kart tasarımı TezBench hatalarına bakılarak değiştirildiği için TezBench artık hafif sızıntılı).
+3. 7–8B sütunu: Granite 4.1 8B (kullanıcı indiriyor) — 3 örnekli protokolle.
+4. LoRA'yı genişlet (daha çok örneklenmiş program + kartlı istemlerle) ve kartlı kipte düşüşü gider.
 
-### A. Hata payını düşürenler (öncelik 1)
+## 6. Ortam notu
 
-- **`filter`/`map` eleman aksiyomu** (ROADMAP ⏸): `all(pred)` ve sıralama korunumu retlerinin ana kaynağı.
-  Lambda yakalamalarını aksiyomlamak sağlamsızlık riski taşır — indüksiyon lemması olmadan açma.
-- **String interpolation** `` "toplam: {n}" ``: `++` + `toStr` zincirleri olası sık küçük hata kaynağı;
-  ~2-3 kart tokeni, tek gramer kuralı. TezBench ret frekansıyla doğrula, sonra ekle.
-- **`Result` için `?` / `try`**: zincirli `andThen`/`mapErr` modellerin hata noktası;
-  VC üretimine erken-return çevirisi gerekir (maliyetli).
-- **`is` desen ifadesi** (`if p is Some(x)`): tek kollu durumlar için `match` yükünü indirir.
-
-### B. LLM kavraması (öncelik 2) — çevre, dil değil
-
-- TezBench'e gerçek dünya görev seti (TEA/UI, dizgi işleme) — 20 görev çoğunlukla algoritmik.
-- Her hata kodu için makinede uygulanabilir `suggestedFix` alanı (JSON şema değişimi → `SCHEMA_VERSION` bump).
-- `ensures`/`decreases` tek-token kısaltmaları: mevcut programları kırar; yalnız LoRA öncesi
-  dil sabitleme noktasında değerlendir.
-
-### C. Token ekonomisi (öncelik 3)
-
-- Prelude genişletme (`zipWith`, `chunks`, `sumBy` …): her metodun kart maliyeti + doğrulayıcı
-  aksiyom desteği var. Seçimi TezBench ret frekans analiziyle yap, sezgiyle değil.
-
-### D. Bilinçli olarak eklenmeyecekler
-
-- Döngü/mutasyon/sınıflar — sağlamlık kanıtını ve dar karar uzayını kırar.
-- Etkiler (`Cmd`/`Sub`, HTTP, io) — capability modeli olmadan doğrulamayı geçersiz kılar (Faz 7 ⏸ doğru).
-- Wasm fast-path (⏸) — `fib(30)` ≈ 0,03 sn; ölçüm darboğaz göstermeden açma.
-
-## 4. Sıradaki somut adım
-
-1. TezBench başarısız görevlerini (kart-v2 koşusunda 7/20) **hata kodu frekansına göre** grupla;
-   en sık kod = en yüksek getirili ergonomi düzeltmesi.
-2. Model sunucusu kalıcı bağlanınca: `node bench/tezbench/run.mjs --prompts DIR --card` ile
-   düzenli ölçüm; sonuçlar `bench/results/` altında `--label` ile sürümlenir.
-3. LoRA veri seti büyütme (`data/sample.mjs`) GPU onayı gelince.
-
-## 5. Söz dizimi/gramer sadeleştirme önerileri (2026-10-15)
-
-Kart-v2 TezBench koşusunun ret kırılımı (20 görev): 3 **parse** (03-largest, 05-reverse-text,
-17-last-or), 1 **tür** (08-fibonacci), 3 geçersiz çıktı, 13 geçti.
-En büyük kayıp söz dizimi üretiminde; öneriler bu kırılıma göre sıralı.
-
-### A. Parse hatası üreten sürtünmeler (en yüksek getiri)
-
-1. **`match` kolları satır tabanlı, virgül yok**: Rust/TS eğitimli modeller `,` ile bitirir
-   veya tek satıra çok kol yazar. Kollarda opsiyonel `,` ayırıcı kabul edilmeli; tek gramer
-   kuralı, kanıt katmanına dokunmaz. Trailing comma kuralının `args` ve kollara genellemesi.
-2. **`if`/`match` koşulunda record literal yasağı**: Kartta takip edilmeyen ince kısıt;
-   parantez zorunluluğu (`if (e) { }`, ~2 token) belirsizliği tamamen kaldırır.
-3. **`++` dizgi birleştirme**: Modeller refleks olarak `+` yazar. `+`'nın `Str` üzerinde
-   aşırı yüklenmesi `catExpr` öncelik seviyesini gramarden siler — hem sadeleşme hem hata
-   azaltma; tür çıkarımı sayesinde sağlamsızlık riski yok.
-
-### B. Tür/kanıt hatası üreten sürtünmeler
-
-4. **Yapısal `decreases` çıkarımı**: Desen eşlemeli listeden-kuyruğa özyinelemede küçülen
-   argümanı derleyici çıkarabilmeli; `decreases` karttan kısmen düşer (~8-10 token),
-   Int-decreases açık yazılmaya devam eder.
-5. **`List.map(xs, f)` yasağı**: Kartın açık uyarı ihtiyacının kendisi hata sinyali.
-   Uniform-call syntax açmak yöntem çözümlemeyi karmaşıklaştırır; önce ölç.
-
-### C. Grameri küçültenler
-
-6. **`extern`**: Kelime listesinde ama kartta kullanımı görünmüyor — ölü ağırlıksa kaldır.
-7. **`with { x: 3 }` ayırıcı tutarlılığı**: `:` hem tür hem fieldInit'te; `=` yalnız `let`'te.
-   Yalnız TezBench frekansı gösterirse `with { x = 3 }` değerlendir (kırıcı).
-8. **`it` refinement örtük adı**: Modeller bazen lambda yazar; ret mesajı net olduğu sürece beklet.
-
-### D. İdeal kullanım şekli — üretim hattı üçlüsü
-
-1. **Kart + GBNF kısıtlı üretim** (`spec/grammar.gbnf` hazır): Parse hatalarını yapısal
-   olarak sıfırlar — bugünkü 3 parse hatasının tamamını ortadan kaldırır; tek başına en
-   büyük getiri. llama.cpp/Ollama GBNF destekli; tarayıcı için Faz 6.
-2. **Tamir döngüsü açık**: 0,30 → 0,55 geçiş bu döngüden geldi; `suggestedFix` ile ucuzlar.
-3. **Kart bütçesini boşaltma**: Sadeleşmelerden kazanılan token, kartta few-shot örnek
-   veya prelude metoduna dönüştürülür.
-
-**Önerilen sıra**: (1) `+` Str birleştirme + opsiyonel kol ayırıcıları → (2) yapısal
-`decreases` çıkarımı → (3) GBNF kısıtlı üretim. Hepsi sürekli kurala tabi:
-`spec/ → tez_fmt → card.md bütçesi → TezBench yeniden ölçümü`.
-
-## 6. Ortam notu (2026-10-15)
-
-`make check` başlangıçta wasm32 hedefinde `E0463: can't find crate for std/core` ile düşüyordu.
-Kök neden: Homebrew sade `rust` formülü rustup shim'lerini PATH'te gölgeliyordu.
-Düzeltme: `brew unlink rust && brew link --force rustup` (geri alma: `brew link rust`).
-Sorun depo kaynaklı değildi; `rust-toolchain.toml` (1.99.0 + wasm32) doğru.
+`make check` wasm32 hedefinde `E0463: can't find crate for std/core` ile düşerse: Homebrew sade `rust` formülü rustup shim'lerini gölgeliyordur. Düzeltme: `brew unlink rust && brew link --force rustup` (geri alma: `brew link rust`). `rust-toolchain.toml` (1.99.0 + wasm32) doğru.
