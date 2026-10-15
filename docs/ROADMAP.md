@@ -8,7 +8,7 @@ Durum: `⬜ başlamadı` · `🟦 sürüyor` · `✅ bitti` · madde işaretleri
 | Faz | Ad | Süre | Durum |
 |---|---|---|---|
 | A | Altyapı ve ajan ortamı | 1 gün | 🟦 |
-| 0 | Dil tasarımı + ölçüm | 2 hafta | 🟦 (dil ✅, token ölçümü ✅, model ölçümü 🔒) |
+| 0 | Dil tasarımı + ölçüm | 2 hafta | ✅ (Faz 0 çıkış kriteri "≥%80 sözdizimi geçerliliği": kartla %85, geri bildirimle %90 ✓) |
 | 1 | Çekirdek derleyici | 3 hafta | ✅ |
 | 2 | WasmGC + tarayıcı | 3 hafta | ✅ (fast path ⏸) |
 | 3 | LLM döngüsü + veri hattı v1 | 2 hafta | 🟦 (araçlar ✅, model ölçümü 🔒) |
@@ -51,7 +51,17 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] TezBench iskeleti: `bench/tezbench/` — 20 görev, Tez + TypeScript referansları, dört düzeyli yargıç (ayrıştırır, tür denetler, doğrular, vakaları geçer), `--self-check`, `--prompts`
 - [x] `q4f16` ONNX boyutları ölçüldü (yalnız HF üst verisi, ağırlık indirilmedi; `bench/onnx-sizes.mjs`): **metin-only q4f16 = 4,9 GB** (kod çözücü 2,9 + gömme 2,0), q4 5,6 GB, fp16 16,5 GB. Sonuç: Mod C "isteğe bağlı indirme" olmalı (ARCHITECTURE §9 riski doğrulandı); ince ayarlı daha küçük bir model hedefi anlamlı
 - [ ] 🔒 Küçük deneme LoRA — GPU ve temel model ağırlığı indirme onayı gerekir
-- [ ] 🔒 İlk ölçüm: Gemma 4 E4B, kartla → sözdizimi geçerliliği. Token oranı ölçüldü (0,88); geçerlilik için bir model sunucusu gerekir. Hazır araç: `node bench/tezbench/run.mjs --prompts DIR --card` + `tools/agent/solve.mjs` (OpenAI uyumlu herhangi bir sunucu: Ollama, llama.cpp, vLLM)
+- [x] İlk ölçüm (2026-10-15, LM Studio, `google/gemma-4-e4b`, greedy, 20 görev, tek deneme; `bench/tezbench/generate.mjs`, sonuçlar `bench/results/tezbench-gemma4-e4b-*`):
+
+  | Kip | geçerli sözdizimi | doğrulanır + testleri geçer |
+  |---|---|---|
+  | Tez, kart yok | %0 | %0 |
+  | Tez, kart (ilk sürüm) | %75 | %30 |
+  | Tez, kart + 3 turluk derleyici geri bildirimi | %90 | %55 |
+  | Tez, kart (yöntem-öncelikli cümle eklendi) | %85 | %65 |
+  | TypeScript (karşılaştırma) | — | %100 |
+
+  Yorum: kart olmadan model Tez'i hiç yazamıyor; kart + geri bildirim ince ayar olmadan %55–65'e çıkarıyor, TypeScript'in hâlâ çok gerisinde — ince ayar gerçekten gerekli (Faz 5). Baskın hata: listeler için yöntem yerine elle özyineleme yazıp `decreases` unutmak. Karta tek genel cümle (`Before writing recursion over a list, use these methods`) %30 → %65. **Uyarı:** bu cümle TezBench hatalarına bakıldıktan sonra eklendi (kart tasarımına hafif sızıntı); yeni ölçümler için TezBench'in yanında ayrı bir dışlanmış görev kümesi gerekir. Tek örnekleme, 20 görev: ±%10 belirsizlik
 
 ## Faz 1 — Çekirdek derleyici ✅
 
@@ -91,7 +101,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Otomatik düzeltme döngüsü: `tools/agent/loop.mjs` (Node + tarayıcı ortak), `solve.mjs` CLI, gerçek derleyiciyle testli
 - [x] `data/` hattı v1: `sample.mjs` (görev → N aday → derleyici reddi → kanonikleştirme → tekilleştirme → kirlenme filtresi), `build-v1.mjs`
 - [x] Düzeltme izi üretimi: modelsiz mutasyonla (`data/mutate.mjs`, 11 işleç, 17 hata kodu) ve model denemelerinden
-- [ ] 🔒 TezBench ilk tam ölçüm (3–4B, 7–8B, öncü model; Tez vs TypeScript) — model sunucusu/API anahtarı gerekir; yargıç ve görevler hazır (`bench/tezbench/`)
+- [ ] TezBench tam ölçüm: 4B (Gemma 4 E4B) ✅ yukarıda; 7–8B ve öncü model sütunları 🔒 (LM Studio'da başka model/API anahtarı gerekir: `node bench/tezbench/generate.mjs --base-url … --model …`)
 - [x] `tez-mcp` (`tools/tez-mcp/`): `tez_check`, `tez_fmt`, `tez_run`, `tez_test`; bağımlılıksız stdio MCP sunucusu, testli
 
 **Çıkış kriteri:** İlk uçtan uca demo; ≤ 3 turda yakınsama ≥ %90 (orta model).

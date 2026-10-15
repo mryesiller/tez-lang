@@ -4,11 +4,12 @@
  * Any server that speaks the OpenAI chat-completions protocol (OpenAI, vLLM, llama.cpp server, Ollama, LM Studio,
  * OpenRouter, ...). Works in Node and in the browser.
  */
-export function openAICompatible({ baseUrl, model, apiKey = "", temperature = 0.2, maxTokens = 1024, fetchImpl = fetch }) {
+export function openAICompatible({ baseUrl, model, apiKey = "", temperature = 0.2, maxTokens = 1024, timeoutMs = 300000, fetchImpl = fetch }) {
   const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
   return async (prompt) => {
     const res = await fetchImpl(url, {
       method: "POST",
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { "content-type": "application/json", ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}) },
       body: JSON.stringify({ model, temperature, max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
     });

@@ -1,0 +1,199 @@
+{
+  "label": "gemma4-e4b-ts",
+  "date": "2026-10-15",
+  "tasks": 20,
+  "summary": {
+    "tez": {
+      "parses": 0,
+      "typed": 0,
+      "verified": 0,
+      "passes": 0
+    },
+    "ts": {
+      "parses": 1,
+      "passes": 1
+    }
+  },
+  "rows": [
+    {
+      "id": "01-sum-to",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "02-abs-diff",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "03-largest",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "04-count-positive",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "05-reverse-text",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "06-clamp-score",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "07-factorial",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "08-fibonacci",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "09-is-prime",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "10-sum-of-squares",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "11-keep-evens",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "12-double-all",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "13-join-words",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "14-word-count",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "15-capitalize",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "16-average",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "17-last-or",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "18-gcd",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "19-power",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    },
+    {
+      "id": "20-zip-sum",
+      "tez": {
+        "level": "missing"
+      },
+      "ts": {
+        "level": "passes"
+      }
+    }
+  ]
+}

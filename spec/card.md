@@ -39,6 +39,7 @@ Generic: `fn first[T](xs: List[T]) -> Option[T]`.
 - `/` and `%` truncate toward zero · patterns: `_` `n` `0` `Some(x)` `(a, b)` `[]` `[h, ..t]`, guard `n if n > 0`
 
 ## Methods: always `value.method(args)`, never `List.map(xs, f)`
+There are no loops. Before writing recursion over a list, use these methods: `xs.map(f)`, `xs.filter(f)`, `xs.sum()`, `xs.count(f)`, `xs.fold(init, f)`. A method call needs no `decreases`.
 - Int `abs min max clamp pow isEven isOdd toStr toFloat` · Float `sqrt floor ceil round abs min max toStr`
 - Str `len slice chars toInt contains startsWith endsWith trim upper lower split repeat isEmpty`
 - List `len get map filter fold flatMap append concat reverse take drop any all count contains indexOf first last zip enumerate sort sortBy sum min max join isEmpty` · static `List.range(lo, hi)` `List.repeat(x, n)`
