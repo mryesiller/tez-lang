@@ -1,0 +1,20 @@
+# QLoRA on the 4-bit Gemma 4 E4B that LM Studio keeps locally; small enough for a 25 GB laptop.
+model: "/Users/mryesiller/.lmstudio/models/lmstudio-community/gemma-4-E4B-it-MLX-4bit"
+train: true
+data: "data/lora"
+adapter_path: "data/lora/adapters"
+batch_size: 1
+num_layers: 16
+iters: 600
+learning_rate: 1.0e-4
+max_seq_length: 1024
+grad_checkpoint: true
+steps_per_report: 20
+steps_per_eval: 100
+save_every: 200
+val_batches: 22
+lora_parameters:
+  rank: 16
+  scale: 20.0
+  dropout: 0.05
+  keys: ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"]

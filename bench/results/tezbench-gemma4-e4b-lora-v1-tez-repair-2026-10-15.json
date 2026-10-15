@@ -1,0 +1,207 @@
+{
+  "label": "gemma4-e4b-lora-v1-tez-repair",
+  "date": "2026-10-15",
+  "tasks": 20,
+  "summary": {
+    "tez": {
+      "parses": 1,
+      "typed": 0.8,
+      "verified": 0.75,
+      "passes": 0.6
+    },
+    "ts": {
+      "parses": 0,
+      "passes": 0
+    }
+  },
+  "rows": [
+    {
+      "id": "01-sum-to",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "02-abs-diff",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "03-largest",
+      "tez": {
+        "level": "parses",
+        "diag": "E_MATCH_NON_EXHAUSTIVE"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "04-count-positive",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "05-reverse-text",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "06-clamp-score",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "07-factorial",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "08-fibonacci",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "09-is-prime",
+      "tez": {
+        "level": "verified",
+        "diag": "TESTS_FAILED"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "10-sum-of-squares",
+      "tez": {
+        "level": "typed",
+        "diag": "E_POSTCONDITION"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "11-keep-evens",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "12-double-all",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "13-join-words",
+      "tez": {
+        "level": "parses",
+        "diag": "E_TYPE_MISMATCH"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "14-word-count",
+      "tez": {
+        "level": "verified",
+        "diag": "TESTS_FAILED"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "15-capitalize",
+      "tez": {
+        "level": "parses",
+        "diag": "E_TYPE_BAD_OPERAND"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "16-average",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "17-last-or",
+      "tez": {
+        "level": "parses",
+        "diag": "E_MATCH_NON_EXHAUSTIVE"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "18-gcd",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "19-power",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "20-zip-sum",
+      "tez": {
+        "level": "verified",
+        "diag": "TESTS_FAILED"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    }
+  ]
+}

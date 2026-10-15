@@ -22,3 +22,4 @@ dist
 *.gguf
 *.safetensors
 /studio/public/z3
+/data/lora/adapters

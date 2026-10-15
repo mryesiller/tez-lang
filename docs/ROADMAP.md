@@ -51,7 +51,15 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] `spec/grammar.gbnf`: `spec/tools/ebnf2gbnf.py` ile EBNF'den üretilir; `--check` güncelliği ve 30 örneğin türetilebilirliğini doğrular (üst küme: boşluk/yeni satır serbest, anahtar sözcükler tanımlayıcıdan dışlanmaz)
 - [x] TezBench iskeleti: `bench/tezbench/` — 20 görev, Tez + TypeScript referansları, dört düzeyli yargıç (ayrıştırır, tür denetler, doğrular, vakaları geçer), `--self-check`, `--prompts`
 - [x] `q4f16` ONNX boyutları ölçüldü (yalnız HF üst verisi, ağırlık indirilmedi; `bench/onnx-sizes.mjs`): **metin-only q4f16 = 4,9 GB** (kod çözücü 2,9 + gömme 2,0), q4 5,6 GB, fp16 16,5 GB. Sonuç: Mod C "isteğe bağlı indirme" olmalı (ARCHITECTURE §9 riski doğrulandı); ince ayarlı daha küçük bir model hedefi anlamlı
-- [ ] 🔒 Küçük deneme LoRA — GPU ve temel model ağırlığı indirme onayı gerekir
+- [x] Küçük deneme LoRA (2026-10-15, Mac M4 Pro 25 GB, `mlx-lm`, yerel 4-bit Gemma 4 E4B; yeni ağırlık indirilmedi): `data/lora/` — 227 örnek (26 örnek program + 77 Gemma'dan reddetmeli örneklenmiş doğrulanmış program + 124 düzeltme izi; TezBench çakışması 0), rank 16, 16 katman, 600 adım, tepe bellek ≈ 6 GB (~10 dk). Doğrulama kaybı 2,94 → 0,16. **TezBench (aynı model, greedy, 20 görev):**
+
+  | Kip | önce | LoRA sonrası (geçer) | (doğrulanır) |
+  |---|---|---|---|
+  | kart yok | %0 | **%70** | %70 |
+  | kart | %65 | %50 | %60 |
+  | kart + 3 tur geri bildirim | %55 | %60 | %75 |
+
+  Yorum: ince ayar kart ihtiyacını ortadan kaldırdı (%0 → %70, sözdizimi geçerliliği kartla %100); kartlı kipler değişmedi/biraz düştü (ince ayar verisi kartsız). Uyarılar: 20 görev tek örnekleme (±%10); eğitim istemleri TezBench'ten bağımsız ama aynı alanda kısa fonksiyonlar; ağırlıklar yayımlanmadı (`data/lora/adapters` git dışı)
 - [x] İlk ölçüm (2026-10-15, LM Studio, `google/gemma-4-e4b`, greedy, 20 görev, tek deneme; `bench/tezbench/generate.mjs`, sonuçlar `bench/results/tezbench-gemma4-e4b-*`):
 
   | Kip | geçerli sözdizimi | doğrulanır + testleri geçer |
