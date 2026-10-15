@@ -1,0 +1,61 @@
+{"id": "min-of-three", "task": "Write `fn minOfThree(a: Int, b: Int, c: Int) -> Int` returning the smallest of three integers."}
+{"id": "is-positive", "task": "Write `fn isPositive(n: Int) -> Bool` that is true when n is greater than zero."}
+{"id": "sign", "task": "Write `fn sign(n: Int) -> Int` returning -1, 0 or 1 according to the sign of n."}
+{"id": "cube", "task": "Write `fn cube(n: Int) -> Int` returning n multiplied by itself three times."}
+{"id": "triangle-area", "task": "Write `fn rectArea(w: Int, h: Int) -> Int` returning width times height, for non-negative sides."}
+{"id": "last-digit", "task": "Write `fn lastDigit(n: Int) -> Int` returning the last decimal digit of a non-negative n."}
+{"id": "count-negative", "task": "Write `fn countNegative(xs: List[Int]) -> Int` counting the elements below zero."}
+{"id": "product", "task": "Write `fn product(xs: List[Int]) -> Int` multiplying all elements; the empty list gives 1. Use fold."}
+{"id": "smallest", "task": "Write `fn smallest(xs: List[Int]) -> Int` for a non-empty list, returning the smallest element."}
+{"id": "take-three", "task": "Write `fn firstThree(xs: List[Int]) -> List[Int]` returning at most the first three elements."}
+{"id": "drop-first", "task": "Write `fn dropFirst(xs: List[Int]) -> List[Int]` returning the list without its first element, or empty."}
+{"id": "increment-all", "task": "Write `fn incrementAll(xs: List[Int]) -> List[Int]` adding one to every element."}
+{"id": "keep-positive", "task": "Write `fn keepPositive(xs: List[Int]) -> List[Int]` keeping only elements greater than zero."}
+{"id": "all-positive", "task": "Write `fn allPositive(xs: List[Int]) -> Bool` true when every element is greater than zero."}
+{"id": "any-zero", "task": "Write `fn hasZero(xs: List[Int]) -> Bool` true when some element equals zero."}
+{"id": "is-sorted", "task": "Write `fn isSorted(xs: List[Int]) -> Bool` true when the list is in non-decreasing order. Use zip and all."}
+{"id": "range-sum", "task": "Write `fn rangeSum(lo: Int, hi: Int) -> Int` summing the integers from lo up to but not including hi."}
+{"id": "squares-below", "task": "Write `fn squaresBelow(n: Int) -> List[Int]` listing the squares of 0 up to n-1; n is non-negative."}
+{"id": "repeat-text", "task": "Write `fn shout(s: Str, n: Int) -> Str` repeating s n times, for non-negative n."}
+{"id": "text-length-twice", "task": "Write `fn doubleLength(s: Str) -> Int` returning twice the length of s."}
+{"id": "upper-first-word", "task": "Write `fn firstWord(s: Str) -> Str` returning the text before the first space (the whole text if no space)."}
+{"id": "starts-with-a", "task": "Write `fn startsWithA(s: Str) -> Bool` true when s begins with the letter a."}
+{"id": "trim-and-lower", "task": "Write `fn clean(s: Str) -> Str` trimming spaces and converting to lower case."}
+{"id": "count-chars", "task": "Write `fn countLetter(s: Str, c: Str) -> Int` counting how many characters of s equal c."}
+{"id": "join-lines", "task": "Write `fn joinLines(ls: List[Str]) -> Str` joining lines with a newline character."}
+{"id": "shape-perimeter", "task": "Define `type Shape = Square(Int) | Rect(Int, Int)` and `fn perimeter(s: Shape) -> Int`."}
+{"id": "traffic", "task": "Define `type Light = Red | Green | Yellow` and `fn canGo(l: Light) -> Bool` true only for Green."}
+{"id": "weekday", "task": "Define `type Day = Mon | Tue | Wed | Thu | Fri | Sat | Sun` and `fn isWeekend(d: Day) -> Bool`."}
+{"id": "point-move", "task": "Define `type Point = { x: Int, y: Int }` and `fn translate(p: Point, dx: Int, dy: Int) -> Point`."}
+{"id": "point-dist", "task": "Define `type Point = { x: Int, y: Int }` and `fn manhattan(a: Point, b: Point) -> Int` (sum of absolute differences)."}
+{"id": "person-adult", "task": "Define `type Person = { name: Str, age: Int }` and `fn isAdult(p: Person) -> Bool` for age at least 18."}
+{"id": "rename", "task": "Define `type Person = { name: Str, age: Int }` and `fn rename(p: Person, name: Str) -> Person`."}
+{"id": "safe-first", "task": "Write `fn safeFirst(xs: List[Int]) -> Option[Int]` returning the first element if any."}
+{"id": "option-double", "task": "Write `fn doubleOpt(o: Option[Int]) -> Option[Int]` doubling the value inside, keeping None."}
+{"id": "opt-or-zero", "task": "Write `fn orZero(o: Option[Int]) -> Int` returning the value or 0."}
+{"id": "parse-or-neg", "task": "Write `fn parseOr(s: Str, d: Int) -> Int` converting text to an integer, or d when it is not a number."}
+{"id": "div-result", "task": "Write `fn divide(a: Int, b: Int) -> Result[Int, Str]` returning Err(\"zero\") when b is 0."}
+{"id": "result-default", "task": "Write `fn valueOr(r: Result[Int, Str], d: Int) -> Int` returning the Ok value or d."}
+{"id": "percent", "task": "Write `fn percent(part: Int, whole: Int) -> Int` returning part*100/whole for a positive whole."}
+{"id": "evens-below", "task": "Write `fn evensBelow(n: Int) -> List[Int]` listing the even numbers from 0 below n; n is non-negative."}
+{"id": "lcm-like", "task": "Write `fn doubleThenAdd(a: Int, b: Int) -> Int` returning 2*a + b."}
+{"id": "clamp-low", "task": "Write `fn atLeastZero(n: Int) -> Int` returning n, but 0 when n is negative."}
+{"id": "max-of-two", "task": "Write `fn bigger(a: Int, b: Int) -> Int` returning the larger one."}
+{"id": "count-down", "task": "Write `fn countDown(n: Int) -> List[Int]` listing n, n-1, ..., 1 for n >= 0 using recursion."}
+{"id": "sum-digits", "task": "Write `fn digitSum(n: Int) -> Int` summing the decimal digits of a non-negative n using recursion."}
+{"id": "len-recursive", "task": "Write `fn length(xs: List[Int]) -> Int` counting elements with pattern matching and recursion."}
+{"id": "contains-rec", "task": "Write `fn has(xs: List[Int], x: Int) -> Bool` using pattern matching and recursion."}
+{"id": "sum-pairs", "task": "Write `fn sumPairs(ps: List[(Int, Int)]) -> List[Int]` adding the two numbers of each pair."}
+{"id": "tuple-swap", "task": "Write `fn swap(p: (Int, Str)) -> (Str, Int)` swapping the two parts."}
+{"id": "average-pair", "task": "Write `fn mean(a: Int, b: Int) -> Int` returning (a + b) / 2."}
+{"id": "celsius", "task": "Write `fn toFahrenheit(c: Float) -> Float` converting with c * 1.8 + 32.0."}
+{"id": "rounded", "task": "Write `fn roundedHalf(x: Float) -> Int` returning x / 2.0 rounded to an integer."}
+{"id": "bmi-class", "task": "Write `fn bmiClass(bmi: Int) -> Str` returning \"low\" below 18, \"normal\" below 25, otherwise \"high\"."}
+{"id": "grade", "task": "Write `fn grade(score: Int) -> Str` returning \"A\" from 90, \"B\" from 80, \"C\" from 70, otherwise \"F\"."}
+{"id": "leap", "task": "Write `fn isLeap(y: Int) -> Bool` using the Gregorian rule."}
+{"id": "fizz", "task": "Write `fn fizz(n: Int) -> Str` returning \"Fizz\" for multiples of 3, otherwise the number as text."}
+{"id": "nth-or", "task": "Write `fn nth(xs: List[Int], i: Int, d: Int) -> Int` returning the element at i or d when i is out of range."}
+{"id": "middle", "task": "Write `fn middle(xs: List[Int]) -> Int` returning the element at the middle index of a non-empty list."}
+{"id": "pairs-up", "task": "Write `fn pairUp(xs: List[Int]) -> List[(Int, Int)]` pairing each element with its index using enumerate (index first)."}
+{"id": "positive-type", "task": "Define `type Pos = Int where it > 0` and `fn halfOf(n: Pos) -> Int` returning n / 2."}
+{"id": "percent-type", "task": "Define `type Percent = Int where it >= 0 && it <= 100` and `fn invert(p: Percent) -> Percent` returning 100 minus p."}

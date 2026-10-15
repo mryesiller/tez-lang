@@ -1,0 +1,31 @@
+type Model = { left: Int where it >= 0 }
+
+type Msg = Tick | Reset
+
+fn init() -> Model = Model { left: 10 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Tick => if m.left > 0 { m with { left: m.left - 1 } } else { m }
+  Reset => init()
+}
+
+fn view(m: Model) -> Html[Msg] =
+  Html.node(
+    "section",
+    [UiProp("class", "col")],
+    [
+      Html.heading(if m.left == 0 { "Liftoff!" } else { m.left.toStr() }),
+      Html.node(
+        "ul",
+        [],
+        List.range(0, m.left).map(i => Html.node("li", [], [Html.text("#" ++ i.toStr())]))
+      ),
+      Html.row([Html.button("tick", Tick), Html.button("reset", Reset)])
+    ]
+  )
+
+test countsDown = update(init(), Tick).left == 9
+
+test stopsAtZero = update(Model { left: 0 }, Tick).left == 0
+
+fn main() -> Int = update(update(init(), Tick), Tick).left
