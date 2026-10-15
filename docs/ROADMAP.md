@@ -173,7 +173,7 @@ Asıl amaç: tarayıcıdaki bir LLM Tez yazar, kod aynı tarayıcıda derlenip �
 - [x] Siteyi dışa aktar: Studio **Publish** ve `tez site main.tez -o index.html` → tek dosya (wasm + runtime + app host gömülü, sıkı CSP, ağ yok); herhangi bir statik barındırmada ya da diskten çalışır. (Henüz yok: paylaşılabilir bağlantı/barındırma)
 - [x] Tetikleyiciler: `Sub.every` (aralık), `Sub.clock(ms, f)` (duvar saati → cron benzeri zamanlama saf kod olarak), `Sub.online`, `Sub.visible`; olay günlüğü argümanı da kaydeder (hot-swap tekrar oynatır). Örnek 55. Kart tam 1.200 token (sınırda)
 - [x] Kalıcılık ve ağ: `save`/`restore` (yerel depolama; geri yüklenen model doğrulanmış kodla kurulur) ve `fetches` → `Fetch.get` (varsayılan: yalnız sayfanın kendi kökeni, `tez site --allow=` ile ek köken; çerez/yönlendirme yok, 10 sn, 1 MB). Örnek 56. Henüz yok: POST, başlıklar, WebSocket
-- [ ] Tarayıcıda LLM → derle → doğrula → çalıştır döngüsü uçtan uca (WebGPU model, tamir döngüsü)
+- [~] Tarayıcıda LLM → derle → **kanıtla** → çalıştır döngüsü: Studio'daki "Ask a model" artık yalnız tür hatalarını değil Z3 kanıt hatalarını (karşı örnekle) modele geri verir; kabul edilen uygulama otomatik çalışır (sahte OpenAI uyumlu sunucuyla uçtan uca doğrulandı: kanıtsız bölme reddedildi, düzeltilen sürüm çalıştı). **Eksik:** gerçek WebGPU modeliyle deneme (4,9 GB indirme; ayarlı modelin ONNX dışa aktarımı yok)
 
 ## Sürekli kurallar
 

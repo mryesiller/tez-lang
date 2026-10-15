@@ -169,11 +169,11 @@ export default function App() {
     setBusy(false);
   };
 
-  const runApp = async () => {
+  const runApp = async (project: Files = files) => {
     setBusy(true);
     app.current?.stop();
     app.current = null;
-    const built = await compiler.build(files);
+    const built = await compiler.build(project);
     if (!built.ok || !built.wasm) {
       setOutput({ kind: "error", text: showReport(built) });
       setBusy(false);
@@ -239,11 +239,26 @@ export default function App() {
         task: aiTask,
         card,
         generate: aiLocal ? inBrowserModel((t) => setAiLog(t)) : openAICompatible({ baseUrl: ai.baseUrl ?? "", model: ai.model ?? "", apiKey: ai.apiKey }),
-        check: async (code) => (await compiler.check({ [ENTRY]: code })).report.diagnostics,
+        // a program is accepted only when it is proved, not just type-correct; without a solver, type errors only
+        check: async (code) => {
+          const project = { [ENTRY]: code };
+          const typed = (await compiler.check(project)).report.diagnostics;
+          if (typed.length) return typed;
+          try {
+            setAiLog((l) => `${l}\n  proving…`);
+            return (await compiler.verify(project)).report.diagnostics;
+          } catch {
+            return typed;
+          }
+        },
         onTurn: (t, i) => setAiLog((l) => `${l}\nturn ${i + 1}: ${t.diagnostics.length ? `${t.diagnostics.length} problem(s), first ${t.diagnostics[0]?.code}` : "accepted"}`),
       });
       setFiles({ [ENTRY]: r.code });
       setActive(ENTRY);
+      if (r.ok && /\bfn view\(/.test(r.code)) {
+        setAiLog((l) => `${l}\nAccepted and proved. Starting the app…`);
+        await runApp({ [ENTRY]: r.code });
+      }
       setAiLog((l) => `${l}\n${r.ok ? "Done: the program is accepted." : "Stopped after the last turn; the program still has problems."}`);
     } catch (e) {
       setAiLog(`failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -374,7 +389,7 @@ export default function App() {
         <button onClick={run} disabled={busy || diags.length > 0}>
           Run
         </button>
-        <button onClick={runApp} disabled={busy || diags.length > 0} title="Run init/update/view as an app">
+        <button onClick={() => runApp()} disabled={busy || diags.length > 0} title="Run init/update/view as an app">
           App
         </button>
         <button onClick={publish_} disabled={busy || diags.length > 0} title="Download the program as one self-contained web page">
