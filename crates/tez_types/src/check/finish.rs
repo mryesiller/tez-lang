@@ -5,7 +5,7 @@ use tez_syntax::{ByteSpan, Problem};
 
 use super::{Checker, Pending};
 use crate::exhaust::{self, ArmInfo, Issue};
-use crate::hir::{Expr, ExprKind, Stmt};
+use crate::hir::{Expr, ExprKind, Pat, PatKind, Stmt, TypeKind};
 use crate::ty::Ty;
 
 impl Checker<'_> {
@@ -160,6 +160,14 @@ impl Checker<'_> {
             }
             for &f in &comp {
                 self.program.fns[f].is_recursive = true;
+                // structural recursion needs no clause: the measure is inferred (and still proved by the verifier)
+                if comp.len() == 1
+                    && self.program.fns[f].decreases.is_none()
+                    && !self.program.fns[f].is_prelude
+                    && let Some(m) = self.infer_measure(f)
+                {
+                    self.program.fns[f].decreases = Some(m);
+                }
                 if self.program.fns[f].decreases.is_none() && !self.program.fns[f].is_prelude {
                     let span = self.fn_srcs[f]
                         .as_ref()
@@ -176,6 +184,90 @@ impl Checker<'_> {
                 }
             }
         }
+    }
+
+    /// A `decreases` measure for a self-recursive function whose every recursive call passes, for one parameter, a
+    /// value taken apart from that parameter by a pattern: the tail of `[h, ..t]` (measure `p.len()`) or a field of a
+    /// constructor of a sum type (measure `p`, structural size). `None` when no parameter qualifies.
+    fn infer_measure(&self, f: usize) -> Option<Expr> {
+        let def = &self.program.fns[f];
+        let body = def.body.as_ref()?;
+        for p in &def.params {
+            let is_list = matches!(p.ty, Ty::List(_));
+            let is_sum = matches!(&p.ty, Ty::Adt(id, _) if matches!(self.program.types[*id].kind, TypeKind::Adt(_)));
+            if !is_list && !is_sum {
+                continue;
+            }
+            // locals that are proper parts of the parameter (transitively)
+            let mut smaller: Vec<u32> = Vec::new();
+            let mut origin: Vec<u32> = vec![p.local];
+            loop {
+                let before = smaller.len();
+                body.walk(&mut |e| {
+                    if let ExprKind::Match(scrut, arms) = &e.kind
+                        && let ExprKind::Local(s) = scrut.kind
+                        && (origin.contains(&s))
+                    {
+                        for arm in arms {
+                            collect_parts(&arm.pat, is_list, &p.ty, &mut smaller);
+                        }
+                    }
+                });
+                for s in &smaller {
+                    if !origin.contains(s) {
+                        origin.push(*s);
+                    }
+                }
+                if smaller.len() == before {
+                    break;
+                }
+                smaller.sort_unstable();
+                smaller.dedup();
+                if smaller.len() == before {
+                    break;
+                }
+            }
+            let at = def.params.iter().position(|q| q.local == p.local)?;
+            let mut calls = 0usize;
+            let mut all_smaller = true;
+            body.walk(&mut |e| {
+                if let ExprKind::Call { f: g, args, .. } = &e.kind
+                    && *g == f
+                {
+                    calls += 1;
+                    let ok = matches!(args.get(at).map(|a| &a.kind), Some(ExprKind::Local(l)) if smaller.contains(l));
+                    all_smaller &= ok;
+                }
+            });
+            if calls == 0 || !all_smaller {
+                continue;
+            }
+            let span = def.span;
+            let local = Expr {
+                kind: ExprKind::Local(p.local),
+                ty: p.ty.clone(),
+                span,
+            };
+            if is_sum {
+                return Some(local);
+            }
+            let len = self
+                .program
+                .fns
+                .iter()
+                .position(|d| d.is_prelude && d.full_name() == "List.len")?;
+            let Ty::List(elem) = &p.ty else { return None };
+            return Some(Expr {
+                kind: ExprKind::Call {
+                    f: len,
+                    targs: vec![(**elem).clone()],
+                    args: vec![local],
+                },
+                ty: Ty::Int,
+                span,
+            });
+        }
+        None
     }
 
     // ------------------------------------------------------------ patterns
@@ -259,5 +351,34 @@ impl Checker<'_> {
         for p in issues {
             self.err(p);
         }
+    }
+}
+
+/// Locals bound in `pat` to a proper part of the matched value: the rest of a list pattern with at least one leading
+/// item, or (for sum types) any binding inside a constructor's arguments that has the same type as the whole.
+fn collect_parts(pat: &Pat, is_list: bool, whole: &Ty, out: &mut Vec<u32>) {
+    match &pat.kind {
+        PatKind::List { items, rest } if is_list => {
+            if !items.is_empty()
+                && let Some(Some(t)) = rest
+            {
+                out.push(*t);
+            }
+        }
+        PatKind::Ctor { args, .. } if !is_list => {
+            for a in args {
+                bindings_of_type(a, whole, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn bindings_of_type(pat: &Pat, whole: &Ty, out: &mut Vec<u32>) {
+    match &pat.kind {
+        PatKind::Bind(l) if &pat.ty == whole => out.push(*l),
+        PatKind::Ctor { args, .. } => args.iter().for_each(|a| bindings_of_type(a, whole, out)),
+        PatKind::Tuple(ps) => ps.iter().for_each(|a| bindings_of_type(a, whole, out)),
+        _ => {}
     }
 }

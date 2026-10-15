@@ -48,5 +48,5 @@ There are no loops. Before writing recursion over a list, use these methods: `xs
 - UI view: `Html[Msg]` built with `Html.text(s)` `Html.heading(s)` `Html.paragraph(s)` `Html.button(label, msg)` `Html.input(value, f)` `Html.row(kids)` `Html.col(kids)` `Html.node(tag, attrs, kids)`
 
 ## What the compiler proves (else it rejects with a code and a counterexample)
-Division and `%` need a nonzero divisor; `xs[i]` and `get` need `0 <= i < len`; every call must meet the callee's `requires`; `ensures` and `where` must hold; a recursive function needs `decreases` (an Int that shrinks, or a data value that gets smaller). State what a caller needs in `requires`, what it gets in `ensures`.
+Division and `%` need a nonzero divisor; `xs[i]` and `get` need `0 <= i < len`; every call must meet the callee's `requires`; `ensures` and `where` must hold; a recursive function needs `decreases` (an Int that shrinks, or a data value that gets smaller), except when every recursive call gets the tail of a `[h, ..t]` match or a part of a matched constructor: then it is inferred. State what a caller needs in `requires`, what it gets in `ensures`.
 Don't reuse a name already in scope. Don't write `snake_case`. A `test name = expr` item checks a Bool.

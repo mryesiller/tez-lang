@@ -588,3 +588,16 @@ fn review_regressions_are_rejected() {
         assert!(ps.iter().any(|p| p.code == Code::DivZero), "{f}: {ps:?}");
     }
 }
+
+#[test]
+fn structural_measures_are_inferred_and_proved() {
+    need_z3!();
+    let ok = [
+        "fn sum(xs: List[Int]) -> Int = match xs {\n  [] => 0\n  [h, ..t] => h + sum(t)\n}\n",
+        "type T = Leaf | Node(T, Int, T)\n\nfn size(t: T) -> Int = match t {\n  Leaf => 0\n  Node(l, _, r) => size(l) + 1 + size(r)\n}\n",
+        "fn pairs(xs: List[Int]) -> Int = match xs {\n  [a, b, ..rest] => a * b + pairs(rest)\n  _ => 0\n}\n",
+    ];
+    for src in ok {
+        assert!(run(src).is_empty(), "{src}");
+    }
+}

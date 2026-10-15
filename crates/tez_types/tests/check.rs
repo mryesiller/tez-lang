@@ -567,3 +567,21 @@ fn calling_a_function_field_suggests_parentheses() {
     let p = out.problems.first().expect("a problem");
     assert!(p.message.contains("(b.f)(..)"), "{}", p.message);
 }
+
+#[test]
+fn non_structural_recursion_still_needs_decreases() {
+    for src in [
+        "fn bad(xs: List[Int]) -> Int = match xs {\n  [] => 0\n  [h, ..t] => bad(xs)\n}\n",
+        "fn bad(xs: List[Int]) -> Int = match xs {\n  [] => 0\n  [h, ..t] => bad(t.append(h))\n}\n",
+        "fn fib(n: Int) -> Int = if n < 2 { n } else { fib(n - 1) + fib(n - 2) }\n",
+    ] {
+        let parsed = tez_syntax::parse(src, tez_syntax::ParseOptions::default());
+        let out = tez_types::check(&parsed.file, src);
+        assert!(
+            out.problems
+                .iter()
+                .any(|p| p.code == tez_diag::Code::TerminationMissing),
+            "{src}"
+        );
+    }
+}

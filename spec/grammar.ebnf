@@ -20,7 +20,7 @@ variants    = [ "|" ] variant { "|" variant } ;              (* >= 2 variants, o
 variant     = UPPER [ "(" type { "," type } ")" ] ;
 
 fnDecl      = "fn" LOWER [ tparams ] "(" [ param { "," param } ] ")" "->" type
-              { clause } "=" expr ;
+              { clause } ( "=" expr | block ) ;            (* `{ .. }` without `=` is the same as `= { .. }` *)
 param       = LOWER ":" type ;
 clause      = "requires" expr | "ensures" expr | "decreases" expr ;
 

@@ -600,8 +600,11 @@ impl Parser<'_> {
         } else {
             let idx = self.next_sig(self.pos);
             self.pos = idx;
-            self.expect(&Tok::Eq)?;
-            self.skip_newlines();
+            // `fn f() -> T { .. }` (the Rust/TypeScript habit) means `fn f() -> T = { .. }`; `tez fmt` writes the `=`
+            if !self.at(&Tok::LBrace) {
+                self.expect(&Tok::Eq)?;
+                self.skip_newlines();
+            }
             Some(self.expr()?)
         };
         let end = self.prev_end();
@@ -1359,6 +1362,32 @@ impl Parser<'_> {
                         let cond = self.expr()?;
                         let span = start.join(cond.span);
                         stmts.push(Stmt::Assert { cond, span });
+                    }
+                    Tok::Lower(ref w) if w == "return" => {
+                        // a habit from other languages: the block's value is its last expression
+                        let kw = self.bump().span;
+                        let e = self.expr()?;
+                        self.push(
+                            Problem::new(
+                                Code::ParseUnexpectedToken,
+                                "Tez has no `return`: a block's value is its last expression",
+                                kw,
+                            )
+                            .expected("the expression alone")
+                            .fix(
+                                "remove `return`",
+                                ByteSpan::new(kw.start, e.span.start),
+                                String::new(),
+                            ),
+                        );
+                        if let Some(prev) = tail.replace(e) {
+                            self.push(Problem::new(
+                                Code::ParseUnexpectedToken,
+                                "this expression is discarded; bind it with `let` or remove it",
+                                prev.span,
+                            ));
+                        }
+                        return Ok(());
                     }
                     _ => {
                         let e = self.expr()?;

@@ -382,3 +382,20 @@ fn one_element_tuple_pattern_is_rejected() {
     // found by the mutation fuzzer: `(p,)` used to parse as a one-element tuple the formatter printed as `(p)`
     assert!(!codes("fn f(x: Bool) -> Int = match x {\n  (true,) => 1\n  _ => 0\n}").is_empty());
 }
+
+#[test]
+fn brace_body_is_a_block_body() {
+    let f = ok("fn f(n: Int) -> Int {\n  n + 1\n}");
+    let Item::Fn(d) = &f.items[0] else {
+        panic!("not a fn")
+    };
+    assert!(matches!(
+        d.body.as_ref().map(|b| &b.kind),
+        Some(ExprKind::Block { .. })
+    ));
+}
+
+#[test]
+fn return_is_explained() {
+    assert!(!codes("fn f(n: Int) -> Int {\n  return n\n}").is_empty());
+}

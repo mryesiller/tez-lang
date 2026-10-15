@@ -13,7 +13,7 @@ recordbody ::= "{" ws field ("," ws field)* ("," ws)? "}" ws
 field ::= lower ws ":" ws type
 variants ::= ("|" ws)? variant ("|" ws variant)*
 variant ::= upper ws ("(" ws type ("," ws type)* ")" ws)?
-fndecl ::= "fn" ws lower ws (tparams)? "(" ws (param ("," ws param)*)? ")" ws "->" ws type (clause)* "=" ws expr
+fndecl ::= "fn" ws lower ws (tparams)? "(" ws (param ("," ws param)*)? ")" ws "->" ws type (clause)* ("=" ws expr | block)
 param ::= lower ws ":" ws type
 clause ::= "requires" ws expr | "ensures" ws expr | "decreases" ws expr
 constdecl ::= "const" ws lower ws ":" ws type "=" ws expr

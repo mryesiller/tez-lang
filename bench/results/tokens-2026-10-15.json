@@ -622,6 +622,118 @@
       "ts": 193,
       "ratio": 0.82,
       "ratioCodeOnly": 0.82
+    },
+    {
+      "example": "41-countdown-app",
+      "tez": 471,
+      "tezCodeOnly": 471,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "42-toggle-panel",
+      "tez": 375,
+      "tezCodeOnly": 375,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "43-todo-list",
+      "tez": 642,
+      "tezCodeOnly": 642,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "44-temperature",
+      "tez": 371,
+      "tezCodeOnly": 371,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "45-tabs",
+      "tez": 527,
+      "tezCodeOnly": 527,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "46-tic-tac-toe",
+      "tez": 934,
+      "tezCodeOnly": 934,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "47-shopping-cart",
+      "tez": 667,
+      "tezCodeOnly": 667,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "48-quiz",
+      "tez": 804,
+      "tezCodeOnly": 804,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "49-traffic-light-app",
+      "tez": 703,
+      "tezCodeOnly": 703,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "50-color-mixer",
+      "tez": 727,
+      "tezCodeOnly": 727,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "51-password-strength",
+      "tez": 497,
+      "tezCodeOnly": 497,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "52-live-filter",
+      "tez": 409,
+      "tezCodeOnly": 409,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "53-word-counter",
+      "tez": 411,
+      "tezCodeOnly": 411,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
+    },
+    {
+      "example": "54-todo-app",
+      "tez": 1224,
+      "tezCodeOnly": 1224,
+      "ts": null,
+      "ratio": null,
+      "ratioCodeOnly": null
     }
   ],
   "total": {
@@ -631,6 +743,6 @@
     "ratio": 0.88,
     "ratioCodeOnly": 0.84
   },
-  "card": 1006,
+  "card": 1154,
   "cardBudget": 1200
 }

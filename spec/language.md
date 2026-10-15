@@ -49,7 +49,8 @@ test areaWorks = area(Rect(2, 3)) == 6          // checked by `tez test`, exclud
 - Clauses go between the return type and `=`: `requires`, `ensures` (may use `result`), `decreases`. Several `requires`/`ensures` are conjoined.
 - Order of items does not matter. Names must be unique (`E_NAME_DUPLICATE`) and must not collide with the prelude (`E_NAME_PRELUDE`).
 - A binding may not reuse a name already in scope (`E_NAME_SHADOWING`), including parameters, `let`, lambda parameters and pattern bindings.
-- Recursive and mutually recursive functions require `decreases` (§7). Constants may not be recursive.
+- Recursive and mutually recursive functions require `decreases` (§7), with one exception: a self-recursive function whose every recursive call passes, for one parameter, the tail of a `[h, ..t]` match on it (or a same-typed part of a matched constructor) gets the measure `p.len()` (or `p`) inferred; the verifier still proves it. Constants may not be recursive.
+- `fn f(..) -> T { .. }` is accepted as `fn f(..) -> T = { .. }`; `tez fmt` writes the `=`.
 
 ## 4. Expressions
 
