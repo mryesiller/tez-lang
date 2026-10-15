@@ -3,7 +3,7 @@
 RUSTUP_BIN := $(shell brew --prefix rustup 2>/dev/null)/bin
 export PATH := $(RUSTUP_BIN):$(HOME)/.cargo/bin:$(PATH)
 
-.PHONY: bench-check gbnf site-dev site-build help check fmt fmt-check lint test wasm studio-wasm studio-install studio-dev studio-build doctor link-agents
+.PHONY: agent-test bench-check gbnf site-dev site-build help check fmt fmt-check lint test wasm studio-wasm studio-install studio-dev studio-build doctor link-agents
 
 help: ## List commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -13,6 +13,10 @@ check: fmt-check lint test gbnf wasm studio-build ## Full local gate (same as CI
 bench-check: ## TezBench reference solutions must pass (builds the debug CLI first)
 	cargo build -p tez-lang
 	node bench/tezbench/run.mjs --self-check
+
+agent-test: ## Node tests: repair loop, MCP server, data pipeline (needs the debug CLI)
+	cargo build -p tez-lang
+	node --test tools/agent/loop.test.mjs tools/tez-mcp/server.test.mjs data/data.test.mjs
 
 gbnf: ## Verify spec/grammar.gbnf is current and every example is derivable
 	python3 spec/tools/ebnf2gbnf.py --check

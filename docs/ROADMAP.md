@@ -84,12 +84,12 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 
 ## Faz 3 — LLM döngüsü + veri hattı v1 (2 hafta)
 
-- [ ] Studio'da LLM entegrasyonu (sağlayıcıdan bağımsız arayüz)
-- [ ] Otomatik düzeltme döngüsü: kod → `tez check --json` → LLM → kod
-- [ ] `data/` hattı v1: görev → N aday → reddetmeli örnekleme → kanonikleştirme
-- [ ] Düzeltme izi (hatalı kod, JSON hata, düzeltme) üretimi
+- [x] Studio'da LLM entegrasyonu: "Ask a model" paneli — OpenAI uyumlu herhangi bir sunucu (`tools/agent/providers.mjs`), kart + hata geri besleme, tarayıcıda uçtan uca doğrulandı (sahte sunucuyla)
+- [x] Otomatik düzeltme döngüsü: `tools/agent/loop.mjs` (Node + tarayıcı ortak), `solve.mjs` CLI, gerçek derleyiciyle testli
+- [x] `data/` hattı v1: `sample.mjs` (görev → N aday → derleyici reddi → kanonikleştirme → tekilleştirme → kirlenme filtresi), `build-v1.mjs`
+- [x] Düzeltme izi üretimi: modelsiz mutasyonla (`data/mutate.mjs`, 11 işleç, 17 hata kodu) ve model denemelerinden
 - [ ] TezBench ilk tam ölçüm (3–4B, 7–8B, öncü model; Tez vs TypeScript)
-- [ ] `tez-mcp`: `check`, `fmt`, `run` araçlarını sunan MCP sunucusu
+- [x] `tez-mcp` (`tools/tez-mcp/`): `tez_check`, `tez_fmt`, `tez_run`, `tez_test`; bağımlılıksız stdio MCP sunucusu, testli
 
 **Çıkış kriteri:** İlk uçtan uca demo; ≤ 3 turda yakınsama ≥ %90 (orta model).
 
@@ -110,8 +110,8 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 
 ## Faz 5 — Tez-Coder v0 (3 hafta)
 
-- [ ] Eğitim seti v1 (doğrulanmış programlar + düzeltme izleri + mutasyon verisi)
-- [ ] Kirlenme kontrolü (TezBench ile çakışma sıfır)
+- [x] Eğitim seti v1 (küçük: 26 doğrulanmış program + 108 mutasyon düzeltme izi, `data/v1/`); ölçek model gerektirir (`sample.mjs`)
+- [x] Kirlenme kontrolü: `data/contamination.mjs` (eşitlik, 24-token ortak dizi, istem metni); 4 örnek TezBench ile çakıştığı için eğitimden çıkarıldı; testle zorlanır
 - [ ] 3–4B ince ayar (LoRA), değerlendirme
 - [ ] Açık ağırlık + veri seti yayını (lisans kontrolü sonrası)
 

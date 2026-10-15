@@ -1,0 +1,54 @@
+{
+  "programs": 26,
+  "repairs": 108,
+  "dropped": [
+    {
+      "id": "05-primes",
+      "why": "overlaps TezBench 09-is-prime"
+    },
+    {
+      "id": "09-list-recursion",
+      "why": "overlaps TezBench 12-double-all"
+    },
+    {
+      "id": "17-gcd",
+      "why": "overlaps TezBench 18-gcd"
+    },
+    {
+      "id": "18-power",
+      "why": "overlaps TezBench 19-power"
+    }
+  ],
+  "repairsByOperator": {
+    "drop-ensures-weaken": 4,
+    "wrong-literal-type": 21,
+    "snake-case": 6,
+    "drop-match-arm": 36,
+    "unknown-name": 2,
+    "drop-decreases": 9,
+    "drop-requires": 2,
+    "drop-else": 8,
+    "shadow-binding": 10,
+    "function-style-method": 8,
+    "mix-logic": 2
+  },
+  "diagnosticCodes": {
+    "E_POSTCONDITION": 5,
+    "E_TYPE_MISMATCH": 32,
+    "E_PARSE_NAME_CASE": 8,
+    "E_MATCH_NON_EXHAUSTIVE": 34,
+    "E_NAME_UNKNOWN": 2,
+    "E_TERMINATION_MISSING": 9,
+    "E_TERMINATION": 2,
+    "E_PARSE_ELSE_REQUIRED": 8,
+    "E_NAME_SHADOWING": 10,
+    "E_NAME_USE_METHOD_SYNTAX": 6,
+    "E_TYPE_BAD_OPERAND": 1,
+    "E_TYPE_AMBIGUOUS": 1,
+    "E_PARSE_BAD_ITEM": 1,
+    "E_TYPE_TUPLE_INDEX": 1,
+    "E_PARSE_MIXED_LOGIC": 2,
+    "E_PARSE_BLOCK_NO_TAIL": 1,
+    "E_PARSE_UNEXPECTED_TOKEN": 1
+  }
+}

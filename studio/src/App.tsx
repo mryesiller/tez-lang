@@ -3,6 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Compiler, type Diagnostic, type Fix } from "./compiler";
 import { load } from "../../runtime/tez-runtime.mjs";
+import card from "../../spec/card.md?raw";
+import { solve } from "../../tools/agent/loop.mjs";
+import { openAICompatible } from "../../tools/agent/providers.mjs";
 import { isApp, mountApp, type AppHandle } from "../../runtime/tez-app.mjs";
 import "./monaco";
 
@@ -42,6 +45,15 @@ export default function App() {
   const appRoot = useRef<HTMLDivElement | null>(null);
   const app = useRef<AppHandle | null>(null);
   const [appOn, setAppOn] = useState(false);
+  const [ai, setAi] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("tez-ai") ?? "{}") as { baseUrl?: string; model?: string; apiKey?: string };
+    } catch {
+      return {};
+    }
+  });
+  const [aiTask, setAiTask] = useState("");
+  const [aiLog, setAiLog] = useState("");
 
   const publish = useCallback((ds: Diagnostic[]) => {
     setDiags(ds);
@@ -142,6 +154,34 @@ export default function App() {
     }, 400);
     return () => clearTimeout(t);
   }, [source, compiler]);
+
+  const askAi = async () => {
+    if (!ai.baseUrl || !ai.model || !aiTask.trim()) {
+      setAiLog("Fill in the server URL, the model and a task.");
+      return;
+    }
+    try {
+      localStorage.setItem("tez-ai", JSON.stringify(ai));
+    } catch {
+      /* private mode: the settings just are not remembered */
+    }
+    setBusy(true);
+    setAiLog("asking the model…");
+    try {
+      const r = await solve({
+        task: aiTask,
+        card,
+        generate: openAICompatible({ baseUrl: ai.baseUrl, model: ai.model, apiKey: ai.apiKey }),
+        check: async (code) => (await compiler.check(code)).report.diagnostics,
+        onTurn: (t, i) => setAiLog((l) => `${l}\nturn ${i + 1}: ${t.diagnostics.length ? `${t.diagnostics.length} problem(s), first ${t.diagnostics[0]?.code}` : "accepted"}`),
+      });
+      setSource(r.code);
+      setAiLog((l) => `${l}\n${r.ok ? "Done: the program is accepted." : "Stopped after the last turn; the program still has problems."}`);
+    } catch (e) {
+      setAiLog(`failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    setBusy(false);
+  };
 
   const runTests = async () => {
     setBusy(true);
@@ -250,6 +290,21 @@ export default function App() {
               </li>
             ))}
           </ul>
+          <details className="ai">
+            <summary>Ask a model</summary>
+            <p className="muted">
+              Any OpenAI-compatible server (Ollama, llama.cpp, vLLM, a hosted API). The language card is sent with the task,
+              and compiler errors are fed back for up to 3 turns. Settings stay in this browser.
+            </p>
+            <input aria-label="Server URL" placeholder="http://localhost:11434/v1" value={ai.baseUrl ?? ""} onChange={(e) => setAi({ ...ai, baseUrl: e.target.value })} />
+            <input aria-label="Model" placeholder="model name" value={ai.model ?? ""} onChange={(e) => setAi({ ...ai, model: e.target.value })} />
+            <input aria-label="API key" type="password" placeholder="API key (if the server needs one)" value={ai.apiKey ?? ""} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} />
+            <textarea aria-label="Task" rows={3} placeholder="What should the program do?" value={aiTask} onChange={(e) => setAiTask(e.target.value)} />
+            <button onClick={askAi} disabled={busy}>
+              Generate
+            </button>
+            <pre className="out">{aiLog}</pre>
+          </details>
           <h2 hidden={!appOn}>App</h2>
           <div className="app" ref={appRoot} hidden={!appOn} />
           <h2>Output</h2>
