@@ -16,7 +16,7 @@ bench-check: ## TezBench reference solutions must pass (builds the debug CLI fir
 
 agent-test: ## Node tests: repair loop, MCP server, data pipeline (needs the debug CLI)
 	cargo build -p tez-lang
-	node --test runtime/tez-app.test.mjs tools/agent/loop.test.mjs tools/tez-mcp/server.test.mjs data/data.test.mjs
+	node --test runtime/tez-app.test.mjs runtime/prelude-contracts.test.mjs tools/agent/loop.test.mjs tools/tez-mcp/server.test.mjs data/data.test.mjs
 
 gbnf: ## Verify spec/grammar.gbnf is current and every example is derivable
 	python3 spec/tools/ebnf2gbnf.py --check

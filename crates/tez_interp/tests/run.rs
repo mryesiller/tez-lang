@@ -415,3 +415,18 @@ fn case_mapping_can_change_the_length() {
     assert_eq!(ev("Int", "\"😀é\".len()"), "2");
     assert_eq!(ev("Int", "\"😀é\".chars().len()"), "2");
 }
+
+#[test]
+fn trusted_prelude_contracts_hold_on_hard_inputs() {
+    let src = include_str!("prelude_contracts.tez");
+    let prog = compile(src);
+    let results = with_big_stack(|| run_tests(&prog, &Options::default()));
+    assert!(results.len() >= 16, "the contract tests went missing");
+    for r in &results {
+        assert!(
+            matches!(r.outcome, Ok(true)),
+            "prelude contract `{}` is violated: {r:?}",
+            r.name
+        );
+    }
+}

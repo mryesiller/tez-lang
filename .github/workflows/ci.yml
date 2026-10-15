@@ -31,7 +31,7 @@ jobs:
       - run: cargo test --workspace
       - name: Node tests (repair loop, MCP server, data pipeline) and TezBench references
         run: |
-          node --test runtime/tez-app.test.mjs tools/agent/loop.test.mjs tools/tez-mcp/server.test.mjs data/data.test.mjs
+          node --test runtime/tez-app.test.mjs runtime/prelude-contracts.test.mjs tools/agent/loop.test.mjs tools/tez-mcp/server.test.mjs data/data.test.mjs
           node bench/tezbench/run.mjs --self-check
       - run: cargo build --target wasm32-unknown-unknown -p tez_diag -p tez_syntax -p tez_types
 

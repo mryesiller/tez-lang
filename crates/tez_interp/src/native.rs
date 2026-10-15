@@ -201,18 +201,21 @@ pub(crate) fn call<'p>(
             }
         }
         "List.range" => {
-            let lo = big(arg(0)?, span)?.to_i64();
-            let hi = big(arg(1)?, span)?.to_i64();
-            let (Some(lo), Some(hi)) = (lo, hi) else {
-                return Err(rt(Code::Resource, "range bounds too large", span));
-            };
+            // bounds may be arbitrarily large; only the length is limited
+            let lo = big(arg(0)?, span)?;
+            let hi = big(arg(1)?, span)?;
             if hi <= lo {
                 return Ok(new_list(Vec::new()));
             }
-            if usize::try_from(hi.saturating_sub(lo)).map_or(true, |n| n > MAX_LIST) {
-                return Err(rt(Code::Resource, "range too large", span));
-            }
-            Ok(new_list((lo..hi).map(Value::Int).collect()))
+            let n = (&hi - &lo)
+                .to_usize()
+                .filter(|n| *n <= MAX_LIST)
+                .ok_or_else(|| rt(Code::Resource, "range too large", span))?;
+            Ok(new_list(
+                (0..n)
+                    .map(|i| Value::from_big(&lo + BigInt::from(i)))
+                    .collect(),
+            ))
         }
         "List.repeat" => {
             let n = big_to_usize(arg(1)?).ok_or_else(|| {

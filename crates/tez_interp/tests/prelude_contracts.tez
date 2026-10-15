@@ -1,0 +1,43 @@
+// Every trusted contract of an `extern fn` in the prelude, checked on inputs that break naive assumptions.
+// The verifier assumes these contracts without proof, so each one must hold for every value here.
+
+fn texts() -> List[Str] = ["", " ", "a", "ab c", "  padded  ", "ß", "İ", "é", "e\u{301}", "😀", "👩\u{200D}💻", "a\r\nb", "日本語", "ﬃ", "\t\n"]
+
+fn ints() -> List[Int] = [0, 1, -1, 7, -7, 2147483647, -2147483648, 1073741824, 99999999999999999999]
+
+fn lists() -> List[List[Int]] = [[], [0], [3, 1, 2], [-5, 5, -5], List.range(0, 50)]
+
+fn sliceOk(s: Str) -> Bool =
+  List.range(0, s.len() + 1).all(a => List.range(a, s.len() + 1).all(b => s.slice(a, b).len() == b - a))
+
+test strLenNonNegative = texts().all(s => s.len() >= 0)
+
+test sliceLength = texts().all(s => sliceOk(s))
+
+test charsLength = texts().all(s => s.chars().len() == s.len())
+
+test trimShorter = texts().all(s => s.trim().len() <= s.len())
+
+test splitNonEmpty = texts().all(s => s.split(" ").len() >= 1 && s.split("b").len() >= 1)
+
+test repeatLength = texts().all(s => List.range(0, 4).all(n => s.repeat(n).len() == s.len() * n))
+
+test sqrtNonNegative = [0.0, 0.25, 2.0, 1000000.0].all(x => x.sqrt() >= 0.0)
+
+test listLen = lists().all(xs => xs.len() >= 0)
+
+test rangeLength = ints().all(lo => [lo - 3, lo, lo + 5].all(hi => List.range(lo, hi).len() == (if hi > lo { hi - lo } else { 0 })))
+
+test repeatList = List.range(0, 6).all(n => List.repeat(1, n).len() == n)
+
+test mapFilterLengths = lists().all(xs => xs.map(x => x * 2).len() == xs.len() && xs.filter(x => x > 0).len() <= xs.len())
+
+test appendConcatReverse = lists().all(xs => xs.append(9).len() == xs.len() + 1 && xs.concat(xs).len() == 2 * xs.len() && xs.reverse().len() == xs.len())
+
+test takeDrop = lists().all(xs => ints().all(n => xs.take(n).len() == (if n <= 0 { 0 } else if n < xs.len() { n } else { xs.len() }) && xs.drop(n).len() == (if n <= 0 { xs.len() } else if n < xs.len() { xs.len() - n } else { 0 })))
+
+test countBounds = lists().all(xs => xs.count(x => x > 0) >= 0 && xs.count(x => x > 0) <= xs.len())
+
+test zipEnumerate = lists().all(xs => lists().all(ys => xs.zip(ys).len() == (if xs.len() < ys.len() { xs.len() } else { ys.len() })) && xs.enumerate().len() == xs.len())
+
+test sortsKeepLength = lists().all(xs => xs.sort().len() == xs.len() && xs.sortBy(x => 0 - x).len() == xs.len())
