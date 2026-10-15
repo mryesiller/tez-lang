@@ -7,13 +7,16 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predev": "node scripts/copy-z3.mjs",
+    "prebuild": "node scripts/copy-z3.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "monaco-editor": "^0.57.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "z3-solver": "^5.2.0"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

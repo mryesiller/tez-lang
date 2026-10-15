@@ -105,7 +105,7 @@ error[E_INDEX_BOUNDS]: the index may be out of range
    = counterexample: i = 1, xs.len() = 1
 ```
 
-The SMT proofs run in the `tez` command line today. The in-browser compiler checks syntax, names, types and exhaustiveness.
+The SMT proofs run in the `tez` command line and, in the Studio, behind the **Verify** button (Z3 compiled to WebAssembly). The compiler on this website checks syntax, names, types and exhaustiveness.
 
 ## 8. Recursion must end
 

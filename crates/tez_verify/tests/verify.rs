@@ -26,6 +26,7 @@ fn run(src: &str) -> Vec<Problem> {
             timeout_ms: 6000,
             include_prelude: false,
             cache_dir: None,
+            backend: tez_verify::Backend::Process,
         },
     )
     .unwrap()
@@ -74,6 +75,7 @@ fn prelude_function_bodies_satisfy_their_contracts() {
             timeout_ms: 8000,
             include_prelude: true,
             cache_dir: None,
+            backend: tez_verify::Backend::Process,
         },
     )
     .unwrap();
@@ -530,6 +532,7 @@ fn run_cached(src: &str, dir: &std::path::Path) -> Vec<Problem> {
             timeout_ms: 6000,
             include_prelude: false,
             cache_dir: Some(dir.to_path_buf()),
+            backend: tez_verify::Backend::Process,
         },
     )
     .unwrap()
@@ -545,16 +548,29 @@ fn proofs_are_cached_and_refutations_never_are() {
 
     let before = tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed);
     assert!(run_cached(good, &dir).is_empty());
-    assert_eq!(tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed), before, "first run solves everything");
-    assert!(std::fs::read_dir(&dir).unwrap().count() > 0, "proofs are stored");
+    assert_eq!(
+        tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed),
+        before,
+        "first run solves everything"
+    );
+    assert!(
+        std::fs::read_dir(&dir).unwrap().count() > 0,
+        "proofs are stored"
+    );
 
     assert!(run_cached(good, &dir).is_empty());
-    assert!(tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed) > before, "second run is answered from the cache");
+    assert!(
+        tez_verify::CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed) > before,
+        "second run is answered from the cache"
+    );
 
     // a program that can fail is rejected every time, with the cache warm or cold
     for _ in 0..2 {
         let ps = run_cached(bad, &dir);
-        assert!(ps.iter().any(|p| p.code == tez_diag::Code::IndexBounds), "{ps:?}");
+        assert!(
+            ps.iter().any(|p| p.code == tez_diag::Code::IndexBounds),
+            "{ps:?}"
+        );
     }
     let _ = std::fs::remove_dir_all(&dir);
 }

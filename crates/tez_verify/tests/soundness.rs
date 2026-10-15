@@ -151,6 +151,7 @@ fn accepted_programs_never_violate_their_contracts() {
                 timeout_ms: 2000,
                 include_prelude: false,
                 cache_dir: None,
+                backend: tez_verify::Backend::Process,
             },
         )
         .unwrap_or_else(|e| panic!("verifier error: {e}\n{src}"));

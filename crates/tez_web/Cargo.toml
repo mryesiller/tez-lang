@@ -20,6 +20,7 @@ tez_interp.workspace = true
 tez_fmt.workspace = true
 tez_driver.workspace = true
 tez_wasm.workspace = true
+tez_verify.workspace = true
 serde_json.workspace = true
 wasm-bindgen.workspace = true
 

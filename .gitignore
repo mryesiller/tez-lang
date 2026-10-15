@@ -21,3 +21,4 @@ dist
 /data/out
 *.gguf
 *.safetensors
+/studio/public/z3

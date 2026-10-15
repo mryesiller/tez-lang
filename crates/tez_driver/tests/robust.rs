@@ -128,7 +128,13 @@ fn mutated_programs_never_crash_the_front_end() {
             let m = mutate(&src, &mut rng);
             let r = catch_unwind(AssertUnwindSafe(|| {
                 // full front end without the solver
-                let _ = compile(&m, &CompileOptions { verify: false });
+                let _ = compile(
+                    &m,
+                    &CompileOptions {
+                        verify: false,
+                        ..CompileOptions::default()
+                    },
+                );
                 let ok = parse(&m, ParseOptions::default()).problems.is_empty();
                 if ok && let Ok(once) = format_source(&m, ParseOptions::default()) {
                     {

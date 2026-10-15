@@ -183,6 +183,25 @@ export default function App() {
     setBusy(false);
   };
 
+  const verify = async () => {
+    setBusy(true);
+    setOutput({ kind: "idle", text: "Loading Z3 (WebAssembly, 33 MB the first time)…" });
+    try {
+      const t0 = performance.now();
+      const r = await compiler.verify(source, (text) => setOutput({ kind: "idle", text }));
+      publish(r.report.diagnostics);
+      const secs = ((performance.now() - t0) / 1000).toFixed(1);
+      setOutput(
+        r.verified
+          ? { kind: "ok", text: `Verified: every contract, index, division and termination argument is proved (${r.queries} solver queries, ${r.rounds} rounds, ${secs} s).` }
+          : { kind: "error", text: `Not verified: ${r.report.diagnostics.length} problem(s), see Diagnostics (${secs} s).` },
+      );
+    } catch (e) {
+      setOutput({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    }
+    setBusy(false);
+  };
+
   const runTests = async () => {
     setBusy(true);
     const r = await compiler.test(source, false);
@@ -251,11 +270,14 @@ export default function App() {
         <button onClick={runApp} disabled={busy || diags.length > 0} title="Run init/update/view as an app">
           App
         </button>
+        <button onClick={verify} disabled={busy || diags.length > 0} title="Prove contracts, indexing, division and termination with Z3 in the browser">
+          Verify
+        </button>
         <button onClick={runTests} disabled={busy || diags.length > 0}>
           Test
         </button>
         <span className="muted spacer">
-          Types, patterns and names are checked here. Contract proofs (SMT) run in the <code>tez</code> CLI for now.
+          Types, patterns and names are checked as you type. <b>Verify</b> proves contracts with Z3 in your browser.
         </span>
       </header>
       <main className="panes">

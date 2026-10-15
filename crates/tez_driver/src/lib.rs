@@ -12,11 +12,16 @@ use tez_types::hir::Program;
 pub struct CompileOptions {
     /// Prove contracts, refinements and termination (needs the `z3` solver). On by default.
     pub verify: bool,
+    /// Which solver backend proves obligations (native process, or script replay for the browser).
+    pub backend: tez_verify::Backend,
 }
 
 impl Default for CompileOptions {
     fn default() -> Self {
-        Self { verify: true }
+        Self {
+            verify: true,
+            backend: tez_verify::Backend::default(),
+        }
     }
 }
 
@@ -54,8 +59,14 @@ pub fn compile(src: &str, options: &CompileOptions) -> Compiled {
         };
     }
     if options.verify {
-        let verified =
-            tez_verify::verify(&checked.program, src, &tez_verify::VerifyOptions::default());
+        let verified = tez_verify::verify(
+            &checked.program,
+            src,
+            &tez_verify::VerifyOptions {
+                backend: options.backend,
+                ..tez_verify::VerifyOptions::default()
+            },
+        );
         let problems = match verified {
             Ok(p) => p,
             Err(msg) => vec![

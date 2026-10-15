@@ -30,7 +30,61 @@ type Pending = { resolve: (json: string) => void; timer?: ReturnType<typeof setT
  *  an unverified program can still recurse for ever or take exponential time). */
 export const RUN_TIMEOUT_MS = 10_000;
 
+export type VerifyMissing = { id: string; query: string; wantsValues: boolean };
+export type VerifyStep = { done: false; missing: VerifyMissing[] } | { done: true; verified: boolean; report: Report };
+export type VerifyResult = { verified: boolean; report: Report; rounds: number; queries: number };
+
+type Z3Api = {
+  mk_config(): number;
+  mk_context(cfg: number): number;
+  del_config(cfg: number): void;
+  del_context(ctx: number): void;
+  eval_smtlib2_string(ctx: number, s: string): Promise<string>;
+};
+
+/**
+ * Z3 compiled to WebAssembly, started on first use because it is 33 MB. It runs on the page, not in a worker: Z3's
+ * build is multithreaded and starts its own thread workers, which only the main thread may do reliably; its calls
+ * are asynchronous, so the page stays responsive. Needs cross-origin isolation (SharedArrayBuffer).
+ */
+class Z3Client {
+  private api: Promise<Z3Api> | null = null;
+
+  private async load(): Promise<Z3Api> {
+    if (!self.crossOriginIsolated) {
+      throw new Error("verification needs a cross-origin isolated page (COOP/COEP headers) for Z3's threads");
+    }
+    const base = new URL(`${import.meta.env.BASE_URL}z3/`, document.baseURI).href;
+    // Z3's loader is a classic script that defines a global `initZ3`, and its thread workers re-load that same script
+    await new Promise<void>((resolve, reject) => {
+      const tag = document.createElement("script");
+      tag.src = `${base}z3-built.js`;
+      tag.onload = () => resolve();
+      tag.onerror = () => reject(new Error("could not load Z3 (z3-built.js)"));
+      document.head.append(tag);
+    });
+    (window as unknown as { global: unknown }).global = window;
+    const { init } = await import("z3-solver");
+    const z3 = await init({ locateFile: (f: string) => `${base}${f}` } as never);
+    return z3.Z3 as unknown as Z3Api;
+  }
+
+  async solve(query: string): Promise<string> {
+    this.api ??= this.load();
+    const z3 = await this.api;
+    const cfg = z3.mk_config();
+    const ctx = z3.mk_context(cfg);
+    z3.del_config(cfg);
+    try {
+      return await z3.eval_smtlib2_string(ctx, query);
+    } finally {
+      z3.del_context(ctx);
+    }
+  }
+}
+
 export class Compiler {
+  private z3 = new Z3Client();
   private worker = this.spawn();
   private next = 1;
   private pending = new Map<number, Pending>();
@@ -92,6 +146,25 @@ export class Compiler {
   build(src: string) {
     return this.call<{ ok: boolean; wasm?: string; report?: Report; error?: string }>("build", src);
   }
+  /**
+   * Proves the program's contracts in the browser. The verifier works in rounds (see `verify_step` in tez_web):
+   * it reports which solver queries it still needs, Z3-WebAssembly answers them, and it runs again.
+   */
+  async verify(src: string, onProgress: (text: string) => void = () => {}): Promise<VerifyResult> {
+    const answers: Record<string, string> = {};
+    let queries = 0;
+    for (let round = 1; round <= 80; round++) {
+      const step = await this.call<VerifyStep>("verify_step", src, { answers: JSON.stringify(answers) });
+      if (step.done) return { verified: step.verified, report: step.report, rounds: round, queries };
+      onProgress(`round ${round}: solving ${step.missing.length} quer${step.missing.length === 1 ? "y" : "ies"} (${queries} so far)`);
+      for (const m of step.missing) {
+        answers[m.id] = await this.z3.solve(m.query);
+        queries++;
+      }
+    }
+    throw new Error("verification did not converge in 80 rounds");
+  }
+
   test(src: string, contracts = false) {
     return this.call<TestResult>("test", src, { contracts });
   }

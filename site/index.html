@@ -107,7 +107,7 @@ fn main() -> Light = next(Red)</pre>
           <pre class="term" id="miss-out">Press the button.</pre>
         </div>
       </div>
-      <p class="note">The in-browser compiler checks syntax, names, types and exhaustiveness. The SMT proofs shown above run in the <code>tez</code> command line today; bringing them to the browser is on the roadmap.</p>
+      <p class="note">The compiler on this page checks syntax, names, types and exhaustiveness. The proofs shown above are produced by the SMT solver: in the <code>tez</code> command line, and in the browser in the Studio, where the <b>Verify</b> button runs Z3 compiled to WebAssembly.</p>
     </section>
 
     <section id="numbers" class="numbers">
@@ -130,7 +130,7 @@ fn main() -> Light = next(Red)</pre>
         <li class="done">SMT verifier for contracts, indexing, division and termination</li>
         <li class="done">WasmGC compiler and runtime, checked against the reference interpreter</li>
         <li class="done">Browser compiler, Studio IDE, TEA app runtime with hot-swap</li>
-        <li class="todo">Verification inside the browser (needs a WebAssembly solver)</li>
+        <li class="done">Proofs in the browser: Z3 as WebAssembly in the Studio (33 MB, loaded when you press Verify)</li>
         <li class="todo">Fine-tuned small model and TezBench (next phase, after the language)</li>
       </ul>
       <p><a class="btn" href="./docs/#/roadmap">Full roadmap</a></p>

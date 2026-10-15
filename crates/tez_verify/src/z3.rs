@@ -1,5 +1,7 @@
 //! A Z3 process driven over SMT-LIB 2 (native builds only).
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -33,8 +35,8 @@ pub enum Verdict {
     Unknown,
 }
 
-/// A running `z3 -in -smt2` process.
-pub struct Z3 {
+/// A running `z3 -in -smt2` process (native builds).
+pub struct ProcessZ3 {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
@@ -45,13 +47,13 @@ pub struct Z3 {
     cache: Option<PathBuf>,
 }
 
-impl Z3 {
+impl ProcessZ3 {
     /// Starts Z3 with a per-query timeout.
     ///
     /// # Errors
     /// Returns a message when the `z3` executable cannot be started.
     #[cfg(test)]
-    pub fn spawn(timeout_ms: u32) -> Result<Z3, String> {
+    pub fn spawn(timeout_ms: u32) -> Result<ProcessZ3, String> {
         Self::spawn_cached(timeout_ms, None)
     }
 
@@ -59,7 +61,7 @@ impl Z3 {
     ///
     /// # Errors
     /// Returns a message when the `z3` executable cannot be started.
-    pub fn spawn_cached(timeout_ms: u32, cache: Option<PathBuf>) -> Result<Z3, String> {
+    pub fn spawn_cached(timeout_ms: u32, cache: Option<PathBuf>) -> Result<ProcessZ3, String> {
         let mut child = Command::new("z3")
             .args(["-in", "-smt2"])
             .stdin(Stdio::piped())
@@ -69,7 +71,7 @@ impl Z3 {
             .map_err(|e| format!("cannot start `z3`: {e}"))?;
         let stdin = child.stdin.take().ok_or("z3 has no stdin")?;
         let stdout = BufReader::new(child.stdout.take().ok_or("z3 has no stdout")?);
-        let mut z = Z3 {
+        let mut z = ProcessZ3 {
             child,
             stdin,
             stdout,
@@ -222,7 +224,7 @@ impl Z3 {
     }
 }
 
-impl Drop for Z3 {
+impl Drop for ProcessZ3 {
     fn drop(&mut self) {
         let _ = self.stdin.write_all(b"(exit)\n");
         let _ = self.child.kill();
@@ -304,12 +306,244 @@ mod tests {
 
     #[test]
     fn z3_round_trip_if_installed() {
-        let Ok(mut z) = Z3::spawn(2000) else { return };
+        let Ok(mut z) = ProcessZ3::spawn(2000) else {
+            return;
+        };
         z.run(&["(declare-const x Int)".into(), "(assert (> x 3))".into()])
             .unwrap();
         assert_eq!(z.check_sat().unwrap(), Verdict::Refuted);
         assert_eq!(z.get_values(&["x".into()]).unwrap().len(), 1);
         z.run(&["(assert (< x 2))".into()]).unwrap();
         assert_eq!(z.check_sat().unwrap(), Verdict::Proved);
+    }
+}
+
+// ------------------------------------------------------------------ replay backend
+
+/// A query the verifier needed and had no answer for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Missing {
+    /// Hash of `query`; the host answers under this key.
+    pub id: String,
+    /// The complete script to evaluate in a fresh solver (starts with `(reset)`), ending in `(check-sat)` and,
+    /// for model queries, `(get-value ..)`. The raw solver output is the answer.
+    pub query: String,
+    /// True when the answer must also contain the requested values.
+    pub wants_values: bool,
+}
+
+thread_local! {
+    static ANSWERS: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+    static MISSING: RefCell<Vec<Missing>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Installs the answers known so far (id -> raw solver output) and forgets earlier missing queries.
+pub fn replay_set_answers(answers: HashMap<String, String>) {
+    ANSWERS.with(|a| *a.borrow_mut() = answers);
+    MISSING.with(|m| m.borrow_mut().clear());
+}
+
+/// The queries the last verification run needed and did not have.
+#[must_use]
+pub fn replay_take_missing() -> Vec<Missing> {
+    MISSING.with(|m| std::mem::take(&mut *m.borrow_mut()))
+}
+
+fn hex_digest(text: &str) -> String {
+    Sha256::digest(text.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// The solver as a script recorder (see the module docs).
+pub struct ReplayZ3 {
+    script: String,
+}
+
+impl ReplayZ3 {
+    /// Starts an empty session.
+    #[must_use]
+    pub fn new() -> ReplayZ3 {
+        ReplayZ3 {
+            script: String::from("(reset)\n"),
+        }
+    }
+
+    fn lookup(&self, query: String, wants_values: bool) -> Result<Option<String>, String> {
+        let id = hex_digest(&query);
+        if let Some(raw) = ANSWERS.with(|a| a.borrow().get(&id).cloned()) {
+            return Ok(Some(raw));
+        }
+        MISSING.with(|m| {
+            let mut m = m.borrow_mut();
+            if !m.iter().any(|x| x.id == id) {
+                m.push(Missing {
+                    id,
+                    query,
+                    wants_values,
+                });
+            }
+        });
+        Ok(None)
+    }
+
+    /// Records commands (nothing is sent anywhere).
+    ///
+    /// # Errors
+    /// Never.
+    pub fn run(&mut self, cmds: &[String]) -> Result<(), String> {
+        for c in cmds {
+            self.script.push_str(c);
+            self.script.push('\n');
+        }
+        Ok(())
+    }
+
+    /// `(check-sat)` answered from the table, or `Unknown` plus a recorded request.
+    ///
+    /// # Errors
+    /// When the host reported a solver error for this script.
+    pub fn check_sat(&mut self) -> Result<Verdict, String> {
+        let query = format!("{}(check-sat)\n", self.script);
+        let Some(raw) = self.lookup(query, false)? else {
+            return Ok(Verdict::Unknown);
+        };
+        verdict_of(&raw)
+    }
+
+    /// Values after a `sat` answer, from the table; placeholders while the request is pending.
+    ///
+    /// # Errors
+    /// When the host reported a solver error for this script.
+    pub fn get_values(&mut self, terms: &[String]) -> Result<Vec<String>, String> {
+        if terms.is_empty() {
+            return Ok(Vec::new());
+        }
+        let query = format!(
+            "{}(check-sat)\n(get-value ({}))\n",
+            self.script,
+            terms.join(" ")
+        );
+        let Some(raw) = self.lookup(query, true)? else {
+            return Ok(vec!["?".to_string(); terms.len()]);
+        };
+        let after = raw
+            .lines()
+            .map(str::trim)
+            .skip_while(|l| !matches!(*l, "sat" | "unsat" | "unknown" | "timeout"))
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join(" ");
+        if after.trim_start().starts_with("(error") {
+            return Err(after);
+        }
+        Ok(parse_values(&after, terms.len()))
+    }
+}
+
+impl Default for ReplayZ3 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reads a `check-sat` answer out of raw solver output (which may also contain `success` acknowledgements).
+fn verdict_of(raw: &str) -> Result<Verdict, String> {
+    for l in raw.lines().map(str::trim) {
+        match l {
+            "unsat" => return Ok(Verdict::Proved),
+            "sat" => return Ok(Verdict::Refuted),
+            "unknown" | "timeout" => return Ok(Verdict::Unknown),
+            "" | "success" => {}
+            other if other.starts_with("(error") => return Err(other.to_string()),
+            _ => {}
+        }
+    }
+    Err(format!(
+        "no verdict in solver output: {}",
+        raw.chars().take(200).collect::<String>()
+    ))
+}
+
+// ------------------------------------------------------------------ the one type the verifier uses
+
+/// Which solver backend to use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Backend {
+    /// A native `z3` child process.
+    Process,
+    /// Record scripts and take answers from the host (see [`replay_set_answers`]).
+    Replay,
+}
+
+impl Default for Backend {
+    fn default() -> Self {
+        if cfg!(target_arch = "wasm32") {
+            Backend::Replay
+        } else {
+            Backend::Process
+        }
+    }
+}
+
+/// A solver session.
+pub enum Z3 {
+    /// See [`ProcessZ3`].
+    Process(ProcessZ3),
+    /// See [`ReplayZ3`].
+    Replay(ReplayZ3),
+}
+
+impl Z3 {
+    /// Opens a session on the chosen backend.
+    ///
+    /// # Errors
+    /// When the process backend cannot start `z3`.
+    pub fn open(backend: Backend, timeout_ms: u32, cache: Option<PathBuf>) -> Result<Z3, String> {
+        match backend {
+            Backend::Process => Ok(Z3::Process(ProcessZ3::spawn_cached(timeout_ms, cache)?)),
+            Backend::Replay => {
+                let mut z = ReplayZ3::new();
+                z.run(&[
+                    "(set-option :print-success true)".to_string(),
+                    format!("(set-option :timeout {timeout_ms})"),
+                ])?;
+                Ok(Z3::Replay(z))
+            }
+        }
+    }
+
+    /// Sends commands.
+    ///
+    /// # Errors
+    /// The solver's complaint.
+    pub fn run(&mut self, cmds: &[String]) -> Result<(), String> {
+        match self {
+            Z3::Process(z) => z.run(cmds),
+            Z3::Replay(z) => z.run(cmds),
+        }
+    }
+
+    /// `(check-sat)`.
+    ///
+    /// # Errors
+    /// When the solver misbehaves.
+    pub fn check_sat(&mut self) -> Result<Verdict, String> {
+        match self {
+            Z3::Process(z) => z.check_sat(),
+            Z3::Replay(z) => z.check_sat(),
+        }
+    }
+
+    /// `(get-value ..)` after `sat`.
+    ///
+    /// # Errors
+    /// When the solver misbehaves.
+    pub fn get_values(&mut self, terms: &[String]) -> Result<Vec<String>, String> {
+        match self {
+            Z3::Process(z) => z.get_values(terms),
+            Z3::Replay(z) => z.get_values(terms),
+        }
     }
 }

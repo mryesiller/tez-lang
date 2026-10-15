@@ -147,6 +147,7 @@ fn cmd_check(args: &Args, src: &str, path: &str) -> ExitCode {
 fn compile_options(args: &Args) -> CompileOptions {
     CompileOptions {
         verify: !args.flag("--no-verify"),
+        ..CompileOptions::default()
     }
 }
 

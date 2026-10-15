@@ -9,7 +9,9 @@ mod enc;
 mod vc;
 mod z3;
 
-pub use z3::{CACHE_HITS, default_cache_dir};
+pub use z3::{
+    Backend, CACHE_HITS, Missing, default_cache_dir, replay_set_answers, replay_take_missing,
+};
 
 use tez_diag::Code;
 use tez_syntax::Problem;
@@ -27,6 +29,8 @@ pub struct VerifyOptions {
     pub include_prelude: bool,
     /// Directory remembering proved queries by script hash (`None` = no cache). See [`z3::default_cache_dir`].
     pub cache_dir: Option<std::path::PathBuf>,
+    /// Native `z3` process, or script recording for a host that solves asynchronously (the browser).
+    pub backend: Backend,
 }
 
 impl Default for VerifyOptions {
@@ -35,6 +39,7 @@ impl Default for VerifyOptions {
             timeout_ms: 8000,
             include_prelude: false,
             cache_dir: z3::default_cache_dir(),
+            backend: Backend::default(),
         }
     }
 }
@@ -95,7 +100,7 @@ pub fn verify(prog: &Program, src: &str, opts: &VerifyOptions) -> Result<Vec<Pro
         let _ = std::fs::write(path, slicer.dump(&base, &vc.obligs));
     }
 
-    let mut z3 = Z3::spawn_cached(opts.timeout_ms, opts.cache_dir.clone())?;
+    let mut z3 = Z3::open(opts.backend, opts.timeout_ms, opts.cache_dir.clone())?;
     z3.run(&base)?;
     // The axioms must be consistent: an inconsistent set would "prove" everything.
     // (a quick check: inconsistencies are found at once, "unknown" is the normal answer otherwise)

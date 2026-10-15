@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tez Studio</title>
+    <script>
+      // Static hosts cannot send COOP/COEP, which Z3's threads need: a service worker adds them (one reload).
+      if (!self.crossOriginIsolated && "serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+        navigator.serviceWorker
+          .register("./coi-sw.js")
+          .then((reg) => {
+            if (reg.active && !navigator.serviceWorker.controller) location.reload();
+            else reg.addEventListener("updatefound", () => reg.installing?.addEventListener("statechange", (e) => e.target.state === "activated" && location.reload()));
+          })
+          .catch(() => {});
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

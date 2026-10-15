@@ -77,7 +77,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Hot-swap: durum serileştirme yerine olay günlüğü yeniden oynatma (yapısal göç gerekmez: program saftır, model her seferinde yeniden hesaplanır)
 - [x] Çalıştırma sınırları: derleyici Worker'da; çalıştırma/test 10 sn'yi aşarsa worker öldürülüp yeniden başlatılır (`E_RESOURCE`), liste/üs/büyük sayı tavanları ve bellek hataları `E_RESOURCE`'a eşlenir. Yakıt sayacı yerine duvar saati seçildi (derlenmiş koda sayaç eklemek her çağrıyı yavaşlatır). Sınır: TEA uygulamalarının `update`/`view` çağrıları ana iş parçacığında koşar
 - [x] Studio paketi küçültüldü: Monaco çekirdeği + yalnız gerekli katkılar (`studio/src/monaco-lite.js`); ilk yüklenen JS 4,3 MB → 3,45 MB (gzip 1,08 → 0,89 MB), `dist` ≈ 13 MB → 5 MB (ts/css/html çalışanları çıktı)
-- [ ] Tarayıcıda doğrulama (Z3 WASM ya da `tez_solve`)
+- [x] Tarayıcıda doğrulama: Z3 WebAssembly + **tekrar oynatma (replay) arka ucu** — doğrulayıcı çözücüyü beklemez; elinde olmayan cevap için `unknown` alır (yalnız reddedebilir), gereken betiği kaydeder; ev sahibi betikleri asenkron çözer; cevaplarla yeniden çalıştırılır, eksik kalmayana kadar. `tez_verify/tests/replay.rs`: 30 programda süreç arka ucuyla birebir aynı sonuç; Studio'da **Verify** düğmesi (36-tree-depth: 211 sorgu, 15 tur, 1,2 sn). Z3 33 MB, yalnız Verify'a basılınca iner; çapraz kaynak izolasyonu gerekir (dev sunucu + Pages için `coi-sw.js`)
 - [ ] Artımlı derleme: fonksiyon başına önbellek
 - [x] Kod üretimi: kuyruk çağrıları (`return_call`/`return_call_ref`; `if`/`match` kollarında da; 5 milyon derinlikli özyineleme sabit yığında çalışır; gereksinim: Chrome 112+/Firefox 121+/Safari 18.2+/Node 20+), nullary ADT singleton (kullanım başına ayırma yok)
 - [ ] Kod üretimi: yerel Float/Int fast path (kutusuz yerel değişkenler; tür-bilgili yerel tipler gerektirir, ayrı bir yeniden düzenleme)
@@ -106,7 +106,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 - [x] Prelude gövdeleri kendi sözleşmelerini sağlıyor (testle)
 - [x] 27 doğrulayıcı testi (kabul + her kod için ret + çelişki + soundness tuzakları)
 - [ ] `filter/map` sonucunun elemanları hakkında sözleşme (`all(pred)`, eleman eşitliği) — lambda gövdesini kapalı terim olarak aksiyomla
-- [ ] `tez_solve` (L1): gömülü hafif çözücü → tarayıcıda doğrulama (Z3 WASM ya da kendi LIA çözücüsü)
+- [x] `tez_solve` (L1) gerekmedi: tarayıcıda doğrulama Z3 WASM ile çözüldü (yukarıda). Kendi çözücümüz yalnızca 33 MB'ı küçültmek istersek anlamlı olur; sağlamlık riski nedeniyle ertelendi
 - [x] VC önbelleği: çözücüye gönderilen betiğin (çözücü sürümü dahil) SHA-256'sı; yalnız `unsat` kaydedilir, yani yanlış bir girdi asla ret → kabul çevirmez; soğuk 0,90 s → sıcak 0,32 s; `TEZ_CACHE_DIR`, `TEZ_NO_CACHE`; `cache_dir` seçeneği
 - [x] Soundness fuzz: `tez_verify/tests/soundness.rs` — 300 program, 75 doğrulandı, ~4286 çalıştırma, 0 ihlal
 

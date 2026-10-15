@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: 22
       - run: cd site && pnpm install --frozen-lockfile && pnpm build
-      - run: cd studio && pnpm install --frozen-lockfile && pnpm exec vite build --base ./ --outDir ../site/dist/studio
+      - run: cd studio && pnpm install --frozen-lockfile && node scripts/copy-z3.mjs && pnpm exec vite build --base ./ --outDir ../site/dist/studio
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/dist

@@ -40,8 +40,46 @@ pub fn version() -> String {
 /// in the browser.
 #[wasm_bindgen]
 pub fn check(src: &str) -> String {
-    let c = compile(src, &CompileOptions { verify: false });
+    let c = compile(
+        src,
+        &CompileOptions {
+            verify: false,
+            ..CompileOptions::default()
+        },
+    );
     to_string(&json!({ "report": report_json(&c.report), "verified": false }))
+}
+
+/// One round of in-browser verification.
+///
+/// The verifier cannot wait for a solver, so it works in rounds (see `tez_verify`'s replay backend): each call
+/// takes the solver answers found so far (`answers_json`: `{id: raw solver output}`) and returns either
+/// `{done: false, missing: [{id, query, wantsValues}]}` (solve each `query` in a fresh Z3, answer under `id`, call
+/// again) or `{done: true, verified, report}` once every query the verifier needed has an answer.
+#[wasm_bindgen]
+pub fn verify_step(src: &str, answers_json: &str) -> String {
+    let answers: std::collections::HashMap<String, String> =
+        serde_json::from_str(answers_json).unwrap_or_default();
+    tez_verify::replay_set_answers(answers);
+    let c = compile(
+        src,
+        &CompileOptions {
+            verify: true,
+            backend: tez_verify::Backend::Replay,
+        },
+    );
+    let missing = tez_verify::replay_take_missing();
+    if missing.is_empty() {
+        let verified = c.report.diagnostics.is_empty();
+        return to_string(
+            &json!({ "done": true, "verified": verified, "report": report_json(&c.report) }),
+        );
+    }
+    let items: Vec<Json> = missing
+        .iter()
+        .map(|m| json!({ "id": m.id, "query": m.query, "wantsValues": m.wants_values }))
+        .collect();
+    to_string(&json!({ "done": false, "missing": items }))
 }
 
 /// Formats `src` canonically. Returns `{ok: true, text}` or `{ok: false, report | comment}`.
@@ -89,7 +127,13 @@ fn base64(bytes: &[u8]) -> String {
 /// `{ok: false, report | error}`. Run it with `runtime/tez-runtime.mjs`.
 #[wasm_bindgen]
 pub fn build(src: &str) -> String {
-    let c = compile(src, &CompileOptions { verify: false });
+    let c = compile(
+        src,
+        &CompileOptions {
+            verify: false,
+            ..CompileOptions::default()
+        },
+    );
     let Some(prog) = c.program else {
         return to_string(&json!({ "ok": false, "report": report_json(&c.report) }));
     };
@@ -103,7 +147,13 @@ pub fn build(src: &str) -> String {
 /// Runs the zero-argument function `name`. Returns `{ok: true, value}` or `{ok: false, report}`.
 #[wasm_bindgen]
 pub fn run(src: &str, name: &str, contracts: bool) -> String {
-    let c = compile(src, &CompileOptions { verify: false });
+    let c = compile(
+        src,
+        &CompileOptions {
+            verify: false,
+            ..CompileOptions::default()
+        },
+    );
     let Some(prog) = c.program else {
         return to_string(&json!({ "ok": false, "report": report_json(&c.report) }));
     };
@@ -120,7 +170,13 @@ pub fn run(src: &str, name: &str, contracts: bool) -> String {
 /// Runs every `test` item. Returns `{ok, results: [{name, outcome: "pass"|"fail"|"error", message?}]}`.
 #[wasm_bindgen]
 pub fn test(src: &str, contracts: bool) -> String {
-    let c = compile(src, &CompileOptions { verify: false });
+    let c = compile(
+        src,
+        &CompileOptions {
+            verify: false,
+            ..CompileOptions::default()
+        },
+    );
     let Some(prog) = c.program else {
         return to_string(&json!({ "ok": false, "report": report_json(&c.report) }));
     };
@@ -139,7 +195,13 @@ pub fn test(src: &str, contracts: bool) -> String {
 /// know whether a program is a TEA app). Reserved for the UI runtime.
 #[wasm_bindgen]
 pub fn entry_points(src: &str) -> String {
-    let c = compile(src, &CompileOptions { verify: false });
+    let c = compile(
+        src,
+        &CompileOptions {
+            verify: false,
+            ..CompileOptions::default()
+        },
+    );
     let Some(prog) = c.program else {
         return "[]".into();
     };
@@ -159,6 +221,63 @@ mod tests {
 
     fn parse(s: &str) -> Json {
         serde_json::from_str(s).unwrap_or(Json::Null)
+    }
+
+    /// Solves one `query` the way the browser host does: a fresh solver, raw output back.
+    fn solve(query: &str) -> Option<String> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let mut child = Command::new("z3")
+            .args(["-in", "-smt2"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()?;
+        child.stdin.take()?.write_all(query.as_bytes()).ok()?;
+        String::from_utf8(child.wait_with_output().ok()?.stdout).ok()
+    }
+
+    /// Drives `verify_step` to completion like the Studio worker does.
+    fn verify_in_rounds(src: &str) -> Option<Json> {
+        let mut answers = serde_json::Map::new();
+        for _ in 0..60 {
+            let r = parse(&verify_step(
+                src,
+                &Json::Object(answers.clone()).to_string(),
+            ));
+            if r["done"] == true {
+                return Some(r);
+            }
+            for m in r["missing"].as_array()? {
+                let raw = solve(m["query"].as_str()?)?;
+                answers.insert(m["id"].as_str()?.to_string(), Json::String(raw));
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn verification_runs_in_rounds_with_an_asynchronous_solver() {
+        if solve("(check-sat)").is_none() {
+            return; // no z3 on this machine
+        }
+        let good = verify_in_rounds(
+            "fn at(xs: List[Int], i: Int) -> Int\n  requires 0 <= i && i < xs.len()\n  = xs.get(i)\n\nfn main() -> Int = at([1, 2, 3], 1)\n",
+        )
+        .unwrap();
+        assert_eq!(good["verified"], true, "{good}");
+        let bad = verify_in_rounds("fn at(xs: List[Int], i: Int) -> Int = xs.get(i)\n").unwrap();
+        assert_eq!(bad["verified"], false);
+        assert_eq!(bad["report"]["diagnostics"][0]["code"], "E_INDEX_BOUNDS");
+        assert!(
+            bad["report"]["diagnostics"][0]["counterexample"].is_object(),
+            "{bad}"
+        );
+        // type errors are reported without any solver round
+        let typed = parse(&verify_step("fn main() -> Int = \"x\"", "{}"));
+        assert_eq!(typed["done"], true);
+        assert_eq!(typed["verified"], false);
     }
 
     #[test]
