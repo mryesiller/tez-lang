@@ -54,6 +54,36 @@ const MAX_BODY = 1_000_000;
 const MAX_SAVED = 65_536;
 
 /**
+ * Reads a response body as text, stopping as soon as it passes `limit` bytes (so a huge body is never held in
+ * memory). Resolves the text, or `null` when the body is too large.
+ */
+export async function readLimited(response, limit = MAX_BODY) {
+  const declared = Number(response.headers?.get?.("content-length"));
+  if (declared > limit) {
+    await response.body?.cancel?.().catch(() => {});
+    return null;
+  }
+  if (!response.body?.getReader) {
+    const text = await response.text();
+    return new TextEncoder().encode(text).length > limit ? null : text;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+}
+
+/**
  * The absolute URL a program may fetch, or `null`: http(s) only, and only from an origin the page's owner listed.
  * Relative URLs resolve against `base` (the page).
  */
@@ -179,22 +209,35 @@ function patch(doc, parent, el, old, vn, fire) {
 }
 
 const MAX_LOG = 20000;
+/** Total length of the strings kept in the log (input values, fetched bodies) before it is checkpointed. */
+const MAX_LOG_CHARS = 4_000_000;
 
 /**
  * Starts the app in `root`. Returns `{ model, dispatch, swap, stop }`.
  * Options: `storage` (an object with getItem/setItem, e.g. localStorage) enables the program's optional
  * `save(model) -> Str` / `restore(Str) -> Option[Model]`; `fetch` and `allow` (a list of origins) enable its
- * optional `fetches(model)`: a program can reach nothing that is not in `allow`.
+ * optional `fetches(model)`: a program can fetch nothing that is not in `allow`. (Images and media in the view are
+ * not limited here; a published page limits them with its Content-Security-Policy, see export-site.mjs.)
  * Runtime failures inside `update`/`view` are reported through `onError` (a `TezError`) and stop the loop.
  *
  * Hot-swap is event sourcing: every UI event is logged as (path in the vnode tree, kind, value). `swap` loads
  * a new program, starts it from its own `init()` and replays the log. The program is pure, so the replay yields
  * exactly the state the user would have reached; events whose target no longer exists end the replay there.
+ * The log starts at `init()`, or at the saved state the app was restored from. When it is full and the program
+ * has `save`/`restore`, the current state becomes the new starting point (a checkpoint) and the log restarts;
+ * without them, later events are counted but not kept, and a swap reports them as dropped.
  */
 export function mountApp(
   rt0,
   root,
-  { onError = (e) => { throw e; }, storage = null, storageKey = "tez-app", fetch: fetchFn = null, allow = [] } = {},
+  {
+    onError = (e) => { throw e; },
+    storage = null,
+    storageKey = "tez-app",
+    fetch: fetchFn = null,
+    allow = [],
+    logLimit = MAX_LOG, // for tests
+  } = {},
 ) {
   if (!isApp(rt0)) throw new TezError("E_INTERNAL", "an app needs `init()`, `update(model, msg)` and `view(model)`");
   const doc = root.ownerDocument;
@@ -205,10 +248,41 @@ export function mountApp(
   let dead = false;
   let queued = false;
   let log = [];
+  let logChars = 0;
+  /** the saved state the log starts from (`null`: from `init()`) */
+  let base = null;
+  /** events that happened but could not be logged (the log was full and there is no checkpoint) */
+  let unlogged = 0;
   let replaying = false;
   /** running timers, by position in the subscription list */
   let timers = [];
   let subsNow = [];
+
+  const canSave = () => rt.meta.fns.save?.params === 1 && rt.meta.fns.restore?.params === 1;
+
+  /** Appends an event to the replay log, checkpointing or counting it when the log is full. */
+  const record = (ev) => {
+    const chars = typeof ev.value === "string" ? ev.value.length : 0;
+    if (unlogged === 0 && (log.length >= logLimit || logChars + chars > MAX_LOG_CHARS) && canSave()) {
+      try {
+        const s = rt.exports.f_save(model); // the state after this event: it becomes the starting point
+        if (typeof s === "string") {
+          base = s;
+          log = [];
+          logChars = 0;
+          return;
+        }
+      } catch {
+        /* fall through: count the event as unlogged */
+      }
+    }
+    if (unlogged > 0 || log.length >= logLimit || logChars + chars > MAX_LOG_CHARS) {
+      unlogged++;
+      return;
+    }
+    log.push(ev);
+    logChars += chars;
+  };
 
   const fail = (e) => {
     dead = true;
@@ -296,7 +370,7 @@ export function mountApp(
     if (dead || replaying || !subsNow[i]) return;
     try {
       model = rt.exports.f_update(model, subMessage(rt, subsNow[i], value));
-      if (log.length < MAX_LOG) log.push({ kind: "tick", path: [i], value });
+      record({ kind: "tick", path: [i], value });
     } catch (e) {
       fail(e);
       return;
@@ -306,6 +380,8 @@ export function mountApp(
 
   let fetchesActive = new Set();
   let fetchesNow = [];
+  /** aborts every request still in flight (on stop) */
+  const inFlight = new AbortController();
 
   /** Performs a GET for every fetch that newly appears in `fetches(model)`. */
   const syncFetches = () => {
@@ -328,13 +404,17 @@ export function mountApp(
       reply(false, allow.length ? "blocked: this origin is not allowed" : "blocked: this page may not use the network");
       return;
     }
-    const signal = AbortSignal.timeout(10_000);
+    const timeout = AbortSignal.timeout(10_000);
+    const signal = AbortSignal.any ? AbortSignal.any([timeout, inFlight.signal]) : timeout;
     Promise.resolve()
       .then(() => fetchFn(target, { credentials: "omit", referrerPolicy: "no-referrer", redirect: "error", signal }))
       .then(async (r) => {
-        const text = await r.text();
-        if (!r.ok) return reply(false, `HTTP ${r.status}`);
-        if (text.length > MAX_BODY) return reply(false, "response too large");
+        if (!r.ok) {
+          await r.body?.cancel?.().catch(() => {});
+          return reply(false, `HTTP ${r.status}`);
+        }
+        const text = await readLimited(r);
+        if (text === null) return reply(false, "response too large");
         reply(true, text);
       })
       .catch((e) => reply(false, String(e && e.name === "TimeoutError" ? "timed out" : "request failed")));
@@ -346,7 +426,7 @@ export function mountApp(
     if (!f) return; // the program no longer wants it
     try {
       model = rt.exports.f_update(model, rt.exports.__apply1(ok ? f.ok : f.err, text));
-      if (log.length < MAX_LOG) log.push({ kind: "fetch", url, ok, value: text });
+      record({ kind: "fetch", url, ok, value: text });
     } catch (e) {
       fail(e);
       return;
@@ -356,11 +436,17 @@ export function mountApp(
 
   /** Saves the model after each change through the program's own `save`; a failed save never stops the app. */
   let saved = null;
+  const TOO_LARGE = {};
   const persist = () => {
     if (!storage || !rt.meta.fns.save || rt.meta.fns.save.params !== 1) return;
     try {
       const s = rt.exports.f_save(model);
-      if (typeof s === "string" && s !== saved && s.length <= MAX_SAVED) {
+      if (typeof s === "string" && s !== saved) {
+        if (s.length > MAX_SAVED) {
+          if (saved !== TOO_LARGE) console.warn(`tez: the saved state is over ${MAX_SAVED} characters; it was not stored`);
+          saved = TOO_LARGE;
+          return;
+        }
         storage.setItem(storageKey, s);
         saved = s;
       }
@@ -379,6 +465,7 @@ export function mountApp(
           const opt = rt.exports.f_restore(s);
           if (rt.exports.__tag(opt) === 1) {
             saved = s;
+            base = s;
             return rt.exports.__get0(opt);
           }
         }
@@ -401,7 +488,7 @@ export function mountApp(
     try {
       const path = pathOf(node);
       if (!step(node.__tez, kind, value)) return;
-      if (log.length < MAX_LOG) log.push({ path, kind, value });
+      record({ path, kind, value });
     } catch (e) {
       fail(e);
       return;
@@ -431,9 +518,12 @@ export function mountApp(
         queueMicrotask(render);
       }
     },
-    /** Replaces the program, keeping the user's session. Returns `{ replayed, dropped }`. */
+    /**
+     * Replaces the program, keeping the user's session. Returns `{ replayed, dropped, restarted }`; `restarted`
+     * means the new program could not restore the checkpoint the log starts from, so it starts from `init()`.
+     */
     swap(next) {
-      if (dead) return { replayed: 0, dropped: 0 };
+      if (dead) return { replayed: 0, dropped: 0, restarted: false };
       if (!isApp(next)) throw new TezError("E_INTERNAL", "an app needs `init()`, `update(model, msg)` and `view(model)`");
       const oldRt = rt;
       const oldModel = model;
@@ -441,11 +531,21 @@ export function mountApp(
       let replayed = 0;
       try {
         rt = next;
-        model = next.exports.f_init();
+        let restarted = false;
+        model = undefined;
+        if (base !== null && next.meta.fns.restore?.params === 1) {
+          const opt = next.exports.f_restore(base);
+          if (next.exports.__tag(opt) === 1) model = next.exports.__get0(opt);
+        }
+        if (model === undefined) {
+          restarted = base !== null; // the session cannot be rebuilt: nothing of the log applies
+          model = next.exports.f_init();
+        }
+        const events = restarted ? [] : log;
         tree = undefined;
         // replay against virtual trees only; the DOM is patched once at the end
         let cur = readHtml(rt, rt.exports.f_view(model));
-        for (const ev of log) {
+        for (const ev of events) {
           if (ev.kind === "tick") {
             const subs = readSubs(rt, model);
             const sub = subs[ev.path[0]];
@@ -469,8 +569,7 @@ export function mountApp(
           cur = readHtml(rt, rt.exports.f_view(model));
           replayed++;
         }
-        const dropped = log.length - replayed;
-        log = log.slice(0, replayed);
+        const dropped = log.length - replayed + unlogged;
         // keep the existing DOM and patch it from the old tree to the new one
         tree = oldTree;
         replaying = true;
@@ -478,11 +577,16 @@ export function mountApp(
         patch(doc, root, el, tree, nextTree, fire);
         tree = nextTree;
         replaying = false;
+        // the session is now this program's: keep only the events it replayed
+        log = log.slice(0, replayed);
+        logChars = log.reduce((n, ev) => n + (typeof ev.value === "string" ? ev.value.length : 0), 0);
+        unlogged = 0;
+        if (restarted) base = null;
         syncTimers();
         fetchesNow = readFetches(rt, model);
         fetchesActive = new Set(fetchesNow.map((f) => f.url));
         persist();
-        return { replayed, dropped };
+        return { replayed, dropped, restarted };
       } catch (e) {
         // the new program failed while replaying: restore the old one untouched
         replaying = false;
@@ -495,6 +599,7 @@ export function mountApp(
     stop() {
       dead = true;
       stopTimers();
+      inFlight.abort();
       root.textContent = "";
     },
   };

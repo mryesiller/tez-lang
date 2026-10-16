@@ -181,7 +181,7 @@ tez run main.tez
 tez test main.tez      # runs the tests of every file
 ```
 
-There are no namespaces and no private items: every name is global, defined once, and nothing shadows anything, exactly as inside a single file. Errors name the file they are in. The editor on this website works on one file, so `use` is for the command line.
+Every name is defined once in the whole program and nothing shadows anything, exactly as inside a single file. A file sees its own names and those of the files it `use`s directly, no more: that is why `main.tez` above uses `util/money.tez` itself instead of getting `format` through `cart.tez`. Using a name without its `use` is `E_USE_MISSING`, and the fix adds the line. Errors name the file they are in. The editor on this website works on one file, so `use` is for the command line.
 
 ## 12. What gets rejected
 

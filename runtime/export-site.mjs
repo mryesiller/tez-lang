@@ -1,6 +1,11 @@
 // One self-contained web page for a compiled Tez program: the WasmGC module (base64), the runtime and the app host are
 // inlined, so the file works from any static host, from `file://` and offline. Used by the Studio ("Publish") and
-// `tez site`. The page runs under a strict Content-Security-Policy: no network, no foreign scripts.
+// `tez site`. The page runs under a strict Content-Security-Policy: no foreign scripts, and every network read (fetches,
+// images, media, CSS images) goes only to the page's own origin and the origins its author allowed. Links the visitor
+// clicks are ordinary navigation and are not limited.
+
+/** JSON for a value placed inside a <script> element: `<` is escaped, so no text can close the element. */
+const scriptJson = (v) => JSON.stringify(v).replace(/</g, "\\u003c");
 
 const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -20,8 +25,14 @@ function inline(src) {
  *   `allow` lists the extra origins the program may fetch from (the page's own origin is always allowed).
  */
 export function siteHtml({ title, wasm, runtime, app, css = "", allow = [] }) {
-  const origins = allow.map((o) => new URL(o).origin);
-  const csp = `default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: https:; media-src data: https:; connect-src 'self'${origins.map((o) => ` ${o}`).join("")}`;
+  const origins = allow.map((o) => {
+    const u = new URL(o);
+    if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error(`not a web origin: ${o}`);
+    return u.origin;
+  });
+  if (!/^[A-Za-z0-9+/=]*$/.test(wasm)) throw new Error("the module must be base64");
+  const reach = `'self'${origins.map((o) => ` ${o}`).join("")}`;
+  const csp = `default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: ${reach}; media-src data: ${reach}; connect-src ${reach}`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -33,7 +44,7 @@ export function siteHtml({ title, wasm, runtime, app, css = "", allow = [] }) {
 body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
 #app { max-width: 720px; margin: 0 auto; }
 pre#out { white-space: pre-wrap; }
-${css}
+${css.replace(/<\/style/gi, "<\\/style")}
 </style>
 </head>
 <body>
@@ -51,9 +62,9 @@ try {
     mountApp(rt, root, {
       onError: (e) => { root.textContent = "The program stopped: " + e.message; },
       storage,
-      storageKey: ${JSON.stringify(`tez-site:${title}`)},
+      storageKey: ${scriptJson(`tez-site:${title}`)},
       fetch: window.fetch.bind(window),
-      allow: [location.origin, ...${JSON.stringify(origins)}],
+      allow: [location.origin, ...${scriptJson(origins)}],
     });
   } else {
     const pre = document.createElement("pre");

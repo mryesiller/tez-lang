@@ -159,7 +159,7 @@ Dil tasarımı tamamlandı ve uygulandı; LLM ölçümleri ertelendi (kullanıc�
 
 Terminalde Tez ile geliştirme yapmak isteyen biri için eksikler; sırayla:
 
-- [x] **Çok dosya / `use`**: `use "dosya.tez"` ile bağımlılıklar tek programa katılır; yollar göreli ve proje içinde kalır (`E_USE_NOT_FOUND`/`E_USE_CYCLE`/`E_USE_BAD_PATH`), dosya bir kez yüklenir, ortak ad alanı (gölgeleme yok). Tüm dosyalar birlikte doğrulanır; tanılar `file` alanıyla doğru dosyayı gösterir. Örnek: `spec/examples/projects/shop`
+- [x] **Çok dosya / `use`**: `use "dosya.tez"` ile bağımlılıklar tek programa katılır; yollar göreli ve proje içinde kalır (`E_USE_NOT_FOUND`/`E_USE_CYCLE`/`E_USE_BAD_PATH`), dosya bir kez yüklenir, adlar programda tekil (gölgeleme yok); her dosya yalnızca kendi adlarını ve doğrudan `use` ettiği dosyalarınkini görür (`E_USE_MISSING`, fix ile). Tüm dosyalar birlikte doğrulanır; tanılar `file` alanıyla doğru dosyayı gösterir. Örnek: `spec/examples/projects/shop`
 - [x] Hazır ikililer + npm paketi **hazırlandı, yayımlanmadı**: `release.yml` (v* etiketinde 5 platform + npm tarball → TASLAK release), `npm/tez-lang` (WASM derleyici, `tez` komutu, çok dosyalı, Z3: sistem `z3` ya da `z3-solver` WASM). Yayın = kullanıcı onayı (etiket + `npm publish`)
 - [ ] VS Code eklentisi (renklendirme + `tez check --json` ile canlı hata), sonra dil sunucusu (LSP)
 - [ ] `tez --help` çıkış kodu, `tez check --watch`, `tez new`

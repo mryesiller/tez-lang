@@ -104,3 +104,120 @@ fn fetches(m: Int) -> List[Fetch[Msg]] = [Fetch.get("a.txt", s => Good(s), e => 
   assert.equal(rt.exports.__get0(msg), "body");
   assert.equal(rt.exports.__tag(rt.exports.__apply1(f.err, "x")), 1);
 });
+
+import { mountApp, readLimited } from "./tez-app.mjs";
+
+test("a response body is read only up to the limit", async () => {
+  assert.equal(await readLimited(new Response("héllo"), 10), "héllo");
+  assert.equal(await readLimited(new Response("x".repeat(11)), 10), null);
+  assert.equal(await readLimited(new Response("é".repeat(6)), 10), null); // 12 bytes, 6 characters
+  const declared = new Response("small", { headers: { "content-length": "999999999" } });
+  assert.equal(await readLimited(declared, 10), null);
+  let pulled = 0;
+  const endless = new ReadableStream({
+    pull(c) {
+      pulled++;
+      c.enqueue(new Uint8Array(1024));
+    },
+  });
+  assert.equal(await readLimited(new Response(endless), 4096), null);
+  assert.ok(pulled < 10, `stopped reading after ${pulled} chunks`);
+});
+
+/** Just enough of a DOM for mountApp: elements, text nodes, attributes and click listeners. */
+function fakeDocument() {
+  class Node {
+    constructor(doc) {
+      this.ownerDocument = doc;
+      this.childNodes = [];
+      this.parentNode = null;
+      this.listeners = {};
+    }
+    get lastChild() {
+      return this.childNodes[this.childNodes.length - 1];
+    }
+    appendChild(n) {
+      n.parentNode = this;
+      this.childNodes.push(n);
+      return n;
+    }
+    removeChild(n) {
+      this.childNodes.splice(this.childNodes.indexOf(n), 1);
+      n.parentNode = null;
+      return n;
+    }
+    replaceChild(n, old) {
+      this.childNodes[this.childNodes.indexOf(old)] = n;
+      n.parentNode = this;
+      old.parentNode = null;
+      return old;
+    }
+    setAttribute() {}
+    removeAttribute() {}
+    addEventListener(type, f) {
+      this.listeners[type] = f;
+    }
+    set textContent(t) {
+      this.childNodes = [];
+    }
+    get text() {
+      return this.nodeValue ?? this.childNodes.map((c) => c.text).join("");
+    }
+  }
+  const doc = { defaultView: null, baseURI: "https://site.example/" };
+  doc.createElement = (tag) => Object.assign(new Node(doc), { tag });
+  doc.createTextNode = (t) => Object.assign(new Node(doc), { nodeValue: t });
+  return { doc, root: new Node(doc) };
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+async function counter(saveLine) {
+  const root = new URL("../", import.meta.url).pathname;
+  const bin = process.env.TEZ_BIN ?? `${root}target/debug/tez`;
+  const dir = mkdtempSync(join(tmpdir(), "tez-log-"));
+  writeFileSync(
+    join(dir, "a.tez"),
+    `type Msg = Inc | Reset
+fn init() -> Int = 0
+fn update(m: Int, msg: Msg) -> Int = match msg {
+  Inc => m + 1
+  Reset => 0
+}
+fn view(m: Int) -> Html[Msg] = Html.button(m.toStr(), Inc)
+${saveLine}
+`,
+  );
+  const r = spawnSync(bin, ["build", "--no-verify", join(dir, "a.tez"), "-o", join(dir, "a.wasm")], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  return () => load(readFileSync(join(dir, "a.wasm")));
+}
+
+test("a full replay log becomes a checkpoint, so a hot-swap still rebuilds the exact session", async () => {
+  const build = await counter(`fn save(m: Int) -> Str = m.toStr()
+fn restore(s: Str) -> Option[Int] = s.toInt()`);
+  const { root } = fakeDocument();
+  const app = mountApp(await build(), root, { logLimit: 3 });
+  for (let i = 0; i < 10; i++) {
+    root.childNodes[0].listeners.click();
+    await flush();
+  }
+  assert.equal(root.text, "10");
+  const r = app.swap(await build());
+  assert.equal(r.restarted, false);
+  assert.equal(r.dropped, 0);
+  assert.equal(root.text, "10");
+});
+
+test("without save/restore, events past a full log are reported as dropped, never silently lost", async () => {
+  const build = await counter("");
+  const { root } = fakeDocument();
+  const app = mountApp(await build(), root, { logLimit: 3 });
+  for (let i = 0; i < 10; i++) {
+    root.childNodes[0].listeners.click();
+    await flush();
+  }
+  const r = app.swap(await build());
+  assert.deepEqual([r.replayed, r.dropped], [3, 7]);
+  assert.equal(root.text, "3"); // the state the kept log leads to, and the swap says so
+});

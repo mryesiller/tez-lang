@@ -7,6 +7,8 @@ use tez_diag::{Diagnostic, Report};
 use tez_syntax::{ByteSpan, LineIndex, ParseOptions, Problem, parse};
 use tez_types::hir::Program;
 
+mod visibility;
+
 /// Options for [`compile`].
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
@@ -156,6 +158,8 @@ struct Project<'a> {
     order: Vec<SourceFile>,
     /// Spans of the `use` lines of each file (blanked in the merged text).
     use_spans: Vec<Vec<ByteSpan>>,
+    /// The files each file `use`s (project-relative names), parallel to `order`.
+    use_targets: Vec<Vec<String>>,
     done: Vec<String>,
     visiting: Vec<String>,
     problems: Vec<(String, Problem)>,
@@ -166,6 +170,7 @@ impl Project<'_> {
         self.visiting.push(name.to_string());
         let parsed = parse(&text, ParseOptions::default());
         let mut uses = Vec::new();
+        let mut targets = Vec::new();
         if !parsed.problems.is_empty() {
             for p in parsed.problems {
                 self.problems.push((name.to_string(), p));
@@ -182,6 +187,7 @@ impl Project<'_> {
                         Problem::new(tez_diag::Code::UseBadPath, msg, u.span),
                     )),
                     Ok(target) => {
+                        targets.push(target.clone());
                         if self.visiting.contains(&target) {
                             let chain = self
                                 .visiting
@@ -225,6 +231,7 @@ impl Project<'_> {
             text,
         });
         self.use_spans.push(uses);
+        self.use_targets.push(targets);
     }
 }
 
@@ -242,6 +249,7 @@ pub fn compile_project(
         load,
         order: Vec::new(),
         use_spans: Vec::new(),
+        use_targets: Vec::new(),
         done: Vec::new(),
         visiting: Vec::new(),
         problems: Vec::new(),
@@ -312,7 +320,25 @@ pub fn compile_project(
             ranges: ranges.clone(),
         };
     }
-    let checked = tez_types::check(&parsed.file, src);
+    let mut checked = tez_types::check(&parsed.file, src);
+    if checked.problems.is_empty() && multi {
+        let names: Vec<String> = files.iter().map(|f| f.name.clone()).collect();
+        let uses: Vec<Vec<usize>> = project
+            .use_targets
+            .iter()
+            .map(|ts| {
+                ts.iter()
+                    .filter_map(|t| names.iter().position(|n| n == t))
+                    .collect()
+            })
+            .collect();
+        let view = visibility::Files {
+            names: &names,
+            ranges: &ranges,
+            uses: &uses,
+        };
+        checked.problems = visibility::check(&view, src, &parsed.file, &checked.program);
+    }
     if !checked.problems.is_empty() {
         return Compiled {
             report: Report::new(project_diagnostics(

@@ -116,3 +116,9 @@ Dikkat: dil kartı tam **1.200/1.200 token** (yeni `Sub` cümlesi 1.148 → 1.20
 
 Açık: gerçek WebGPU model denemesi, `tez_web` ile `Fetch` için POST/başlık, yayın/barındırma bağlantısı, VS Code eklentisi/LSP, `tez check --watch`/`tez new`.
 
+
+### 7.1 Review düzeltmeleri (2026-10-16)
+- **Site CSP**: `img-src`/`media-src` artık yalnızca `data:` + sayfanın kökeni + `--allow` kökenleri (önceden her `https:` açıktı → izin listesi `<img>` ile aşılabiliyordu). Başlık/CSS `</script>`/`</style>` ile elemandan çıkamaz; `allow` yalnız http(s), wasm yalnız base64.
+- **Fetch**: gövde akışla okunur, 1 MB (byte) aşılınca okuma kesilir; `stop()` uçuştaki istekleri iptal eder.
+- **Hot-swap logu**: dolunca program `save`/`restore` tanımlıysa o anki durum checkpoint olur (log sıfırlanır); tanımlı değilse kaydedilemeyen olaylar sayılır ve swap bunları `dropped` olarak bildirir (önceden sessizce farklı duruma replay ediyordu). Geri yüklenmiş (restore) bir oturumda swap artık `init()` yerine o durumdan başlar; yeni sürüm okuyamazsa `restarted: true`.
+- **Dosya başına görünürlük** (`E_USE_MISSING`): bir dosya yalnızca kendi adlarını ve doğrudan `use` ettiği dosyalarınkini görür (geçişli değil). Tip denetiminden sonra ayrı bir geçiş (`tez_driver/src/visibility.rs`), yalnızca reddeder; fix `use` satırını ekler, döngü yaratacaksa taşımayı önerir. Kart: 1.198/1.200.

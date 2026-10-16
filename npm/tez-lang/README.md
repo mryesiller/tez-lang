@@ -13,7 +13,7 @@ tez build app.tez        # write app.wasm
 tez fmt app.tez --write  # canonical formatting
 ```
 
-`use "other.tez"` pulls in files next to (or below) the entry file; everything is checked together.
+`use "other.tez"` pulls in files next to (or below) the entry file; each file sees the names of the files it `use`s directly, and everything is checked together.
 
 Proving needs an SMT solver: the `z3` executable when it is on `PATH` (set `TEZ_Z3` to choose one), otherwise the
 `z3-solver` WebAssembly build installed with this package. Without either, `tez` refuses to claim anything is verified

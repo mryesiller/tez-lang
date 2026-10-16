@@ -54,11 +54,12 @@ test areaWorks = area(Rect(2, 3)) == 6          // checked by `tez test`, exclud
 
 ### 3.1 Files and `use`
 
-A program may span several files. `use "geometry.tez"` (a top-level item, usually first) makes every item of that file part of this program, as if it were written here.
+A program may span several files. `use "geometry.tez"` (a top-level item, usually first) makes every item of that file part of this program and visible in this file.
 
 - The path is relative to the file that contains the `use`, ends in `.tez`, uses `/` separators and must stay inside the directory of the entry file (no absolute paths, no `..` above it). Violations are `E_USE_BAD_PATH`; a missing file is `E_USE_NOT_FOUND`.
 - A file is loaded once however many files use it. Imports may not form a cycle (`E_USE_CYCLE`). Order does not matter.
-- There is no qualification and no visibility: all items of all files share one namespace, so a name defined twice is `E_NAME_DUPLICATE` and nothing can shadow anything (the same rules as inside one file). Only the entry file should define `main`.
+- Names are unqualified and unique across the whole program: a name defined twice, in any two files, is `E_NAME_DUPLICATE`, and nothing can shadow anything (the same rules as inside one file). Only the entry file should define `main`.
+- A file sees only its own items and those of the files it `use`s **directly**; using anything else (a function, constant, type or constructor) is `E_USE_MISSING`, with a fix that adds the `use` line. Importing is not transitive: if `main.tez` uses `cart.tez` and `cart.tez` uses `money.tez`, `main.tez` must `use "money.tez"` itself to call `format`. Values whose type comes from another file can still be passed around and their fields read without naming the type. When the name's file already imports this one, the `use` would be a cycle: move the item instead.
 - `tez check`, `run`, `test` and `build` take the entry file and follow the imports; everything is verified together, so a contract in one file is proved against its uses in another. `tez test` runs the `test` items of every file. Diagnostics name the file they are in (`file` in the JSON report). `tez fmt` formats one file at a time.
 - `use` is not available where there are no other files (the single-file editor in a browser): it reports `E_USE_NOT_FOUND`.
 

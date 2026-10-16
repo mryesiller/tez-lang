@@ -214,7 +214,12 @@ export default function App() {
         const rt = await load(Uint8Array.from(atob(built.wasm), (c) => c.charCodeAt(0)));
         if (!isApp(rt)) return;
         const r = app.current.swap(rt);
-        setOutput({ kind: "ok", text: `Hot-swapped: replayed ${r.replayed} event(s)${r.dropped ? `, dropped ${r.dropped} that no longer apply` : ""}.` });
+        setOutput({
+          kind: "ok",
+          text: r.restarted
+            ? "Hot-swapped: the new version cannot read the saved state, so the app started over."
+            : `Hot-swapped: replayed ${r.replayed} event(s)${r.dropped ? `, dropped ${r.dropped} that could not be replayed` : ""}.`,
+        });
       } catch (e) {
         setOutput({ kind: "error", text: `hot-swap failed, the previous version keeps running: ${e instanceof Error ? e.message : e}` });
       }

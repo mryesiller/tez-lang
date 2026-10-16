@@ -109,6 +109,7 @@ codes! {
     UseNotFound => "E_USE_NOT_FOUND", Resolve;
     UseCycle => "E_USE_CYCLE", Resolve;
     UseBadPath => "E_USE_BAD_PATH", Resolve;
+    UseMissing => "E_USE_MISSING", Resolve;
     TypeMismatch => "E_TYPE_MISMATCH", Types;
     TypeArity => "E_TYPE_ARITY", Types;
     TypeNotFunction => "E_TYPE_NOT_FUNCTION", Types;

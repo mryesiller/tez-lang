@@ -467,3 +467,92 @@ fn a_file_imported_twice_is_loaded_once() {
     let out = tez(&["run", dir.join("m.tez").to_str().unwrap()]);
     assert_eq!(s(&out.stdout).trim(), "42", "{}", s(&out.stderr));
 }
+
+#[test]
+fn files_see_only_the_names_of_files_they_use() {
+    let lib = "type Shape = Dot | Box(Int)\n\nconst unit: Int = 1\n\nfn area(s: Shape) -> Int = match s {\n  Dot => 0\n  Box(n) => n * n\n}\n";
+    // `mid.tez` uses `lib.tez`; `main.tez` uses only `mid.tez`, so lib's names are not visible in main
+    let cases: [(&str, &str); 6] = [
+        ("fn main() -> Int = area(Dot)", "`area`"),
+        ("fn main() -> Int = unit", "`unit`"),
+        (
+            "fn main() -> Int = match make() {\n  Box(n) => n\n  _ => 0\n}",
+            "`Box`",
+        ),
+        ("fn main() -> Int = [make()].map(area).sum()", "`area`"),
+        (
+            "fn size(s: Shape) -> Int = 1\nfn main() -> Int = size(make())",
+            "`Shape`",
+        ),
+        (
+            "fn main() -> Int = [make()].map(s => area(s)).sum()",
+            "`area`",
+        ),
+    ];
+    for (i, (body, name)) in cases.iter().enumerate() {
+        let dir = project(&[
+            ("lib.tez", lib),
+            (
+                "mid.tez",
+                "use \"lib.tez\"\n\nfn make() -> Shape = Box(4)\n",
+            ),
+            (
+                &format!("vis{i}/../main.tez")[..],
+                &format!("use \"mid.tez\"\n\n{body}\n")[..],
+            ),
+        ]);
+        let out = tez(&[
+            "check",
+            "--json",
+            "--no-verify",
+            dir.join("main.tez").to_str().unwrap(),
+        ]);
+        let v: serde_json::Value = serde_json::from_str(&s(&out.stdout)).unwrap();
+        let d = &v["diagnostics"][0];
+        assert_eq!(d["code"], "E_USE_MISSING", "{body}: {v}");
+        assert_eq!(d["file"], "main.tez");
+        assert!(d["message"].as_str().unwrap().contains(name), "{body}: {v}");
+        assert_eq!(d["fixes"][0]["edits"][0]["replace"], "use \"lib.tez\"\n");
+    }
+    // with the `use`, the same program is accepted
+    let dir = project(&[
+        ("lib.tez", lib),
+        (
+            "mid.tez",
+            "use \"lib.tez\"\n\nfn make() -> Shape = Box(4)\n",
+        ),
+        (
+            "ok/../main.tez",
+            "use \"mid.tez\"\nuse \"lib.tez\"\n\nfn main() -> Int = area(make()) + unit\n",
+        ),
+    ]);
+    let out = tez(&[
+        "check",
+        "--no-verify",
+        dir.join("main.tez").to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", s(&out.stderr));
+    // a name from a file that imports this one: the advice is to move it, not to import back (a cycle)
+    let dir = project(&[
+        (
+            "main.tez",
+            "use \"a.tez\"\n\ntype Unit2 = U | V\n\nfn main() -> Int = f(U)\n",
+        ),
+        ("a.tez", "fn f(u: Unit2) -> Int = 1\n"),
+    ]);
+    let out = tez(&[
+        "check",
+        "--json",
+        "--no-verify",
+        dir.join("main.tez").to_str().unwrap(),
+    ]);
+    let v: serde_json::Value = serde_json::from_str(&s(&out.stdout)).unwrap();
+    assert_eq!(v["diagnostics"][0]["code"], "E_USE_MISSING");
+    assert_eq!(v["diagnostics"][0]["file"], "a.tez");
+    assert!(
+        v["diagnostics"][0]["fixes"]
+            .as_array()
+            .is_none_or(Vec::is_empty),
+        "{v}"
+    );
+}
