@@ -31,6 +31,33 @@ fn big(v: &Value<'_>, span: ByteSpan) -> R<BigInt> {
         .ok_or_else(|| rt(Code::Internal, "expected an integer", span))
 }
 
+/// The number of characters. An ASCII text (checked a word at a time) has one byte per character.
+fn char_count(s: &str) -> usize {
+    if s.is_ascii() {
+        s.len()
+    } else {
+        s.chars().count()
+    }
+}
+
+/// The characters `from..to` (the caller has checked `from <= to <= char_count(s)`), without copying the others.
+fn char_slice(s: &str, from: usize, to: usize) -> &str {
+    if s.is_ascii() {
+        return s.get(from..to).unwrap_or("");
+    }
+    let mut at = s
+        .char_indices()
+        .map(|(b, _)| b)
+        .chain(std::iter::once(s.len()));
+    let start = at.nth(from).unwrap_or(s.len());
+    let end = if to == from {
+        start
+    } else {
+        at.nth(to - from - 1).unwrap_or(s.len())
+    };
+    s.get(start..end).unwrap_or("")
+}
+
 /// `-12`, `3.5`, `1e9`, `-2.5E-3`: digits with an optional fraction and exponent, nothing else (no `+`, no `.5`, no `inf`).
 fn parse_float(s: &str) -> Option<f64> {
     let rest = s.strip_prefix('-').unwrap_or(s);
@@ -139,15 +166,15 @@ pub(crate) fn call<'p>(
         "Float.toStr" => Ok(str_val(fmt_float(float(arg(0)?, span)?))),
 
         // ------------------------------------------------------------ Str
-        "Str.len" => Ok(int_val(string(arg(0)?, span)?.chars().count())),
+        "Str.len" => Ok(int_val(char_count(string(arg(0)?, span)?))),
         "Str.slice" => {
             let s = string(arg(0)?, span)?;
-            let n = s.chars().count();
+            let n = char_count(s);
             let from = big_to_usize(arg(1)?);
             let to = big_to_usize(arg(2)?);
             match (from, to) {
                 (Some(f), Some(t)) if f <= t && t <= n => {
-                    Ok(str_val(s.chars().skip(f).take(t - f).collect::<String>()))
+                    Ok(str_val(char_slice(s, f, t).to_string()))
                 }
                 _ => Err(rt(
                     Code::Precondition,

@@ -381,24 +381,21 @@ fn Json.unescape(raw: Str) -> Str = match raw.split("\\") {
   [first, ..rest] => Json.decode(rest, true, 0, first)
 }
 
-// the tokens of a text: (0, punctuation), (1, the text of a string) or (2, a bare word)
-fn Json.tokens(s: Str, i: Int, acc: List[(Int, Str)]) -> Result[List[(Int, Str)], Str]
-  requires 0 <= i && i <= s.len()
-  decreases s.len() - i
-  = if i >= s.len() { Ok(acc) } else {
-    let c = s.slice(i, i + 1)
-    if Json.isSpace(c) { Json.tokens(s, i + 1, acc) } else if Json.isPunct(c) { Json.tokens(s, i + 1, acc.append((0, c))) } else if c == "\"" {
-      let end = Json.stringEnd(s, i + 1)
-      if end < 0 { Err("a string is not closed") } else {
-        Json.tokens(s, end + 1, acc.append((1, Json.unescape(s.slice(i + 1, end)))))
-      }
-    } else {
-      let end = Json.wordEnd(s, i)
-      if end == i { Err("unexpected character `" ++ c ++ "` at position " ++ i.toStr()) } else {
-        Json.tokens(s, end, acc.append((2, s.slice(i, end))))
-      }
-    }
+// the token that starts at i, which is not white space: (kind, text, where the next one starts). Kind 0 is punctuation,
+// 1 a string (its decoded text), 2 a bare word (a number, true, false, null) and 3 a failure (the text is the reason).
+fn Json.token(s: Str, i: Int) -> (Int, Str, Int)
+  requires 0 <= i && i < s.len()
+  ensures result.2 > i && result.2 <= s.len()
+  = {
+  let c = s.slice(i, i + 1)
+  if Json.isPunct(c) { (0, c, i + 1) } else if c == "\"" {
+    let end = Json.stringEnd(s, i + 1)
+    if end < 0 { (3, "a string is not closed", s.len()) } else { (1, Json.unescape(s.slice(i + 1, end)), end + 1) }
+  } else {
+    let end = Json.wordEnd(s, i)
+    if end == i { (3, "unexpected character `" ++ c ++ "` at position " ++ i.toStr(), s.len()) } else { (2, s.slice(i, end), end) }
   }
+}
 
 fn Json.word(w: Str) -> Result[Json, Str] =
   if w == "null" { Ok(JNull) } else if w == "true" { Ok(JBool(true)) } else if w == "false" { Ok(JBool(false)) } else if w.toFloat().isSome() {
@@ -419,84 +416,69 @@ fn Json.attach(stack: List[(Json, Str, Bool)], v: Json) -> Result[(List[(Json, S
   }
 }
 
-// reads one token per call; `stack` holds the arrays and objects that are still open (the innermost first)
-fn Json.step(toks: List[(Int, Str)], stack: List[(Json, Str, Bool)], done: Option[Json]) -> Result[Json, Str]
-  decreases toks.len()
-  = match toks {
-  [] => match done {
+// takes one token: the arrays and objects still open (the innermost first) and the finished value, if there is one
+fn Json.feed(kind: Int, text: Str, stack: List[(Json, Str, Bool)]) -> Result[(List[(Json, Str, Bool)], Option[Json]), Str] =
+  if kind == 0 {
+    if text == "{" { Ok(([(JObj([]), "", false)].concat(stack), None)) } else if text == "[" {
+      Ok(([(JArr([]), "", false)].concat(stack), None))
+    } else if text == "]" {
+      match stack {
+        [top, ..below] => match top.0 {
+          JArr(items) => Json.attach(below, JArr(items))
+          _ => Err("a `]` closes an object")
+        }
+        [] => Err("a `]` closes nothing")
+      }
+    } else if text == "}" {
+      match stack {
+        [top, ..below] => match top.0 {
+          JObj(items) =>
+            if top.2 { Err("an object member has a name but no value") } else { Json.attach(below, JObj(items)) }
+          _ => Err("a `}` closes an array")
+        }
+        [] => Err("a `}` closes nothing")
+      }
+    } else { Ok((stack, None)) }
+  } else if kind == 1 {
+    match stack {
+      [top, ..below] => match top.0 {
+        JObj(items) =>
+          if top.2 { Json.attach(stack, JStr(text)) } else { Ok(([(JObj(items), text, true)].concat(below), None)) }
+        _ => Json.attach(stack, JStr(text))
+      }
+      [] => Json.attach(stack, JStr(text))
+    }
+  } else {
+    match Json.word(text) {
+      Ok(v) => Json.attach(stack, v)
+      Err(e) => Err(e)
+    }
+  }
+
+// reads the text from position i, one token per call (no list of tokens is built)
+fn Json.run(s: Str, i: Int, stack: List[(Json, Str, Bool)], done: Option[Json]) -> Result[Json, Str]
+  requires 0 <= i && i <= s.len()
+  decreases s.len() - i
+  = if i >= s.len() {
+  match done {
     Some(v) => if stack.isEmpty() { Ok(v) } else { Err("the text ends inside an array or object") }
     None => if stack.isEmpty() { Err("the text is empty") } else { Err("the text ends inside an array or object") }
   }
-  [t, ..rest] => match done {
-    Some(_) => Err("there is more text after the value")
-    None =>
-      if t.0 == 0 {
-        if t.1 == "{" { Json.step(rest, [(JObj([]), "", false)].concat(stack), None) } else if t.1 == "[" {
-          Json.step(rest, [(JArr([]), "", false)].concat(stack), None)
-        } else if t.1 == "]" {
-          match stack {
-            [top, ..below] => match top.0 {
-              JArr(items) => match Json.attach(below, JArr(items)) {
-                Ok(r) => Json.step(rest, r.0, r.1)
-                Err(e) => Err(e)
-              }
-              _ => Err("a `]` closes an object")
-            }
-            [] => Err("a `]` closes nothing")
-          }
-        } else if t.1 == "}" {
-          match stack {
-            [top, ..below] => match top.0 {
-              JObj(items) =>
-                if top.2 { Err("an object member has a name but no value") } else {
-                  match Json.attach(below, JObj(items)) {
-                    Ok(r) => Json.step(rest, r.0, r.1)
-                    Err(e) => Err(e)
-                  }
-                }
-              _ => Err("a `}` closes an array")
-            }
-            [] => Err("a `}` closes nothing")
-          }
-        } else { Json.step(rest, stack, None) }
-      } else if t.0 == 1 {
-        match stack {
-          [top, ..below] => match top.0 {
-            JObj(items) =>
-              if top.2 {
-                match Json.attach(stack, JStr(t.1)) {
-                  Ok(r) => Json.step(rest, r.0, r.1)
-                  Err(e) => Err(e)
-                }
-              } else { Json.step(rest, [(JObj(items), t.1, true)].concat(below), None) }
-            _ => match Json.attach(stack, JStr(t.1)) {
-              Ok(r) => Json.step(rest, r.0, r.1)
-              Err(e) => Err(e)
-            }
-          }
-          [] => match Json.attach(stack, JStr(t.1)) {
-            Ok(r) => Json.step(rest, r.0, r.1)
-            Err(e) => Err(e)
-          }
-        }
-      } else {
-        match Json.word(t.1) {
-          Ok(v) => match Json.attach(stack, v) {
-            Ok(r) => Json.step(rest, r.0, r.1)
-            Err(e) => Err(e)
-          }
-          Err(e) => Err(e)
-        }
-      }
+} else if Json.isSpace(s.slice(i, i + 1)) { Json.run(s, i + 1, stack, done) } else if done.isSome() {
+  Err("there is more text after the value")
+} else {
+  let t = Json.token(s, i)
+  if t.0 == 3 { Err(t.1) } else {
+    match Json.feed(t.0, t.1, stack) {
+      Ok(r) => Json.run(s, t.2, r.0, r.1)
+      Err(e) => Err(e)
+    }
   }
 }
 
 // Reads JSON text. It accepts a little more than JSON (a missing comma or colon is tolerated) but never a text whose
-// brackets do not match, a string that is not closed or a word that is no value. Big inputs are slow (it is quadratic).
-fn Json.parse(text: Str) -> Result[Json, Str] = match Json.tokens(text, 0, []) {
-  Ok(toks) => Json.step(toks, [], None)
-  Err(e) => Err(e)
-}
+// brackets do not match, a string that is not closed or a word that is no value.
+fn Json.parse(text: Str) -> Result[Json, Str] = Json.run(text, 0, [], None)
 
 fn Json.findKey(members: List[(Str, Json)], key: Str) -> Option[Json] = match members {
   [] => None
