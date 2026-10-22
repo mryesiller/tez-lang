@@ -156,8 +156,9 @@ pub(crate) struct Checker<'a> {
 }
 
 const BUILTIN_TYPES: [&str; 6] = ["Int", "Float", "Bool", "Str", "Unit", "List"];
-const MODULES: [&str; 8] = [
-    "Int", "Float", "Str", "List", "Option", "Result", "Html", "Sub",
+const MODULES: [&str; 12] = [
+    "Int", "Float", "Str", "List", "Option", "Result", "Html", "Sub", "Fetch", "Json", "Time",
+    "Char",
 ];
 
 impl<'a> Checker<'a> {
@@ -1062,6 +1063,7 @@ impl<'a> Checker<'a> {
             Ty::Adt(id, _) => match self.program.types[id].name.as_str() {
                 "Option" if self.program.types[id].is_prelude => Some("Option"),
                 "Result" if self.program.types[id].is_prelude => Some("Result"),
+                "Json" if self.program.types[id].is_prelude => Some("Json"),
                 _ => None,
             },
             _ => None,

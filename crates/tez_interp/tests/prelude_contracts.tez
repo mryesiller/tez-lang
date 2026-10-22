@@ -41,3 +41,7 @@ test countBounds = lists().all(xs => xs.count(x => x > 0) >= 0 && xs.count(x => 
 test zipEnumerate = lists().all(xs => lists().all(ys => xs.zip(ys).len() == (if xs.len() < ys.len() { xs.len() } else { ys.len() })) && xs.enumerate().len() == xs.len())
 
 test sortsKeepLength = lists().all(xs => xs.sort().len() == xs.len() && xs.sortBy(x => 0 - x).len() == xs.len())
+
+test fromCodeIsOneCharacter = [0, 65, 233, 55357, 56832, 57343, 128512, 1114111].all(n => Char.fromCode(n).len() == 1)
+
+test toFloatReadsOnlyNumbers = "2.5".toFloat().isSome() && "-7".toFloat().isSome() && "1e3".toFloat().isSome() && ".5".toFloat().isNone() && "+1".toFloat().isNone() && "1.".toFloat().isNone() && "abc".toFloat().isNone() && "".toFloat().isNone()

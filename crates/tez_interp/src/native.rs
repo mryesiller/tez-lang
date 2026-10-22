@@ -31,6 +31,25 @@ fn big(v: &Value<'_>, span: ByteSpan) -> R<BigInt> {
         .ok_or_else(|| rt(Code::Internal, "expected an integer", span))
 }
 
+/// `-12`, `3.5`, `1e9`, `-2.5E-3`: digits with an optional fraction and exponent, nothing else (no `+`, no `.5`, no `inf`).
+fn parse_float(s: &str) -> Option<f64> {
+    let rest = s.strip_prefix('-').unwrap_or(s);
+    let (mantissa, exponent) = match rest.find(['e', 'E']) {
+        Some(i) => (&rest[..i], Some(&rest[i + 1..])),
+        None => (rest, None),
+    };
+    let digits = |t: &str| !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit());
+    let (whole, frac) = match mantissa.split_once('.') {
+        Some((w, f)) => (w, Some(f)),
+        None => (mantissa, None),
+    };
+    let signed = |t: &str| digits(t.strip_prefix(['+', '-']).unwrap_or(t));
+    if !digits(whole) || frac.is_some_and(|f| !digits(f)) || exponent.is_some_and(|e| !signed(e)) {
+        return None;
+    }
+    s.parse::<f64>().ok().filter(|f| f.is_finite())
+}
+
 fn float(v: &Value<'_>, span: ByteSpan) -> R<f64> {
     match v {
         Value::Float(f) => Ok(*f),
@@ -151,6 +170,25 @@ pub(crate) fn call<'p>(
             }
             Ok(s.parse::<BigInt>()
                 .map_or_else(|_| it.none(), |b| it.some(Value::from_big(b))))
+        }
+        "Str.toFloat" => {
+            let s = string(arg(0)?, span)?;
+            Ok(parse_float(s).map_or_else(|| it.none(), |f| it.some(Value::Float(f))))
+        }
+        "Char.fromCode" => {
+            let code = big_to_usize(arg(0)?)
+                .and_then(|n| u32::try_from(n).ok())
+                .ok_or_else(|| {
+                    rt(
+                        Code::Precondition,
+                        "`Char.fromCode` needs a code from 0 to 1114111",
+                        span,
+                    )
+                })?;
+            // a surrogate half is not a character: it becomes U+FFFD, as in the JavaScript runtime
+            Ok(str_val(
+                char::from_u32(code).unwrap_or('\u{FFFD}').to_string(),
+            ))
         }
         "Str.contains" => Ok(Value::Bool(
             string(arg(0)?, span)?.contains(string(arg(1)?, span)?),

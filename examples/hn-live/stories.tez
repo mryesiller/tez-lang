@@ -1,0 +1,12 @@
+// Written by build.mjs at 2026-10-22T08:24:16.000Z. Do not edit.
+use "story.tez"
+
+fn bakedAt() -> Int = 1792657456
+
+fn baked() -> List[Story] = [
+  Story { id: 50191507, title: "OpenAI CLI", url: "https://github.com/openai/openai-cli", score: 85, by: "armcat" },
+  Story { id: 50190363, title: "WorldTUI: I trained a 360M model to pretend to be a terminal", url: "https://simedw.com/2026/10/21/world-model-terminal/", score: 133, by: "alphax314" },
+  Story { id: 50190455, title: "The recently proposed o(n log n) integer multiplication algorithm [pdf]", url: "https://web.maths.unsw.edu.au/~davidharvey/research/subnlogn.pdf", score: 180, by: "craigcitro" },
+  Story { id: 50192254, title: "A Markdown File Should Just Open", url: "https://joshuamorris.info/notes/2026/10/13/a-markdown-file-should-just-open/", score: 17, by: "TheWoollyBully" },
+  Story { id: 50188948, title: "There isn't an easy exploit for this PHP vulnerability", url: "https://eliastaylor.com/noexploit/", score: 489, by: "zkldi" }
+]

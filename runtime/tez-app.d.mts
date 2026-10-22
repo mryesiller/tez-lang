@@ -14,6 +14,9 @@ export interface AppHandle {
 /** True when the compiled program defines `init()`, `update(model, msg)` and `view(model)`. */
 export function isApp(rt: TezRuntime): boolean;
 
+/** The method and headers a request may use, or the reason it may not (cookies are never sent). */
+export function requestAllowed(method: string, headers: [string, string][], body: string): { error: string } | { headers: Record<string, string> };
+
 /** Reads a response body as text, giving up (null) once it passes `limit` bytes. */
 export function readLimited(response: Response, limit?: number): Promise<string | null>;
 

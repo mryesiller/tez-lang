@@ -1012,3 +1012,130 @@ fam("proof.refined-params", (r) => {
   }[kind];
   return { name: spec[0], desc: spec[1], sig: `fn ${spec[0]}(${spec[3]}) -> ${spec[4]}`, code: spec[2], cases: spec[5].map((a) => [`${spec[0]}(${a.map(lit).join(", ")})`, lit(spec[6](a))]) };
 });
+
+// ---------------------------------------------------------------------------------------------- JSON, time and text helpers
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const WORDS = ["alpha", "bravo", "delta", "echo", "lima", "nova", "omega", "pixel", "quartz", "rover"];
+const sampleObject = (r, extra = {}) => {
+  const o = {};
+  for (const k of r.shuffle(["id", "by", "kind", "level", "tag"]).slice(0, r.int(1, 3))) o[k] = k === "id" || k === "level" ? r.int(1, 900) : r.pick(WORDS);
+  return { ...o, ...extra };
+};
+
+fam("json.field", (r) => {
+  const key = r.pick(["title", "name", "city", "status", "owner", "label", "score", "count", "age", "active", "enabled", "done"]);
+  const kind = ["score", "count", "age"].includes(key) ? "int" : ["active", "enabled", "done"].includes(key) ? "bool" : "str";
+  const name = r.pick([`${key}Of`, `read${cap(key)}`, `${key}FromJson`]);
+  const make = () => (kind === "int" ? r.int(0, 500) : kind === "bool" ? r.chance(0.5) : r.pick(WORDS));
+  const fallback = kind === "int" ? -1 : kind === "bool" ? false : "none";
+  const access = kind === "int" ? "int" : kind === "bool" ? "bool" : "str";
+  const ret = kind === "int" ? "Int" : kind === "bool" ? "Bool" : "Str";
+  const withKey = (v) => JSON.stringify(sampleObject(r, { [key]: v }));
+  const v1 = make();
+  const v2 = make();
+  return {
+    name,
+    desc: `The text is a JSON object. Return its "${key}" member as ${kind === "int" ? "a whole number" : kind === "bool" ? "a Bool" : "a text"}, or ${lit(fallback)} when the text is not JSON, has no such member or the member has another kind.`,
+    sig: `fn ${name}(text: Str) -> ${ret}`,
+    code: `fn ${name}(text: Str) -> ${ret} = match Json.parse(text) {\n  Ok(j) => j.get("${key}").andThen(v => v.${access}()).unwrapOr(${lit(fallback)})\n  Err(e) => ${lit(fallback)}\n}`,
+    cases: [
+      [`${name}(${lit(withKey(v1))})`, lit(v1)],
+      [`${name}(${lit(withKey(v2))})`, lit(v2)],
+      [`${name}(${lit(JSON.stringify(sampleObject(r)))})`, lit(fallback)],
+      [`${name}(${lit("not json")})`, lit(fallback)],
+      [`${name}(${lit(JSON.stringify({ [key]: kind === "str" ? 1 : "x" }))})`, lit(fallback)],
+    ],
+  };
+});
+
+fam("json.nested", (r) => {
+  const [a, b] = r.pick([["user", "name"], ["data", "city"], ["owner", "login"], ["meta", "kind"], ["result", "label"]]);
+  const name = r.pick([`${b}In${cap(a)}`, `${a}${cap(b)}`, `read${cap(a)}${cap(b)}`]);
+  const doc = (v) => JSON.stringify({ id: r.int(1, 99), [a]: { [b]: v, extra: r.int(1, 9) } });
+  const v1 = r.pick(WORDS);
+  return {
+    name,
+    desc: `The text is a JSON object holding an object "${a}" that has a text member "${b}". Return that text, or "?" when anything on the way is missing or the text is not JSON.`,
+    sig: `fn ${name}(text: Str) -> Str`,
+    code: `fn ${name}(text: Str) -> Str = match Json.parse(text) {\n  Ok(j) => j.path(["${a}", "${b}"]).andThen(v => v.str()).unwrapOr("?")\n  Err(e) => "?"\n}`,
+    cases: [
+      [`${name}(${lit(doc(v1))})`, lit(v1)],
+      [`${name}(${lit(JSON.stringify({ [a]: {} }))})`, lit("?")],
+      [`${name}(${lit(JSON.stringify({ [a]: 5 }))})`, lit("?")],
+      [`${name}(${lit("{")})`, lit("?")],
+    ],
+  };
+});
+
+fam("json.array", (r) => {
+  const kind = r.pick(["sum", "count", "names", "max", "valid", "ids"]);
+  const key = r.pick(["scores", "values", "points", "counts"]);
+  const arr = () => r.list(r.int(0, 5), 1, 90);
+  const objs = () => Array.from({ length: r.int(0, 4) }, () => (r.chance(0.8) ? { name: r.pick(WORDS) } : { id: r.int(1, 9) }));
+  const spec = {
+    sum: () => {
+      const name = r.pick([`totalOf`, `sumScores`, `addUp`]);
+      return { name, desc: `The text is a JSON object with an array "${key}" of whole numbers. Return their sum (0 when the array is missing or the text is not JSON; elements that are not whole numbers count as 0).`, sig: `fn ${name}(text: Str) -> Int`, code: `fn ${name}(text: Str) -> Int = match Json.parse(text) {\n  Ok(j) => j.get("${key}").map(a => a.list().map(x => x.int().unwrapOr(0)).sum()).unwrapOr(0)\n  Err(e) => 0\n}`, cases: [arr(), arr(), []].map((l) => [`${name}(${lit(JSON.stringify({ [key]: l }))})`, lit(l.reduce((s, x) => s + x, 0))]).concat([[`${name}(${lit("{}")})`, "0"], [`${name}(${lit("[")})`, "0"]]) };
+    },
+    count: () => {
+      const name = r.pick([`howMany`, `itemCount`, `countItems`]);
+      return { name, desc: "The text is a JSON array. Return how many elements it has (0 when the text is not JSON or not an array).", sig: `fn ${name}(text: Str) -> Int`, code: `fn ${name}(text: Str) -> Int = match Json.parse(text) {\n  Ok(j) => j.list().len()\n  Err(e) => 0\n}`, cases: [arr(), arr(), []].map((l) => [`${name}(${lit(JSON.stringify(l))})`, lit(l.length)]).concat([[`${name}(${lit("oops")})`, "0"], [`${name}(${lit('{"a":1}')})`, "0"]]) };
+    },
+    names: () => {
+      const name = r.pick([`namesOf`, `allNames`, `readNames`]);
+      return { name, desc: 'The text is a JSON array of objects. Return the text member "name" of each object, using "?" for an object without one. A text that is not JSON gives an empty list.', sig: `fn ${name}(text: Str) -> List[Str]`, code: `fn ${name}(text: Str) -> List[Str] = match Json.parse(text) {\n  Ok(j) => j.list().map(o => o.get("name").andThen(n => n.str()).unwrapOr("?"))\n  Err(e) => []\n}`, cases: [objs(), objs(), []].map((l) => [`${name}(${lit(JSON.stringify(l))})`, lit(l.map((o) => o.name ?? "?"))]).concat([[`${name}(${lit("]")})`, "[]"]]) };
+    },
+    max: () => {
+      const name = r.pick([`highest`, `bestScore`, `topValue`]);
+      return { name, desc: `The text is a JSON array of whole numbers. Return the largest one, or 0 for an empty array or text that is not JSON.`, sig: `fn ${name}(text: Str) -> Int`, code: `fn ${name}(text: Str) -> Int = match Json.parse(text) {\n  Ok(j) => j.list().map(x => x.int().unwrapOr(0)).max().unwrapOr(0)\n  Err(e) => 0\n}`, cases: [arr(), arr(), []].map((l) => [`${name}(${lit(JSON.stringify(l))})`, lit(l.length ? Math.max(...l) : 0)]).concat([[`${name}(${lit("x")})`, "0"]]) };
+    },
+    valid: () => {
+      const name = r.pick([`isJson`, `looksValid`, `parses`]);
+      return { name, desc: "Return true when the text is valid JSON (of any kind).", sig: `fn ${name}(text: Str) -> Bool`, code: `fn ${name}(text: Str) -> Bool = Json.parse(text).isOk()`, cases: [['{"a":[1,2,{"b":null}]}', true], ["[1,2", false], ['"text"', true], ["", false], ["{\"a\":}", false], ["nul", false], ["  42 ", true]].map(([t, v]) => [`${name}(${lit(t)})`, lit(v)]) };
+    },
+    ids: () => {
+      const name = r.pick([`idsOf`, `readIds`, `listIds`]);
+      return { name, desc: 'The text is a JSON array of objects. Return the whole-number member "id" of every object that has one, in order (objects without one are skipped).', sig: `fn ${name}(text: Str) -> List[Int]`, code: `fn ${name}(text: Str) -> List[Int] = match Json.parse(text) {\n  Ok(j) => j.list().map(o => o.get("id").andThen(n => n.int()).unwrapOr(-1)).filter(n => n >= 0)\n  Err(e) => []\n}`, cases: [objs(), objs(), []].map((l) => [`${name}(${lit(JSON.stringify(l))})`, lit(l.filter((o) => o.id !== undefined).map((o) => o.id))]).concat([[`${name}(${lit("[")})`, "[]"]]) };
+    },
+  }[kind]();
+  return spec;
+});
+
+fam("json.build", (r) => {
+  const kind = r.pick(["point", "user", "flags"]);
+  const spec = {
+    point: ["pointJson", "Write the point as JSON text with the members x and y: for example {\"x\":1,\"y\":2}.", "fn pointJson(x: Int, y: Int) -> Str = JObj([(\"x\", JNum(x.toStr())), (\"y\", JNum(y.toStr()))]).toText()", "x: Int, y: Int", [[1, 2], [-3, 40], [0, 0]], ([x, y]) => JSON.stringify({ x, y })],
+    user: ["userJson", "Write a user as JSON text with the text member name and the whole-number member age: for example {\"name\":\"Ada\",\"age\":36}.", "fn userJson(name: Str, age: Int) -> Str = JObj([(\"name\", JStr(name)), (\"age\", JNum(age.toStr()))]).toText()", "name: Str, age: Int", [["Ada", 36], ["Bo \"B\"", 5], ["", 0]], ([name, age]) => JSON.stringify({ name, age })],
+    flags: ["flagsJson", "Write the list of flags as a JSON array of true and false.", "fn flagsJson(flags: List[Bool]) -> Str = JArr(flags.map(f => JBool(f))).toText()", "flags: List[Bool]", [[[true, false]], [[]], [[true]]], ([fl]) => JSON.stringify(fl)],
+  }[kind];
+  return { name: spec[0], desc: spec[1], sig: `fn ${spec[0]}(${spec[3]}) -> Str`, code: spec[2], cases: spec[4].map((a) => [`${spec[0]}(${a.map(lit).join(", ")})`, lit(spec[5](a))]) };
+});
+
+fam("time.text", (r) => {
+  const kind = r.pick(["date", "hhmm", "hms", "weekday", "dayName"]);
+  const stamps = [0, 86399, 1700000000, 1792650000, 1234567890, 951782400];
+  const iso = (t) => new Date(t * 1000).toISOString();
+  const wd = (t) => (new Date(t * 1000).getUTCDay() + 6) % 7;
+  const names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const spec = {
+    date: ["dayOf", "Return the UTC date of a timestamp (seconds since 1970) as YYYY-MM-DD.", "fn dayOf(t: Int) -> Str = Time.date(t)", "Str", (t) => iso(t).slice(0, 10)],
+    hhmm: ["clockText", "Return the UTC time of a timestamp (seconds since 1970) as HH:MM.", "fn clockText(t: Int) -> Str = Time.hhmm(t)", "Str", (t) => iso(t).slice(11, 16)],
+    hms: ["secondsText", "Return the UTC time of a timestamp (seconds since 1970) as HH:MM:SS.", "fn secondsText(t: Int) -> Str = Time.hms(t)", "Str", (t) => iso(t).slice(11, 19)],
+    weekday: ["weekdayNumber", "Return the UTC weekday of a timestamp (seconds since 1970): 0 for Monday up to 6 for Sunday.", "fn weekdayNumber(t: Int) -> Int = Time.weekday(t)", "Int", wd],
+    dayName: ["dayName", "Return the English name of the UTC weekday of a timestamp (seconds since 1970).", "fn dayName(t: Int) -> Str = match Time.weekday(t) {\n  0 => \"Monday\"\n  1 => \"Tuesday\"\n  2 => \"Wednesday\"\n  3 => \"Thursday\"\n  4 => \"Friday\"\n  5 => \"Saturday\"\n  _ => \"Sunday\"\n}", "Str", (t) => names[wd(t)]],
+  }[kind];
+  return { name: spec[0], desc: spec[1], sig: `fn ${spec[0]}(t: Int) -> ${spec[3]}`, code: spec[2], cases: stamps.map((t) => [`${spec[0]}(${t})`, lit(spec[4](t))]) };
+});
+
+fam("str.replace-index", (r) => {
+  const kind = r.pick(["replace", "squash", "position", "has"]);
+  const [from, to] = r.pick([[" ", "-"], [",", ";"], ["a", "4"], ["--", "-"], ["foo", "bar"], [".", "/"]]);
+  const spec = {
+    replace: [`swap${r.int(1, 99)}`, `Return the text with every "${from}" replaced by "${to}".`, (n) => `fn ${n}(s: Str) -> Str = s.replace(${lit(from)}, ${lit(to)})`, ["a b c", "foo.bar,a", "", "aaa", "x--y--z"], (s) => s.split(from).join(to), "Str"],
+    squash: [`tidy${r.int(1, 99)}`, `Return the text with every "${from}" removed.`, (n) => `fn ${n}(s: Str) -> Str = s.replace(${lit(from)}, "")`, ["a b c", "foo.bar,a", "", "aaa", "x--y--z"], (s) => s.split(from).join(""), "Str"],
+    position: [`whereIs${r.int(1, 99)}`, `Return the position (counting from 0) of the first "${from}" in the text, or -1 when it does not occur.`, (n) => `fn ${n}(s: Str) -> Int = s.indexOf(${lit(from)}).unwrapOr(-1)`, ["a b c", "foo.bar,a", "", "aaa", "x--y--z"], (s) => s.indexOf(from), "Int"],
+    has: [`hasMore${r.int(1, 99)}`, `Return true when "${from}" occurs at a position after the first character of the text.`, (n) => `fn ${n}(s: Str) -> Bool = s.indexOf(${lit(from)}).map(i => i > 0).unwrapOr(false)`, ["a b c", "foo.bar,a", "", "aaa", "x--y--z"], (s) => s.indexOf(from) > 0, "Bool"],
+  }[kind];
+  const name = spec[0];
+  return { name, desc: spec[1], sig: `fn ${name}(s: Str) -> ${spec[5]}`, code: spec[2](name), cases: spec[3].map((s) => [`${name}(${lit(s)})`, lit(spec[4](s))]) };
+});

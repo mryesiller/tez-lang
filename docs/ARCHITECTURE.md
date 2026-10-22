@@ -10,6 +10,7 @@
 - Programs may span several files (`use "other.tez"`); each file sees its own names and those of the files it uses directly (`E_USE_MISSING`).
 - Apps may subscribe to time and browser state (`Sub.every/clock/online/visible`), keep state in the browser (`save`/`restore`) and fetch from allow-listed origins (`fetches` → `Fetch.get`). All of it is declared as pure data; the host performs the effects.
 - Verification also runs in the browser: the compiler (WebAssembly) asks for SMT queries, the page solves them with Z3 (WebAssembly) and runs the compiler again.
+- A pure `Json` reader, `Time` and `Html` helpers, and general requests (`Fetch.json/post/send`) in the prelude; the host sends only allow-listed, cookie-less requests (see `examples/hn-live`).
 - Programs can be published as one self-contained web page (`tez site`, Studio *Publish*) under a strict Content-Security-Policy. The compiler is also an npm package, `tez-lang`.
 
 **v0.5 (implementation)** — the v0.4 design was implemented; deviations:

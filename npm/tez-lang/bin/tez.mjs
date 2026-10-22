@@ -18,7 +18,7 @@ USAGE:
                                             compile to a WebAssembly (WasmGC) module
     tez fmt <file|dir> [--check | --write]  print / check / rewrite canonical formatting
                                             (a directory: every .tez file below it; needs --check or --write)
-    tez site <file> [-o index.html] [--allow=https://origin]... [--no-verify]
+    tez site <file> [-o index.html] [--allow=https://origin]... [--css=file.css] [--title=Text] [--no-verify]
                                             write one self-contained web page (program + runtime)
     tez grammar                             print the normative grammar (EBNF)
     tez --version
@@ -37,7 +37,7 @@ const FLAGS = {
   run: ["--json", "--no-verify", "--contracts", "--watch"],
   test: ["--json", "--no-verify", "--contracts", "--watch"],
   build: ["--json", "--no-verify", "--watch"],
-  site: ["--json", "--no-verify", "--watch", "--allow="],
+  site: ["--json", "--no-verify", "--watch", "--allow=", "--css=", "--title="],
   fmt: ["--check", "--write"],
   new: ["--app"],
 };
@@ -45,6 +45,7 @@ const FLAGS = {
 const argv = process.argv.slice(2).map((a) => (a === "-h" ? "--help" : a));
 const flags = new Set(argv.filter((a) => a.startsWith("--")));
 const allow = argv.filter((a) => a.startsWith("--allow=")).map((a) => a.slice(8));
+const optValue = (name) => argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const pos = [];
 let out = null;
 for (let i = 0; i < argv.length; i++) {
@@ -262,7 +263,10 @@ async function runOnce() {
       if (!b.ok) return b.report ? reject(b) : fail(`code generation failed: ${b.error}`, 1);
       const here = (f) => readFileSync(new URL(`../runtime/${f}`, import.meta.url), "utf8");
       const target = out ?? "index.html";
-      writeFileSync(target, siteHtml({ title: basename(file, ".tez"), wasm: b.wasm, runtime: here("tez-runtime.mjs"), app: here("tez-app.mjs"), allow }));
+      const cssFile = optValue("css");
+      if (cssFile && !existsSync(cssFile)) fail(`cannot read \`${cssFile}\`: no such file`);
+      const css = cssFile ? readFileSync(cssFile, "utf8") : "";
+      writeFileSync(target, siteHtml({ title: optValue("title") ?? basename(file, ".tez"), wasm: b.wasm, runtime: here("tez-runtime.mjs"), app: here("tez-app.mjs"), css, allow }));
       console.log(`wrote ${target}: one self-contained page; serve it from any static host`);
       return 0;
     }

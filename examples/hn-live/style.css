@@ -1,0 +1,10 @@
+body { background: #f6f6ef; color: #222; }
+#app { max-width: 680px; }
+h1 { font-size: 1.4rem; border-bottom: 2px solid #ff6600; padding-bottom: .4rem; }
+ol { padding-left: 1.4rem; }
+li { margin: 0 0 .9rem; }
+li a { color: #000; font-weight: 600; text-decoration: none; }
+li a:hover { text-decoration: underline; }
+.meta { color: #828282; font-size: .85rem; }
+.status { color: #828282; font-size: .8rem; margin-top: 1.5rem; }
+@media (prefers-color-scheme: dark) { body { background: #1b1b1b; color: #ddd; } li a { color: #fff; } }

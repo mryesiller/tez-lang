@@ -295,6 +295,10 @@ fn language_card_lists_exactly_the_prelude_methods() {
         if matches!(name.as_str(), "range" | "repeat") && module == "List" {
             continue;
         }
+        // Json, Time, Fetch and the like are for apps and are documented in spec/language.md (the card has no room)
+        if !["Int", "Float", "Str", "List", "Option", "Result"].contains(&module) {
+            continue;
+        }
         assert!(
             card.contains(&name),
             "prelude function `{module}.{name}` is missing from spec/card.md"
@@ -754,4 +758,68 @@ fn watch_runs_again_when_a_file_of_the_project_changes() {
         std::fs::read_to_string(&err).unwrap_or_default()
     );
     assert!(fixed, "the fix was not noticed");
+}
+
+#[test]
+fn app_modules_are_documented_in_the_language_reference() {
+    let language = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/language.md"),
+    )
+    .unwrap();
+    let prelude = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/tez_types/prelude/prelude.tez"),
+    )
+    .unwrap();
+    // the public functions of the app modules (helpers of the JSON reader are internal)
+    let internal = [
+        "isSpace",
+        "isPunct",
+        "stringEnd",
+        "wordEnd",
+        "hexDigit",
+        "hexValue",
+        "simpleEscape",
+        "decode",
+        "unescape",
+        "tokens",
+        "word",
+        "attach",
+        "step",
+        "findKey",
+        "quote",
+        "textList",
+        "textMembers",
+        "pad2",
+    ];
+    for line in prelude.lines() {
+        let Some(rest) = line.strip_prefix("fn ") else {
+            continue;
+        };
+        let Some((module, tail)) = rest.split_once('.') else {
+            continue;
+        };
+        if !["Json", "Time", "Fetch", "Char"].contains(&module) {
+            continue;
+        }
+        let name: String = tail.chars().take_while(|c| c.is_alphanumeric()).collect();
+        if internal.contains(&name.as_str()) {
+            continue;
+        }
+        assert!(
+            language.contains(&format!("{module}.{name}"))
+                || language.contains(&format!(".{name}(")),
+            "`{module}.{name}` is not described in spec/language.md"
+        );
+    }
+}
+
+#[test]
+fn the_hacker_news_example_site_is_proved_and_its_tests_pass() {
+    let main = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hn-live/main.tez");
+    let main = main.to_str().unwrap();
+    let check = tez(&["check", main]);
+    assert!(check.status.success(), "{}", s(&check.stderr));
+    assert!(!s(&check.stdout).contains("NOT verified"));
+    let t = s(&tez(&["test", main]).stdout);
+    assert!(t.contains("0 failed"), "{t}");
 }

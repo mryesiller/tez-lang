@@ -1,0 +1,143 @@
+// Hacker News, top 5. A page written in Tez that refreshes itself on a wall-clock schedule (every 5 minutes).
+// The cron job that builds this site writes the current stories into stories.tez and compiles the page, so the page
+// opens with fresh content; while it stays open it asks Hacker News again at every 5-minute mark.
+use "story.tez"
+use "stories.tez"
+
+type Model = {
+  round: Int where it >= 0,
+  slot: Int,
+  now: Int,
+  ids: List[Int],
+  stories: List[Story],
+  updatedAt: Int,
+  failed: Bool
+}
+
+type Msg = Tick(Int) | Ids(Json) | IdsFailed(Str) | Item(Int, Json) | ItemFailed(Int)
+
+fn init() -> Model =
+  Model { round: 0, slot: -1, now: 0, ids: [], stories: baked(), updatedAt: bakedAt(), failed: false }
+
+// ---- reading Hacker News's JSON
+
+fn storyOf(j: Json) -> Option[Story] = match j.get("title").andThen(t => t.str()) {
+  Some(title) =>
+    Some(
+      Story {
+        id: j.get("id").andThen(x => x.int()).unwrapOr(0),
+        title: title,
+        url: j.get("url").andThen(x => x.str()).unwrapOr(""),
+        score: j.get("score").andThen(x => x.int()).unwrapOr(0),
+        by: j.get("by").andThen(x => x.str()).unwrapOr("")
+      }
+    )
+  None => None
+}
+
+fn idsOf(j: Json) -> List[Int] = j.list().map(x => x.int().unwrapOr(0)).filter(n => n > 0).take(5)
+
+// ---- the schedule: one refresh per 5-minute mark of the wall clock (00, 05, 10, ...)
+
+fn slotOf(t: Int) -> Int = t / 300
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Tick(t) =>
+    if m.slot < 0 { m with { slot: slotOf(t), now: t } } else if slotOf(t) != m.slot {
+      Model { round: m.round + 1, slot: slotOf(t), now: t, ids: m.ids, stories: m.stories, updatedAt: m.updatedAt, failed: m.failed }
+    } else { m with { now: t } }
+  Ids(j) => m with { ids: idsOf(j), failed: false, updatedAt: if m.now > 0 { m.now } else { m.updatedAt } }
+  IdsFailed(e) => m with { failed: true }
+  Item(i, j) => match storyOf(j) {
+    Some(s) => m with { stories: put(m.stories, i, s) }
+    None => m
+  }
+  ItemFailed(i) => m with { failed: true }
+}
+
+fn put(xs: List[Story], i: Int, s: Story) -> List[Story] =
+  if i < 0 { xs } else if i >= xs.len() { xs.append(s) } else { xs.enumerate().map(p => if p.0 == i { s } else { p.1 }) }
+
+// ---- what the page asks for and when
+
+fn topUrl(round: Int) -> Str = "https://hacker-news.firebaseio.com/v0/topstories.json?round=" ++ round.toStr()
+
+fn itemUrl(id: Int, round: Int) -> Str = "https://hacker-news.firebaseio.com/v0/item/" ++ id.toStr() ++ ".json?round=" ++ round.toStr()
+
+fn fetches(m: Model) -> List[Fetch[Msg]] =
+  [Fetch.json(topUrl(m.round), j => Ids(j), e => IdsFailed(e))].concat(
+    m.ids.enumerate().map(p => Fetch.json(itemUrl(p.1, m.round), j => Item(p.0, j), e => ItemFailed(p.0)))
+  )
+
+fn subs(m: Model) -> List[Sub[Msg]] = [Sub.clock(1000, t => Tick(t))]
+
+// ---- the page
+
+fn link(s: Story) -> Str = if s.url.isEmpty() { "https://news.ycombinator.com/item?id=" ++ s.id.toStr() } else { s.url }
+
+fn storyView(s: Story) -> Html[Msg] =
+  Html.col([Html.link(s.title, link(s)), Html.node("div", [UiProp("class", "meta")], [Html.text(s.score.toStr() ++ " points by " ++ s.by)])])
+
+fn status(m: Model) -> Str =
+  "Updated " ++ Time.hhmm(m.updatedAt) ++ " UTC" ++
+    (if m.slot < 0 { "" } else { ". Refreshes every 5 minutes, next at " ++ Time.hhmm((m.slot + 1) * 300) ++ " UTC" }) ++
+    (if m.failed { ". Hacker News could not be reached; showing the last stories." } else { "" })
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Hacker News, top 5"),
+      Html.ordered(m.stories.take(5).map(storyView)),
+      Html.node("p", [UiProp("class", "status")], [Html.text(status(m))])
+    ]
+  )
+
+// ---- tests (the samples are real items as the API sends them)
+
+fn parsed(text: Str) -> Json = match Json.parse(text) {
+  Ok(j) => j
+  Err(e) => JNull
+}
+
+fn sample() -> Json =
+  parsed(
+    "{\"by\":\"armcat\",\"descendants\":46,\"id\":50191507,\"kids\":[50191829,50192525],\"score\":79,\"time\":1792646591,\"title\":\"OpenAI CLI \\u0026 \\\"friends\\\"\",\"type\":\"story\",\"url\":\"https://github.com/openai/openai-cli\"}"
+  )
+
+fn askHn() -> Json = parsed("{\"by\":\"pg\",\"id\":7,\"score\":12,\"title\":\"Ask HN: why?\",\"type\":\"story\"}")
+
+test readsATitleWithEscapes = storyOf(sample()).map(s => s.title) == Some("OpenAI CLI & \"friends\"")
+
+test readsTheNumbers = storyOf(sample()).map(s => s.id + s.score) == Some(50191586)
+
+test readsTheLink = storyOf(sample()).map(s => s.url) == Some("https://github.com/openai/openai-cli")
+
+test askPostsLinkToTheirOwnPage = storyOf(askHn()).map(s => link(s)) == Some("https://news.ycombinator.com/item?id=7")
+
+test nonsenseIsNotAStory = storyOf(parsed("[1,2]")).isNone()
+
+test readsTheTopFiveIds = idsOf(parsed("[11,22,33,44,55,66,77]")) == [11, 22, 33, 44, 55]
+
+test fewerThanFiveIsFine = idsOf(parsed("[11,22]")) == [11, 22]
+
+test badIdsAreDropped = idsOf(parsed("[]")).isEmpty() && idsOf(parsed("{\"a\":1}")).isEmpty()
+
+test theFirstTickOnlySetsTheSlot = update(init(), Tick(1000)).round == 0
+
+test sameSlotDoesNotRefresh = update(update(init(), Tick(1000)), Tick(1100)).round == 0
+
+test nextSlotRefreshes = update(update(init(), Tick(1000)), Tick(1200)).round == 1
+
+test refreshAsksForTheListAgain = fetches(update(update(init(), Tick(1000)), Tick(1200))).len() == 1
+
+test oneRequestPerStoryOnceTheIdsAreKnown = fetches(update(init(), Ids(parsed("[1,2,3,4,5]")))).len() == 6
+
+test eachRoundHasNewAddresses = topUrl(0) != topUrl(1) && itemUrl(5, 0) != itemUrl(5, 1)
+
+test aStoryReplacesItsSlot = update(update(init(), Item(0, askHn())), Item(0, sample())).stories.get(0).id == 50191507 || init().stories.isEmpty()
+
+test failureIsShownButStoriesStay = update(init(), IdsFailed("x")).stories == init().stories && update(init(), IdsFailed("x")).failed
+
+test showsTheTime = status(init()).startsWith("Updated ")
+
+test subscribesToTheClock = subs(init()).len() == 1

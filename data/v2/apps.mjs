@@ -2011,3 +2011,223 @@ for (const entry of apps) {
     };
   };
 }
+
+// ---------------------------------------------------------------------------------------------- apps that read APIs
+app("app.json-feed", (r) => {
+  const file = r.pick(["feed", "posts", "news", "articles", "releases", "events"]);
+  const secs = r.pick([30, 60, 120, 300]);
+  const title = r.pick(["Latest posts", "News", "What is new", "Release notes", "Upcoming events"]);
+  const [titleKey, urlKey] = r.pick([["title", "url"], ["headline", "link"], ["name", "href"]]);
+  const take = r.pick([3, 5, 10]);
+  return {
+    name: `json-feed-${file}`,
+    desc: `A page titled "${title}" that loads the JSON file ${file}.json from this site (an array of objects with a text "${titleKey}" and a text "${urlKey}"), shows the first ${take} as a bulleted list of links, and reloads it by itself every ${secs} seconds. Show "Loading..." until the first answer and "Could not load the feed." if a request fails.`,
+    code: `type Item = { title: Str, link: Str }
+
+type Model = { round: Int where it >= 0, items: List[Item], loaded: Bool, failed: Bool }
+
+type Msg = Got(Json) | Failed(Str) | Again
+
+fn init() -> Model = Model { round: 0, items: [], loaded: false, failed: false }
+
+fn itemsOf(j: Json) -> List[Item] =
+  j.list().take(${take}).map(
+    o => Item { title: o.get("${titleKey}").andThen(t => t.str()).unwrapOr("(untitled)"), link: o.get("${urlKey}").andThen(u => u.str()).unwrapOr("#") }
+  )
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Got(j) => m with { items: itemsOf(j), loaded: true, failed: false }
+  Failed(e) => m with { failed: true }
+  Again => m with { round: m.round + 1 }
+}
+
+// a new address each round makes the page ask again
+fn fetches(m: Model) -> List[Fetch[Msg]] =
+  [Fetch.json("${file}.json?round=" ++ m.round.toStr(), j => Got(j), e => Failed(e))]
+
+fn subs(m: Model) -> List[Sub[Msg]] = [Sub.every(${secs * 1000}, Again)]
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("${title}"),
+      if m.failed && !m.loaded { Html.paragraph("Could not load the feed.") } else if !m.loaded { Html.paragraph("Loading...") } else {
+        Html.list(m.items.map(i => Html.link(i.title, i.link)))
+      }
+    ]
+  )
+
+fn parsed(text: Str) -> Json = match Json.parse(text) {
+  Ok(j) => j
+  Err(e) => JNull
+}
+
+fn sample() -> Json = parsed("[{\\"${titleKey}\\":\\"First\\",\\"${urlKey}\\":\\"https://a.example/1\\"},{\\"${titleKey}\\":\\"Second\\"},{\\"other\\":1}]")
+
+test readsTheItems = itemsOf(sample()).map(i => i.title) == ["First", "Second", "(untitled)"]
+
+test missingLinksBecomeAnchors = itemsOf(sample()).get(1).link == "#"
+
+test keepsOnlyTheFirstFew = itemsOf(parsed("[1,2,3,4,5,6,7,8,9,10,11,12]")).len() == ${take}
+
+test notAnArrayIsEmpty = itemsOf(parsed("{\\"a\\":1}")).isEmpty()
+
+test startsLoading = !init().loaded
+
+test failureBeforeTheFirstAnswerIsShown = update(init(), Failed("HTTP 500")).failed
+
+test eachRoundAsksAgain = update(init(), Again).round == 1 && fetches(init()).len() == 1
+
+test reloadsOnASchedule = subs(init()).len() == 1
+`,
+  };
+});
+
+app("app.weather-card", (r) => {
+  const city = r.pick(["Berlin", "Lisbon", "Tokyo", "Oslo", "Cairo", "Lima"]);
+  const file = r.pick(["weather", "forecast", "conditions"]);
+  const [tempKey, textKey] = r.pick([["temp", "summary"], ["temperature", "condition"], ["celsius", "sky"]]);
+  const mins = r.pick([5, 10, 15, 30]);
+  return {
+    name: "weather-card",
+    desc: `A weather card for ${city}: it loads ${file}.json from this site (a JSON object with a whole-number "${tempKey}" in degrees Celsius and a text "${textKey}"), shows "${city}: <temp> °C, <text>" and the time of the last update as HH:MM UTC, and refreshes every ${mins} minutes by itself. Before the first answer it says "Loading...".`,
+    code: `type Model = { round: Int where it >= 0, now: Int, temp: Int, text: Str, updatedAt: Int, loaded: Bool }
+
+type Msg = Got(Json) | Failed(Str) | Tick(Int) | Again
+
+fn init() -> Model = Model { round: 0, now: 0, temp: 0, text: "", updatedAt: 0, loaded: false }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Got(j) =>
+    Model {
+      round: m.round,
+      now: m.now,
+      temp: j.get("${tempKey}").andThen(t => t.int()).unwrapOr(m.temp),
+      text: j.get("${textKey}").andThen(t => t.str()).unwrapOr(m.text),
+      updatedAt: m.now,
+      loaded: true
+    }
+  Failed(e) => m
+  Tick(t) => m with { now: t }
+  Again => m with { round: m.round + 1 }
+}
+
+fn fetches(m: Model) -> List[Fetch[Msg]] =
+  [Fetch.json("${file}.json?round=" ++ m.round.toStr(), j => Got(j), e => Failed(e))]
+
+fn subs(m: Model) -> List[Sub[Msg]] = [Sub.clock(1000, t => Tick(t)), Sub.every(${mins * 60000}, Again)]
+
+fn summary(m: Model) -> Str =
+  if !m.loaded { "Loading..." } else { "${city}: " ++ m.temp.toStr() ++ " °C, " ++ m.text ++ " (updated " ++ Time.hhmm(m.updatedAt) ++ " UTC)" }
+
+fn view(m: Model) -> Html[Msg] = Html.col([Html.heading("Weather"), Html.paragraph(summary(m))])
+
+fn parsed(text: Str) -> Json = match Json.parse(text) {
+  Ok(j) => j
+  Err(e) => JNull
+}
+
+test startsLoading = summary(init()) == "Loading..."
+
+test showsTheReading = summary(update(update(init(), Tick(3600 * 9 + 60 * 30)), Got(parsed("{\\"${tempKey}\\":21,\\"${textKey}\\":\\"clear\\"}")))) == "${city}: 21 °C, clear (updated 09:30 UTC)"
+
+test aBrokenAnswerKeepsTheOldReading = update(update(init(), Got(parsed("{\\"${tempKey}\\":7,\\"${textKey}\\":\\"fog\\"}"))), Got(parsed("[]"))).temp == 7
+
+test failureChangesNothing = update(init(), Failed("HTTP 500")) == init()
+
+test refreshesOnASchedule = subs(init()).len() == 2 && fetches(update(init(), Again)).len() == 1
+`,
+  };
+});
+
+app("app.feedback-post", (r) => {
+  const endpoint = r.pick(["feedback", "comments", "messages", "contact"]);
+  const label = r.pick(["Send us feedback", "Leave a comment", "Contact us", "Tell us what you think"]);
+  const thanks = r.pick(["Thank you!", "Sent. Thanks!", "Received, thank you."]);
+  return {
+    name: "feedback-form",
+    desc: `A "${label}" page with a text box and a Send button. Pressing Send posts the trimmed text to /${endpoint} on this site (as the request body); blank text is not sent. It shows "Sending..." while the request is out, "${thanks}" when the server answers, and "Could not send: <reason>" if it fails. The box is emptied when the text is sent.`,
+    code: `type Model = { draft: Str, pending: Str, status: Str }
+
+type Msg = Draft(Str) | Send | Sent(Str) | SendFailed(Str)
+
+fn init() -> Model = Model { draft: "", pending: "", status: "" }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Draft(s) => m with { draft: s }
+  Send => if m.draft.trim().isEmpty() || !m.pending.isEmpty() { m } else {
+    Model { draft: "", pending: m.draft.trim(), status: "Sending..." }
+  }
+  Sent(body) => m with { pending: "", status: "${thanks}" }
+  SendFailed(e) => m with { pending: "", status: "Could not send: " ++ e }
+}
+
+// the request exists while \`pending\` holds the text; once it is cleared the same text can be sent again
+fn fetches(m: Model) -> List[Fetch[Msg]] =
+  if m.pending.isEmpty() { [] } else { [Fetch.post("${endpoint}", m.pending, s => Sent(s), e => SendFailed(e))] }
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("${label}"),
+      Html.row([Html.input(m.draft, s => Draft(s)), Html.button("Send", Send)]),
+      Html.paragraph(m.status)
+    ]
+  )
+
+test blankTextIsNotSent = fetches(update(update(init(), Draft("   ")), Send)).isEmpty()
+
+test sendingPostsTheText = fetches(update(update(init(), Draft(" hi ")), Send)).len() == 1 && update(update(init(), Draft(" hi ")), Send).pending == "hi"
+
+test theBoxIsEmptiedAfterSending = update(update(init(), Draft("hi")), Send).draft == ""
+
+test aSecondSendWaitsForTheFirst = update(update(update(update(init(), Draft("a")), Send), Draft("b")), Send).pending == "a"
+
+test thanksAfterTheAnswer = update(update(update(init(), Draft("a")), Send), Sent("ok")).status == "${thanks}"
+
+test failureIsReported = update(update(update(init(), Draft("a")), Send), SendFailed("HTTP 500")).status == "Could not send: HTTP 500"
+
+test afterwardsNothingIsPending = fetches(update(update(update(init(), Draft("a")), Send), Sent("ok"))).isEmpty()
+`,
+  };
+});
+
+app("app.clock-date", (r) => {
+  const title = r.pick(["Today", "UTC clock", "Date and time", "Right now"]);
+  return {
+    name: "clock-and-date",
+    desc: `A page titled "${title}" that shows the UTC date as YYYY-MM-DD, the English name of the weekday and the time as HH:MM:SS, following the wall clock every second.`,
+    code: `type Model = { now: Int }
+
+type Msg = Tick(Int)
+
+fn init() -> Model = Model { now: 0 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Tick(t) => m with { now: t }
+}
+
+fn dayName(d: Int) -> Str = match d {
+  0 => "Monday"
+  1 => "Tuesday"
+  2 => "Wednesday"
+  3 => "Thursday"
+  4 => "Friday"
+  5 => "Saturday"
+  _ => "Sunday"
+}
+
+fn headline(t: Int) -> Str = dayName(Time.weekday(t)) ++ ", " ++ Time.date(t)
+
+fn subs(m: Model) -> List[Sub[Msg]] = [Sub.clock(1000, t => Tick(t))]
+
+fn view(m: Model) -> Html[Msg] = Html.col([Html.heading("${title}"), Html.paragraph(headline(m.now)), Html.paragraph(Time.hms(m.now))])
+
+test knowsTheEpoch = headline(0) == "Thursday, 1970-01-01"
+
+test knowsARecentDay = headline(1792650000) == "Thursday, 2026-10-22"
+
+test followsTheClock = update(init(), Tick(86400 + 61)).now == 86461 && Time.hms(86461) == "00:01:01"
+`,
+  };
+});

@@ -7,7 +7,7 @@ The training-data pipeline. Everything here is deterministic except the model yo
 | Accepted programs + fix traces from mutation (no model needed) | `node data/build-v1.mjs` | `v1/programs.jsonl`, `v1/repairs.jsonl`, `v1/REPORT.json` |
 | Rejection sampling from a model | `node data/sample.mjs --tasks tasks.jsonl --base-url URL --model M` | `out/<date>/programs.jsonl`, `repairs.jsonl` (git-ignored) |
 | Contamination check | `node data/contamination.mjs FILE.jsonl` | exit 1 if any row overlaps a TezBench task |
-| **Fine-tuning set v2** (7,499 chat examples, all proved) | `node data/v2/build.mjs` · audit: `node data/v2/audit.mjs` | `v2/train.jsonl`, `v2/valid.jsonl`, see [`v2/README.md`](v2/README.md) |
+| **Fine-tuning set v2** (8,322 chat examples, all proved) | `node data/v2/build.mjs` · audit: `node data/v2/audit.mjs` | `v2/train.jsonl`, `v2/valid.jsonl`, see [`v2/README.md`](v2/README.md) |
 
 - A **program** row is `{id, prompt?, completion}`: only programs the compiler accepts (verified), in canonical form, unique.
 - A **repair** row is `{id, operator, code, diagnostics, fixed}`: a rejected program, the compiler's stable diagnostics,

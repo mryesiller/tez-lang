@@ -10,6 +10,7 @@
 - **Built for small models** — small LLMs (reference: Gemma 4 E4B), a ≤ 1,200-token language card, a grammar for constrained decoding, structured JSON diagnostics.
 - **Token-lean** — measured against TypeScript on real tokenizers.
 - **WebAssembly (WasmGC)** — compiler, verifier and runtime all run in the browser.
+- **Reads APIs** — a pure, proved `Json` reader, `Fetch.json`/`post`/`send` (allow-listed origins, no cookies), `Time` and `Html` helpers; [`examples/hn-live`](examples/hn-live) is a site that rebuilds itself every 5 minutes.
 - **Live sites** — `subs` (timers, wall clock, online/visible), `fetches` and `save`/`restore` are declared as data, so apps update themselves and remember state while the program stays pure and proven. `tez site` / the Studio's *Publish* export one page under a strict Content-Security-Policy.
 
 Design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · Plan: [`docs/ROADMAP.md`](docs/ROADMAP.md) · Contributors and agents: [`AGENTS.md`](AGENTS.md)

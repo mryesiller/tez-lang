@@ -221,3 +221,88 @@ test("without save/restore, events past a full log are reported as dropped, neve
   assert.deepEqual([r.replayed, r.dropped], [3, 7]);
   assert.equal(root.text, "3"); // the state the kept log leads to, and the swap says so
 });
+
+import { requestAllowed } from "./tez-app.mjs";
+
+test("requests: methods, headers and bodies are limited; requests are told apart by method, url and body", async () => {
+  assert.deepEqual(requestAllowed("GET", [], ""), { headers: {} });
+  assert.deepEqual(requestAllowed("POST", [["Content-Type", "application/json"]], "{}"), { headers: { "content-type": "application/json" } });
+  for (const bad of [
+    requestAllowed("TRACE", [], ""),
+    requestAllowed("CONNECT", [], ""),
+    requestAllowed("GET", [], "body"),
+    requestAllowed("POST", [["Cookie", "a=b"]], "x"),
+    requestAllowed("POST", [["Host", "evil"]], "x"),
+    requestAllowed("POST", [["Sec-Fetch-Mode", "x"]], "x"),
+    requestAllowed("POST", [["x", "a\r\nInjected: 1"]], "x"),
+    requestAllowed("POST", [["bad name", "x"]], "x"),
+    requestAllowed("POST", [], "x".repeat(70000)),
+    requestAllowed("POST", Array.from({ length: 11 }, (_, i) => [`h${i}`, "v"]), "x"),
+  ]) assert.ok(bad.error, JSON.stringify(bad));
+
+  const root = new URL("../", import.meta.url).pathname;
+  const bin = process.env.TEZ_BIN ?? `${root}target/debug/tez`;
+  const dir = mkdtempSync(join(tmpdir(), "tez-req-"));
+  writeFileSync(
+    join(dir, "a.tez"),
+    `type Msg = Good(Str) | Bad(Str)
+fn init() -> Int = 0
+fn update(m: Int, msg: Msg) -> Int = m
+fn view(m: Int) -> Html[Msg] = Html.text("x")
+fn fetches(m: Int) -> List[Fetch[Msg]] = [
+  Fetch.get("a.txt", s => Good(s), e => Bad(e)),
+  Fetch.post("save", "hello", s => Good(s), e => Bad(e)),
+  Fetch.postJson("save", JObj([("n", JNum("1"))]), s => Good(s), e => Bad(e)),
+  Fetch.send("PUT", "item/7", [("x-key", "k")], "v", s => Good(s), e => Bad(e))
+]
+`,
+  );
+  const r = spawnSync(bin, ["build", "--no-verify", join(dir, "a.tez"), "-o", join(dir, "a.wasm")], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const rt = await load(readFileSync(join(dir, "a.wasm")));
+  const fs = readFetches(rt, rt.exports.f_init());
+  assert.deepEqual(fs.map((f) => f.method), ["GET", "POST", "POST", "PUT"]);
+  assert.equal(new Set(fs.map((f) => f.key)).size, 4); // the same url with another body is another request
+  assert.deepEqual(fs[1].headers, [["content-type", "text/plain;charset=UTF-8"]]);
+  assert.equal(fs[1].body, "hello");
+  assert.equal(fs[2].body, '{"n":1}');
+  assert.deepEqual(fs[3].headers, [["x-key", "k"]]);
+});
+
+test("a POST goes out once with its headers and body; the answer is delivered; blocked requests answer with a reason", async () => {
+  const root = new URL("../", import.meta.url).pathname;
+  const bin = process.env.TEZ_BIN ?? `${root}target/debug/tez`;
+  const dir = mkdtempSync(join(tmpdir(), "tez-post-"));
+  writeFileSync(
+    join(dir, "a.tez"),
+    `type Msg = Good(Str) | Bad(Str)
+fn init() -> Str = ""
+fn update(m: Str, msg: Msg) -> Str = match msg {
+  Good(s) => m ++ "+" ++ s
+  Bad(e) => m ++ "!" ++ e
+}
+fn view(m: Str) -> Html[Msg] = Html.text(m)
+fn fetches(m: Str) -> List[Fetch[Msg]] = [
+  Fetch.post("https://api.example/save", "payload", s => Good(s), e => Bad(e)),
+  Fetch.send("TRACE", "https://api.example/t", [], "", s => Good(s), e => Bad(e)),
+  Fetch.post("https://evil.example/x", "p", s => Good(s), e => Bad(e))
+]
+`,
+  );
+  const r = spawnSync(bin, ["build", "--no-verify", join(dir, "a.tez"), "-o", join(dir, "a.wasm")], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const calls = [];
+  const fetchFn = async (url, init) => {
+    calls.push({ url, method: init.method, body: init.body, headers: init.headers, credentials: init.credentials });
+    return new Response("saved");
+  };
+  const { root: rootEl } = fakeDocument();
+  mountApp(await load(readFileSync(join(dir, "a.wasm"))), rootEl, { fetch: fetchFn, allow: ["https://api.example"] });
+  await new Promise((res) => setTimeout(res, 30));
+  assert.equal(calls.length, 1); // TRACE and the foreign origin never reach the network
+  assert.deepEqual(calls[0], { url: "https://api.example/save", method: "POST", body: "payload", headers: { "content-type": "text/plain;charset=UTF-8" }, credentials: "omit" });
+  const shown = rootEl.text;
+  assert.ok(shown.includes("+saved"), shown);
+  assert.ok(shown.includes("!blocked: the method TRACE is not allowed"), shown);
+  assert.ok(shown.includes("!blocked: this origin is not allowed"), shown);
+});

@@ -1,0 +1,60 @@
+// Reading JSON, as an API sends it: parse the text, then follow keys and positions. Nothing here can fail at run time:
+// every lookup answers an Option.
+fn story() -> Str =
+  "{\"by\":\"armcat\",\"id\":50191507,\"kids\":[1,2,3],\"score\":79,\"title\":\"OpenAI CLI \\u0026 \\\"friends\\\"\",\"type\":\"story\",\"url\":\"https://github.com/openai/openai-cli\"}"
+
+fn field(text: Str, key: Str) -> Option[Json] = match Json.parse(text) {
+  Ok(j) => j.get(key)
+  Err(e) => None
+}
+
+fn titleOf(text: Str) -> Str = field(text, "title").andThen(j => j.str()).unwrapOr("(no title)")
+
+fn commentCount(text: Str) -> Int = field(text, "kids").map(j => j.list().len()).unwrapOr(0)
+
+test readsAString = titleOf(story()) == "OpenAI CLI & \"friends\""
+
+test readsAnArray = commentCount(story()) == 3
+
+test readsANumber = field(story(), "score").andThen(j => j.int()) == Some(79)
+
+test missingKeysAreNone = field(story(), "nope").isNone()
+
+test followsAPath = match Json.parse("{\"a\":{\"b\":[10,20,{\"c\":true}]}}") {
+  Ok(j) =>
+    j.path(["a", "b"]).andThen(b => b.at(2)).andThen(o => o.get("c")).andThen(c => c.bool()) ==
+      Some(true)
+  Err(e) => false
+}
+
+test readsFloatsAndUnicode = match Json.parse("[1.5, -2e2, \"\\u00e9\\ud83d\\ude00\"]") {
+  Ok(j) =>
+    j.at(0).andThen(x => x.float()) == Some(1.5)
+      && j.at(1).andThen(x => x.float()) == Some(-200.0)
+      && j.at(2).andThen(x => x.str()) == Some("é😀")
+  Err(e) => false
+}
+
+test rejectsBrokenText =
+  Json.parse("{\"a\":").isOk() == false
+    && Json.parse("[1,2").isOk() == false
+    && Json.parse("\"open").isOk() == false
+    && Json.parse("[1,]x").isOk() == false
+    && Json.parse("").isOk() == false
+
+test writesItBack = match Json.parse(" { \"a\" : [1, true, null, \"x\\ny\"] } ") {
+  Ok(j) => j.toText() == "{\"a\":[1,true,null,\"x\\ny\"]}"
+  Err(e) => false
+}
+
+test timeAsText =
+  Time.hhmm(3600 * 14 + 60 * 5) == "14:05"
+    && Time.date(1792650000) == "2026-10-22"
+    && Time.weekday(0) == 3
+
+test textHelpers =
+  "a-b-c".replace("-", "+") == "a+b+c"
+    && "hello".indexOf("ll") == Some(2)
+    && "hello".indexOf("z").isNone()
+
+fn main() -> (Str, Int) = (titleOf(story()), commentCount(story()))

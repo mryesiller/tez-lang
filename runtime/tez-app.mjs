@@ -43,11 +43,41 @@ export function subMessage(rt, sub, value) {
   return rt.exports.__apply1(sub.fn, sub.kind === "clock" ? wasmInt(value) : value ? 1 : 0);
 }
 
-/** The active fetches of a model, from the optional `fetches(model)` function: `[{url, ok, err}]`. */
+/**
+ * The active requests of a model, from the optional `fetches(model)` function:
+ * `[{key, method, url, headers: [[name, value]], body, ok, err}]`. `key` identifies a request: the same key listed
+ * again is not sent again.
+ */
 export function readFetches(rt, model) {
   if (!rt.meta.fns.fetches || rt.meta.fns.fetches.params !== 1) return [];
   const ex = rt.exports;
-  return ex.f_fetches(model).map((f) => ({ url: ex.__get0(f), ok: ex.__get1(f), err: ex.__get2(f) }));
+  return ex.f_fetches(model).map((f) => {
+    const method = ex.__get0(f);
+    const url = ex.__get1(f);
+    const headers = ex.__get2(f).map((h) => [ex.__get0(h), ex.__get1(h)]);
+    const body = ex.__get3(f);
+    return { key: `${method} ${url}${body ? `\n${body}` : ""}`, method, url, headers, body, ok: ex.__get4(f), err: ex.__get5(f) };
+  });
+}
+
+const METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+const MAX_SENT = 65_536;
+const NEVER = new Set(["cookie", "set-cookie", "host", "origin", "referer", "content-length", "connection", "transfer-encoding"]);
+
+/** The method and headers a request may use, or a reason it may not. Cookies are never sent (credentials are omitted). */
+export function requestAllowed(method, headers, body) {
+  if (!METHODS.has(method)) return { error: `blocked: the method ${method} is not allowed` };
+  if (body.length > MAX_SENT) return { error: "blocked: the request body is too large" };
+  if ((method === "GET" || method === "DELETE") && body) return { error: `blocked: a ${method} request has no body` };
+  if (headers.length > 10) return { error: "blocked: too many headers" };
+  const out = {};
+  for (const [name, value] of headers) {
+    const n = String(name).toLowerCase();
+    if (!/^[a-z0-9-]+$/.test(n) || NEVER.has(n) || n.startsWith("sec-") || n.startsWith("proxy-")) return { error: `blocked: the header ${name} is not allowed` };
+    if (/[\r\n]/.test(String(value)) || String(value).length > 2000) return { error: `blocked: the header ${name} is not valid` };
+    out[n] = String(value);
+  }
+  return { headers: out };
 }
 
 const MAX_BODY = 1_000_000;
@@ -392,22 +422,30 @@ export function mountApp(
       fail(e);
       return;
     }
-    const next = new Set(fetchesNow.map((f) => f.url));
-    for (const f of fetchesNow) if (!fetchesActive.has(f.url)) startFetch(f.url);
+    const next = new Set(fetchesNow.map((f) => f.key));
+    for (const f of fetchesNow) if (!fetchesActive.has(f.key)) startFetch(f);
     fetchesActive = next;
   };
 
-  function startFetch(url) {
-    const reply = (ok, text) => queueMicrotask(() => deliverFetch(url, ok, text));
-    const target = fetchFn ? fetchAllowed(url, allow, doc.baseURI) : null;
+  function startFetch(f) {
+    const reply = (ok, text) => queueMicrotask(() => deliverFetch(f.key, ok, text));
+    const target = fetchFn ? fetchAllowed(f.url, allow, doc.baseURI) : null;
     if (!target) {
       reply(false, allow.length ? "blocked: this origin is not allowed" : "blocked: this page may not use the network");
       return;
     }
+    const allowed = requestAllowed(f.method, f.headers, f.body);
+    if (allowed.error) {
+      reply(false, allowed.error);
+      return;
+    }
     const timeout = AbortSignal.timeout(10_000);
     const signal = AbortSignal.any ? AbortSignal.any([timeout, inFlight.signal]) : timeout;
+    const init = { method: f.method, credentials: "omit", referrerPolicy: "no-referrer", redirect: "error", signal };
+    if (Object.keys(allowed.headers).length) init.headers = allowed.headers;
+    if (f.body) init.body = f.body;
     Promise.resolve()
-      .then(() => fetchFn(target, { credentials: "omit", referrerPolicy: "no-referrer", redirect: "error", signal }))
+      .then(() => fetchFn(target, init))
       .then(async (r) => {
         if (!r.ok) {
           await r.body?.cancel?.().catch(() => {});
@@ -420,13 +458,13 @@ export function mountApp(
       .catch((e) => reply(false, String(e && e.name === "TimeoutError" ? "timed out" : "request failed")));
   }
 
-  function deliverFetch(url, ok, text) {
+  function deliverFetch(key, ok, text) {
     if (dead || replaying) return;
-    const f = fetchesNow.find((x) => x.url === url);
+    const f = fetchesNow.find((x) => x.key === key);
     if (!f) return; // the program no longer wants it
     try {
       model = rt.exports.f_update(model, rt.exports.__apply1(ok ? f.ok : f.err, text));
-      record({ kind: "fetch", url, ok, value: text });
+      record({ kind: "fetch", key, ok, value: text });
     } catch (e) {
       fail(e);
       return;
@@ -556,7 +594,7 @@ export function mountApp(
             continue;
           }
           if (ev.kind === "fetch") {
-            const f = readFetches(rt, model).find((x) => x.url === ev.url);
+            const f = readFetches(rt, model).find((x) => x.key === ev.key);
             if (!f) break;
             model = rt.exports.f_update(model, rt.exports.__apply1(ev.ok ? f.ok : f.err, ev.value));
             cur = readHtml(rt, rt.exports.f_view(model));
@@ -584,7 +622,7 @@ export function mountApp(
         if (restarted) base = null;
         syncTimers();
         fetchesNow = readFetches(rt, model);
-        fetchesActive = new Set(fetchesNow.map((f) => f.url));
+        fetchesActive = new Set(fetchesNow.map((f) => f.key));
         persist();
         return { replayed, dropped, restarted };
       } catch (e) {

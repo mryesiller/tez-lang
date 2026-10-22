@@ -162,6 +162,26 @@ Time is an input too. An app may define `fn subs(m: Model) -> List[Sub[Msg]]`; `
 
 Schedules and browser state are inputs as well: `Sub.clock(1000, t => Clock(t))` delivers the wall clock (seconds since 1970), so "run the job when the minute changes" is plain pure code in `update`, and `Sub.online`/`Sub.visible` deliver connectivity and page visibility. The network and memory are declared the same way: `fetches(m)` lists `Fetch.get(url, onOk, onErr)` requests (only the page's own origin, plus any origin the owner allows), and `save(m)`/`restore(s)` keep the model in this browser, rebuilt by verified code, so a restored model still satisfies its refinements. Example 56 loads a quote and remembers how often. Example 55 is a page that greets by the hour, refreshes a "report" every minute while the page is visible, and notices when you go offline.
 
+APIs answer in JSON, and `Json` reads it without any way to fail: `Json.parse(text)` is `Ok(value)` or `Err(reason)`, and every lookup (`j.get("key")`, `j.at(0)`, `j.path(["a", "b"])`, then `.str()`, `.int()`, `.float()`, `.bool()`) answers an `Option`. `Fetch.json(url, onOk, onErr)` fetches and parses in one step (`Fetch.post`, `Fetch.postJson` and `Fetch.send` send data; `Time.hhmm(t)` and `Time.date(t)` write the clock; `Html.link` and `Html.list` build the page). A real item of the Hacker News API:
+
+```tez
+fn title(text: Str) -> Str = match Json.parse(text) {
+  Ok(j) => j.get("title").andThen(t => t.str()).unwrapOr("(no title)")
+  Err(e) => "not JSON: " ++ e
+}
+
+fn score(text: Str) -> Int = match Json.parse(text) {
+  Ok(j) => j.get("score").andThen(n => n.int()).unwrapOr(0)
+  Err(e) => 0
+}
+
+fn item() -> Str = "{\"by\":\"pg\",\"score\":79,\"title\":\"Ask HN: why? \\u0026 how\",\"type\":\"story\"}"
+
+fn main() -> (Str, Int, Str) = (title(item()), score(item()), title("[oops"))
+```
+
+The whole page, rebuilt every five minutes, is in `examples/hn-live`.
+
 Edit an app while it runs in the playground and the running session is kept: the runtime replays your clicks into the new program.
 
 ## 11. More than one file

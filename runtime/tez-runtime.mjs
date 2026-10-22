@@ -139,6 +139,17 @@ export async function load(bytes) {
     },
     "Str.chars": (s) => codePoints(s),
     "Str.toInt": (s) => (/^-?[0-9]+$/.test(s) ? some(norm(BigInt(s))) : none()),
+    "Str.toFloat": (s) => {
+      if (!/^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/.test(s)) return none();
+      const f = Number(s);
+      return Number.isFinite(f) ? some(newFloat(f)) : none();
+    },
+    "Char.fromCode": (c) => {
+      const n = big(c);
+      if (n < 0n || n > 1114111n) throw new TezError("E_PRECONDITION", "Char.fromCode needs a code from 0 to 1114111");
+      const k = Number(n);
+      return k >= 0xd800 && k <= 0xdfff ? "\uFFFD" : String.fromCodePoint(k); // a surrogate half is not a character
+    },
     "Str.contains": (s, p) => (s.includes(p) ? 1 : 0),
     "Str.startsWith": (s, p) => (s.startsWith(p) ? 1 : 0),
     "Str.endsWith": (s, p) => (s.endsWith(p) ? 1 : 0),

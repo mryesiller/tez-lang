@@ -24,3 +24,18 @@ test("trusted prelude contracts hold in the WebAssembly runtime", async () => {
   const rt = await load(readFileSync(join(dir, "c.wasm")));
   for (const n of names) assert.equal(rt.run(n), "true", `prelude contract ${n} is violated in the runtime`);
 });
+
+// The JSON reader, the time helpers and the text helpers are Tez code in the prelude, so they run in compiled
+// WebAssembly as well; every `test` of the JSON example must come out the same there as in the interpreter.
+test("the JSON example's tests hold in compiled WebAssembly", async () => {
+  const src = readFileSync(`${root}spec/examples/57-json.tez`, "utf8");
+  const names = [...src.matchAll(/^test (\w+) =/gm)].map((m) => m[1]);
+  assert.ok(names.length >= 8);
+  const asFns = src.replace(/^test (\w+) =/gm, "fn $1() -> Bool =");
+  const dir = mkdtempSync(join(tmpdir(), "tez-json-"));
+  writeFileSync(join(dir, "j.tez"), asFns);
+  const r = spawnSync(bin, ["build", "--no-verify", join(dir, "j.tez"), "-o", join(dir, "j.wasm")], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const rt = await load(readFileSync(join(dir, "j.wasm")));
+  for (const n of names) assert.equal(rt.run(n), "true", `${n} differs in WebAssembly`);
+});

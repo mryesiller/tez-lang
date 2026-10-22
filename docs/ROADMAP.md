@@ -136,7 +136,7 @@ The language design is complete and implemented; the LLM measurements were postp
 
 - [x] Training set v1 (small: 26 verified programs + 108 mutation repair traces, `data/v1/`); scale needs a model (`sample.mjs`)
 - [x] Contamination check: `data/contamination.mjs` (equality, a 24-token common sequence, prompt text); 4 examples were removed from training because they overlapped with TezBench; enforced by a test
-- [x] **Fine-tuning set v2** (2026-10-22): `data/v2/` — 7,499 chat examples (7,208 train / 291 validation, ≈ 3.3 M tokens): 2,843 pure-function, 1,299 web-app (timers, clock, fetch, save/restore), 3,235 repair (compiler diagnostics → corrected program, 513 with prover errors) and 122 error-code explanations. Every program is proved and its tests run; an independent audit (`data/v2/audit.mjs`) re-proves all 2,431 answers, re-rejects all 3,196 broken programs and finds no TezBench/web-benchmark leak. The user runs the fine-tune (Unsloth); recipe in `data/v2/README.md`
+- [x] **Fine-tuning set v2** (2026-10-22): `data/v2/` — 8,322 chat examples (8,014 train / 308 validation, ≈ 3.9 M tokens): 3,166 pure-function, 1,603 web-app (timers, clock, fetch, JSON, save/restore, POST), 3,431 repair (compiler diagnostics → corrected program, 571 with prover errors) and 122 error-code explanations. Every program is proved and its tests run; an independent audit (`data/v2/audit.mjs`) re-proves all 2,747 answers, re-rejects all 3,371 broken programs and finds no TezBench/web-benchmark leak. The user runs the fine-tune (Unsloth); recipe in `data/v2/README.md`
 - [ ] 🔒 A 3–4B fine-tune (LoRA), evaluation — needs a GPU and a base model; the data pipeline is ready (`data/`)
 - [ ] 🔒 Open-weights + dataset release (after a licence check) — there are no weights; a release needs the user's approval
 
@@ -173,8 +173,27 @@ The real purpose: an LLM in the browser writes Tez, the code is compiled and run
 - [x] A multi-file project in the Studio: file tabs (+ file / delete), the project is stored in the browser, diagnostics point to the right file, run/test/App/hot-swap/Verify (Z3) over the whole project; example: Examples → shop (the `tez_web` project API: `check_project`, `verify_project_step`, `run_project`, `test_project`, `build_project`)
 - [x] Export the site: the Studio **Publish** button and `tez site main.tez -o index.html` → a single file (wasm + runtime + app host inlined, strict CSP); runs on any static host or from disk. (Not yet: a shareable link/hosting)
 - [x] Triggers: `Sub.every` (interval), `Sub.clock(ms, f)` (wall clock → cron-like scheduling as pure code), `Sub.online`, `Sub.visible`; the event log records the argument too (hot-swap replays it). Example 55. The card is exactly 1,200 tokens (at the limit)
-- [x] Persistence and network: `save`/`restore` (local storage; a restored model is built with verified code) and `fetches` → `Fetch.get` (default: only the page's own origin, extra origins with `tez site --allow=`; no cookies/redirects, 10 s, 1 MB). Example 56. Not yet: POST, headers, WebSocket
+- [x] Persistence and network: `save`/`restore` (local storage; a restored model is built with verified code) and `fetches` → `Fetch.get` (default: only the page's own origin, extra origins with `tez site --allow=`; no cookies/redirects, 10 s, 1 MB). Example 56. Not yet: WebSocket
 - [~] The in-browser LLM → compile → **prove** → run loop: "Ask a model" in the Studio now feeds back not only type errors but Z3 proof errors (with the counterexample) to the model; an accepted app runs automatically (verified end to end with a fake OpenAI-compatible server: an unproven division was rejected, the fixed version ran). **Tried with a real model (2026-10-22, mlx-serve, Gemma 4 E4B 4-bit):** untuned, it does not write Tez web pages: 0% accepted without an example, 19% with a complete example app in the prompt (`bench/tezbench/web.mjs`, 8 held-out page tasks × 2 samples, 2 turns); it invents JSX-like syntax. The Studio now adds the example app to web requests. Fine-tuning (dataset v2) is the fix. **Missing:** a trial with a WebGPU model in the browser (a 4.9 GB download; there is no ONNX export of a tuned model)
+
+## Phase 10 — Gaps found by building a real site (2026-10-22)
+
+The first independent site (`examples/hn-live`: the top five Hacker News stories, rebuilt by a cron job every 5 minutes and refreshed in the browser on the wall clock) worked, but only after cutting the JSON apart with string splits. Building it showed what the language and the host lacked. Fixed in this round:
+
+- [x] **JSON**: `Json.parse` and `get/at/path/str/int/float/bool/list/members/isNull/toText` in the prelude, written in Tez (a pushdown reader, one token per step, `decreases` proved) and proved by the verifier (it caught a missing range proof for surrogate pairs). `\uXXXX` escapes and surrogate pairs work; example `57-json.tez`; its tests also run in compiled WebAssembly
+- [x] **Requests**: `Fetch.json` (parse the answer), `Fetch.post`, `Fetch.postJson`, `Fetch.send(method, url, headers, body, ...)`; the host allows GET/POST/PUT/PATCH/DELETE, at most 10 headers (never cookies, `host`, `sec-*`), a 64 KB body, only allow-listed origins; a request is told apart by method, url and body
+- [x] **Primitives and helpers**: `Str.toFloat`, `Char.fromCode`, `Str.replace`, `Str.indexOf`; `Time.hhmm/hms/date/weekday`; `Html.link/list/ordered`
+- [x] **Methods on the prelude's own types** (`j.get("k")` on a `Json`); `tez site --css=FILE --title=TEXT`
+- [x] The card stays 1,199/1,200 tokens: the app modules are documented in `spec/language.md` (a test requires it) and taught by the fine-tuning set instead
+
+Still open (found, not done):
+
+- [ ] Fan-out is manual: a list and then one request per element needs the index plumbing by hand (no `Fetch.all`)
+- [ ] No WebSocket / server-sent events; no retry or per-request timeout; the 5-minute cron without an open page needs an external scheduler (the GitHub Actions workflow in `examples/hn-live/workflow`)
+- [ ] `List.sort` sorts integers only (`sortBy` takes an integer key); no `Map`; no `Str.padLeft`; no regular expressions; no date parsing or arithmetic beyond writing dates
+- [ ] `Json.parse` is quadratic in the number of tokens (fine for API answers, not for megabytes); numbers keep their text
+- [ ] The Studio's Publish button has no CSS/title/allow options (only `tez site` does)
+- [ ] A program's own types cannot have methods (only the prelude's)
 
 ## Standing rules
 

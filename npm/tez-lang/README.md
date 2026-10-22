@@ -10,8 +10,16 @@ tez check app.tez        # type-check and prove
 tez run app.tez          # run `main` (compiled to WasmGC)
 tez test app.tez         # run the `test` items
 tez build app.tez        # write app.wasm
-tez fmt app.tez --write  # canonical formatting
+tez fmt app.tez --write  # canonical formatting (a directory: every .tez file below it)
+tez new demo --app       # start a project (a small program, or a web app)
+tez check app.tez --watch   # check again whenever a file changes
+tez site app.tez -o index.html --allow=https://api.example --css=style.css --title="My page"
+                         # one self-contained web page (program + runtime + app host, strict CSP)
 ```
+
+Apps can read APIs (`Fetch.json`, `Fetch.post`, a pure `Json` reader), react to the clock (`Sub.clock`), and keep state in the
+browser (`save`/`restore`); a site that rebuilds itself every 5 minutes is in
+[`examples/hn-live`](https://github.com/mryesiller/tez-lang/tree/main/examples/hn-live).
 
 `use "other.tez"` pulls in files next to (or below) the entry file; each file sees the names of the files it `use`s directly, and everything is checked together.
 

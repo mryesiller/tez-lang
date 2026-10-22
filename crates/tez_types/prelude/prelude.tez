@@ -73,6 +73,13 @@ extern fn Str.chars(self: Str) -> List[Str]
 
 extern fn Str.toInt(self: Str) -> Option[Int]
 
+// digits with an optional fraction and exponent ("3.5", "-12", "1e9"); anything else is None
+extern fn Str.toFloat(self: Str) -> Option[Float]
+
+// the character with this Unicode code point (a surrogate half gives U+FFFD)
+extern fn Char.fromCode(code: Int where it >= 0 && it <= 1114111) -> Str
+  ensures result.len() == 1
+
 extern fn Str.contains(self: Str, part: Str) -> Bool
 
 extern fn Str.startsWith(self: Str, prefix: Str) -> Bool
@@ -95,6 +102,15 @@ extern fn Str.repeat(self: Str, n: Int where it >= 0) -> Str
   ensures result.len() == self.len() * n
 
 fn Str.isEmpty(self: Str) -> Bool = self.len() == 0
+
+// every occurrence of `from` replaced by `to`
+fn Str.replace(self: Str, from: Str where it.len() > 0, to: Str) -> Str = self.split(from).join(to)
+
+// the position (counting characters from 0) where `part` first occurs
+fn Str.indexOf(self: Str, part: Str where it.len() > 0) -> Option[Int] = {
+  let parts = self.split(part)
+  if parts.len() > 1 { Some(parts.get(0).len()) } else { None }
+}
 
 // ------------------------------------------------------------------ List
 
@@ -269,8 +285,323 @@ fn Html.col[M](kids: List[Html[M]]) -> Html[M] = UiNode("div", [UiProp("class", 
 
 // ------------------------------------------------------------------ Fetch (declared like subscriptions)
 
-type Fetch[M] = UiGet(Str, (Str) -> M, (Str) -> M)
+// a request: method, url, headers, body, and the messages for success and failure
+type Fetch[M] = UiReq(Str, Str, List[(Str, Str)], Str, (Str) -> M, (Str) -> M)
 
-// Listed by an optional `fn fetches(m: Model) -> List[Fetch[Msg]]`. The host performs one GET each time `url` newly
-// appears in the list and sends `onOk(body)` or `onErr(reason)`. Only origins the page's owner allowed can be reached.
-fn Fetch.get[M](url: Str, onOk: (Str) -> M, onErr: (Str) -> M) -> Fetch[M] = UiGet(url, onOk, onErr)
+// Listed by an optional `fn fetches(m: Model) -> List[Fetch[Msg]]`. The host performs one request each time it newly
+// appears in the list (the same method, url and body again is not sent again) and sends `onOk(body)` or `onErr(reason)`.
+// Only origins the page's owner allowed can be reached.
+fn Fetch.get[M](url: Str, onOk: (Str) -> M, onErr: (Str) -> M) -> Fetch[M] = UiReq("GET", url, [], "", onOk, onErr)
+
+// A POST with a text body (content type text/plain, which needs no CORS preflight).
+fn Fetch.post[M](url: Str, body: Str, onOk: (Str) -> M, onErr: (Str) -> M) -> Fetch[M] =
+  UiReq("POST", url, [("content-type", "text/plain;charset=UTF-8")], body, onOk, onErr)
+
+// A POST of JSON (content type application/json: the server must allow it through CORS).
+fn Fetch.postJson[M](url: Str, body: Json, onOk: (Str) -> M, onErr: (Str) -> M) -> Fetch[M] =
+  UiReq("POST", url, [("content-type", "application/json")], body.toText(), onOk, onErr)
+
+// Any method the host allows (GET, POST, PUT, PATCH, DELETE) with headers of your own (no cookies are ever sent).
+fn Fetch.send[M](method: Str, url: Str, headers: List[(Str, Str)], body: Str, onOk: (Str) -> M, onErr: (Str) -> M) -> Fetch[M] =
+  UiReq(method, url, headers, body, onOk, onErr)
+
+// ------------------------------------------------------------------ Json (read from text; pure)
+
+// A JSON value. Numbers keep their text (`JNum("3.5")`): read them with `.int()` or `.float()`.
+type Json = JNull | JBool(Bool) | JNum(Str) | JStr(Str) | JArr(List[Json]) | JObj(List[(Str, Json)])
+
+type JsonTok = TkPunct(Str) | TkStr(Str) | TkWord(Str)
+
+type JsonFrame = FrArr(List[Json]) | FrObj(List[(Str, Json)], Str, Bool)
+
+fn Json.isSpace(c: Str) -> Bool = c == " " || c == "\n" || c == "\t" || c == "\r"
+
+fn Json.isPunct(c: Str) -> Bool = c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == ","
+
+// the position of the quote that closes a string whose text starts at i, or -1
+fn Json.stringEnd(s: Str, i: Int) -> Int
+  requires 0 <= i && i <= s.len()
+  ensures result == -1 || (result >= i && result < s.len())
+  decreases s.len() - i
+  = if i >= s.len() { -1 } else if s.slice(i, i + 1) == "\"" { i } else if s.slice(i, i + 1) == "\\" {
+    if i + 2 > s.len() { -1 } else { Json.stringEnd(s, i + 2) }
+  } else { Json.stringEnd(s, i + 1) }
+
+// the end of a bare word (a number, true, false, null) that starts at i
+fn Json.wordEnd(s: Str, i: Int) -> Int
+  requires 0 <= i && i <= s.len()
+  ensures result >= i && result <= s.len()
+  decreases s.len() - i
+  = if i >= s.len() { i } else {
+    let c = s.slice(i, i + 1)
+    if Json.isSpace(c) || Json.isPunct(c) || c == "\"" { i } else { Json.wordEnd(s, i + 1) }
+  }
+
+fn Json.hexDigit(c: Str) -> Int = {
+  let l = c.lower()
+  if l.len() == 1 { "0123456789abcdef".indexOf(l).unwrapOr(-1) } else { -1 }
+}
+
+// the value of four hexadecimal digits, or -1
+fn Json.hexValue(four: Str) -> Int =
+  four.chars().fold(0, (acc, c) => if acc < 0 { -1 } else if Json.hexDigit(c) < 0 { -1 } else { acc * 16 + Json.hexDigit(c) })
+
+fn Json.simpleEscape(c: Str) -> Str =
+  if c == "n" { "\n" } else if c == "t" { "\t" } else if c == "r" { "\r" } else if c == "b" { Char.fromCode(8) } else if c == "f" { Char.fromCode(12) } else { c }
+
+// `parts` are the pieces of a string between its backslashes; `esc` says whether the next piece follows a backslash and
+// `high` holds a high surrogate (from \uD83D) that is waiting for its partner
+fn Json.decode(parts: List[Str], esc: Bool, high: Int, acc: Str) -> Str = match parts {
+  [] => acc
+  [p, ..rest] =>
+    if !esc { Json.decode(rest, true, 0, acc ++ p) } else if p.len() == 0 { Json.decode(rest, false, 0, acc ++ "\\") } else {
+      let c = p.slice(0, 1)
+      let tail = p.slice(1, p.len())
+      if c == "u" && tail.len() >= 4 {
+        let code = Json.hexValue(tail.slice(0, 4))
+        let more = tail.slice(4, tail.len())
+        if code < 0 || code > 65535 { Json.decode(rest, true, 0, acc ++ "\\" ++ p) } else if high >= 55296 && high <= 56319 && code >= 56320 && code <= 57343 {
+          Json.decode(rest, true, 0, acc ++ Char.fromCode(65536 + (high - 55296) * 1024 + (code - 56320)) ++ more)
+        } else if code >= 55296 && code <= 56319 { Json.decode(rest, true, code, acc ++ more) } else {
+          Json.decode(rest, true, 0, acc ++ Char.fromCode(code) ++ more)
+        }
+      } else { Json.decode(rest, true, 0, acc ++ Json.simpleEscape(c) ++ tail) }
+    }
+}
+
+fn Json.unescape(raw: Str) -> Str = match raw.split("\\") {
+  [] => raw
+  [first, ..rest] => Json.decode(rest, true, 0, first)
+}
+
+fn Json.tokens(s: Str, i: Int, acc: List[JsonTok]) -> Result[List[JsonTok], Str]
+  requires 0 <= i && i <= s.len()
+  decreases s.len() - i
+  = if i >= s.len() { Ok(acc) } else {
+    let c = s.slice(i, i + 1)
+    if Json.isSpace(c) { Json.tokens(s, i + 1, acc) } else if Json.isPunct(c) { Json.tokens(s, i + 1, acc.append(TkPunct(c))) } else if c == "\"" {
+      let end = Json.stringEnd(s, i + 1)
+      if end < 0 { Err("a string is not closed") } else {
+        Json.tokens(s, end + 1, acc.append(TkStr(Json.unescape(s.slice(i + 1, end)))))
+      }
+    } else {
+      let end = Json.wordEnd(s, i)
+      if end == i { Err("unexpected character `" ++ c ++ "` at position " ++ i.toStr()) } else {
+        Json.tokens(s, end, acc.append(TkWord(s.slice(i, end))))
+      }
+    }
+  }
+
+fn Json.word(w: Str) -> Result[Json, Str] =
+  if w == "null" { Ok(JNull) } else if w == "true" { Ok(JBool(true)) } else if w == "false" { Ok(JBool(false)) } else if w.toFloat().isSome() {
+    Ok(JNum(w))
+  } else { Err("`" ++ w ++ "` is not a JSON value") }
+
+// puts a finished value into the array or object being built, or makes it the result when nothing is open
+fn Json.attach(stack: List[JsonFrame], v: Json) -> Result[(List[JsonFrame], Option[Json]), Str] = match stack {
+  [] => Ok(([], Some(v)))
+  [top, ..below] => match top {
+    FrArr(items) => Ok(([FrArr(items.append(v))].concat(below), None))
+    FrObj(items, key, hasKey) =>
+      if hasKey { Ok(([FrObj(items.append((key, v)), "", false)].concat(below), None)) } else {
+        Err("an object member needs a name before its value")
+      }
+  }
+}
+
+// reads one token per call; `stack` holds the arrays and objects that are still open (the innermost first)
+fn Json.step(toks: List[JsonTok], stack: List[JsonFrame], done: Option[Json]) -> Result[Json, Str]
+  decreases toks.len()
+  = match toks {
+  [] => match done {
+    Some(v) => if stack.isEmpty() { Ok(v) } else { Err("the text ends inside an array or object") }
+    None => if stack.isEmpty() { Err("the text is empty") } else { Err("the text ends inside an array or object") }
+  }
+  [t, ..rest] => match done {
+    Some(_) => Err("there is more text after the value")
+    None => match t {
+      TkPunct(p) =>
+        if p == "{" { Json.step(rest, [FrObj([], "", false)].concat(stack), None) } else if p == "[" {
+          Json.step(rest, [FrArr([])].concat(stack), None)
+        } else if p == "]" {
+          match stack {
+            [FrArr(items), ..below] => match Json.attach(below, JArr(items)) {
+              Ok(r) => Json.step(rest, r.0, r.1)
+              Err(e) => Err(e)
+            }
+            _ => Err("a `]` closes nothing")
+          }
+        } else if p == "}" {
+          match stack {
+            [FrObj(items, key, hasKey), ..below] =>
+              if hasKey { Err("an object member has a name but no value") } else {
+                match Json.attach(below, JObj(items)) {
+                  Ok(r) => Json.step(rest, r.0, r.1)
+                  Err(e) => Err(e)
+                }
+              }
+            _ => Err("a `}` closes nothing")
+          }
+        } else { Json.step(rest, stack, None) }
+      TkStr(s) => match stack {
+        [FrObj(items, key, hasKey), ..below] =>
+          if hasKey {
+            match Json.attach(stack, JStr(s)) {
+              Ok(r) => Json.step(rest, r.0, r.1)
+              Err(e) => Err(e)
+            }
+          } else { Json.step(rest, [FrObj(items, s, true)].concat(below), None) }
+        _ => match Json.attach(stack, JStr(s)) {
+          Ok(r) => Json.step(rest, r.0, r.1)
+          Err(e) => Err(e)
+        }
+      }
+      TkWord(w) => match Json.word(w) {
+        Ok(v) => match Json.attach(stack, v) {
+          Ok(r) => Json.step(rest, r.0, r.1)
+          Err(e) => Err(e)
+        }
+        Err(e) => Err(e)
+      }
+    }
+  }
+}
+
+// Reads JSON text. It accepts a little more than JSON (a missing comma or colon is tolerated) but never a text whose
+// brackets do not match, a string that is not closed or a word that is no value. Big inputs are slow (it is quadratic).
+fn Json.parse(text: Str) -> Result[Json, Str] = match Json.tokens(text, 0, []) {
+  Ok(toks) => Json.step(toks, [], None)
+  Err(e) => Err(e)
+}
+
+fn Json.findKey(members: List[(Str, Json)], key: Str) -> Option[Json] = match members {
+  [] => None
+  [m, ..rest] => if m.0 == key { Some(m.1) } else { Json.findKey(rest, key) }
+}
+
+// the member of an object (None for anything else, or when the key is missing)
+fn Json.get(self: Json, key: Str) -> Option[Json] = match self {
+  JObj(ms) => Json.findKey(ms, key)
+  _ => None
+}
+
+// the element of an array
+fn Json.at(self: Json, i: Int) -> Option[Json] = match self {
+  JArr(xs) => if i >= 0 && i < xs.len() { Some(xs.get(i)) } else { None }
+  _ => None
+}
+
+// follows object keys: `j.path(["user", "name"])`
+fn Json.path(self: Json, keys: List[Str]) -> Option[Json] = keys.fold(Some(self), (acc, k) => acc.andThen(j => j.get(k)))
+
+fn Json.str(self: Json) -> Option[Str] = match self {
+  JStr(s) => Some(s)
+  _ => None
+}
+
+fn Json.int(self: Json) -> Option[Int] = match self {
+  JNum(t) => t.toInt()
+  _ => None
+}
+
+fn Json.float(self: Json) -> Option[Float] = match self {
+  JNum(t) => t.toFloat()
+  _ => None
+}
+
+fn Json.bool(self: Json) -> Option[Bool] = match self {
+  JBool(b) => Some(b)
+  _ => None
+}
+
+fn Json.isNull(self: Json) -> Bool = match self {
+  JNull => true
+  _ => false
+}
+
+// the elements of an array (empty for anything else)
+fn Json.list(self: Json) -> List[Json] = match self {
+  JArr(xs) => xs
+  _ => []
+}
+
+// the members of an object (empty for anything else)
+fn Json.members(self: Json) -> List[(Str, Json)] = match self {
+  JObj(ms) => ms
+  _ => []
+}
+
+fn Json.quote(s: Str) -> Str =
+  "\"" ++ s.split("\\").join("\\\\").split("\"").join("\\\"").split("\n").join("\\n").split("\r").join("\\r").split("\t").join("\\t") ++ "\""
+
+fn Json.textList(xs: List[Json]) -> Str = match xs {
+  [] => ""
+  [h] => h.toText()
+  [h, ..t] => h.toText() ++ "," ++ Json.textList(t)
+}
+
+fn Json.textMembers(ms: List[(Str, Json)]) -> Str = match ms {
+  [] => ""
+  [m] => Json.quote(m.0) ++ ":" ++ m.1.toText()
+  [m, ..t] => Json.quote(m.0) ++ ":" ++ m.1.toText() ++ "," ++ Json.textMembers(t)
+}
+
+// JSON text for a value (to send in a request, say)
+fn Json.toText(self: Json) -> Str = match self {
+  JNull => "null"
+  JBool(b) => if b { "true" } else { "false" }
+  JNum(t) => t
+  JStr(s) => Json.quote(s)
+  JArr(xs) => "[" ++ Json.textList(xs) ++ "]"
+  JObj(ms) => "{" ++ Json.textMembers(ms) ++ "}"
+}
+
+// Like `Fetch.get`, but the answer is read as JSON; a body that is not JSON goes to `onErr`.
+fn Fetch.json[M](url: Str, onOk: (Json) -> M, onErr: (Str) -> M) -> Fetch[M] =
+  Fetch.get(
+    url,
+    t => match Json.parse(t) {
+      Ok(j) => onOk(j)
+      Err(e) => onErr("not JSON: " ++ e)
+    },
+    onErr
+  )
+
+// ------------------------------------------------------------------ Time (the wall clock as text; UTC; total)
+
+// The clock is seconds since 1970-01-01 UTC, as `Sub.clock` sends it. A negative number counts as 0.
+fn Time.pad2(n: Int) -> Str = if n < 10 { "0" ++ n.toStr() } else { n.toStr() }
+
+fn Time.hhmm(t: Int) -> Str = Time.pad2(t.max(0) / 3600 % 24) ++ ":" ++ Time.pad2(t.max(0) / 60 % 60)
+
+fn Time.hms(t: Int) -> Str = Time.hhmm(t) ++ ":" ++ Time.pad2(t.max(0) % 60)
+
+// 0 = Monday ... 6 = Sunday
+fn Time.weekday(t: Int) -> Int
+  ensures result >= 0 && result < 7
+  = (t.max(0) / 86400 + 3) % 7
+
+// YYYY-MM-DD
+fn Time.date(t: Int) -> Str = {
+  let z = t.max(0) / 86400 + 719468
+  let era = z / 146097
+  let doe = z % 146097
+  let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+  let doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+  let mp = (5 * doy + 2) / 153
+  let day = doy - (153 * mp + 2) / 5 + 1
+  let month = if mp < 10 { mp + 3 } else { mp - 9 }
+  let year = yoe + era * 400 + (if month <= 2 { 1 } else { 0 })
+  year.toStr() ++ "-" ++ Time.pad2(month) ++ "-" ++ Time.pad2(day)
+}
+
+// ------------------------------------------------------------------ Html helpers
+
+fn Html.link[M](label: Str, href: Str) -> Html[M] =
+  UiNode("a", [UiProp("href", href), UiProp("target", "_blank"), UiProp("rel", "noopener noreferrer")], [UiText(label)])
+
+// a bulleted list with one item per element
+fn Html.list[M](items: List[Html[M]]) -> Html[M] = UiNode("ul", [], items.map(i => UiNode("li", [], [i])))
+
+// a numbered list with one item per element
+fn Html.ordered[M](items: List[Html[M]]) -> Html[M] = UiNode("ol", [], items.map(i => UiNode("li", [], [i])))
