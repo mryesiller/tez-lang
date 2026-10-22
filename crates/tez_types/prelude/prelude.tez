@@ -310,9 +310,6 @@ fn Fetch.send[M](method: Str, url: Str, headers: List[(Str, Str)], body: Str, on
 // A JSON value. Numbers keep their text (`JNum("3.5")`): read them with `.int()` or `.float()`.
 type Json = JNull | JBool(Bool) | JNum(Str) | JStr(Str) | JArr(List[Json]) | JObj(List[(Str, Json)])
 
-type JsonTok = TkPunct(Str) | TkStr(Str) | TkWord(Str)
-
-type JsonFrame = FrArr(List[Json]) | FrObj(List[(Str, Json)], Str, Bool)
 
 fn Json.isSpace(c: Str) -> Bool = c == " " || c == "\n" || c == "\t" || c == "\r"
 
@@ -350,28 +347,33 @@ fn Json.simpleEscape(c: Str) -> Str =
   if c == "n" { "\n" } else if c == "t" { "\t" } else if c == "r" { "\r" } else if c == "b" { Char.fromCode(8) } else if c == "f" { Char.fromCode(12) } else { c }
 
 // the text for an escape sequence that starts at the beginning of `p` (the piece after a backslash) and the high surrogate
-// (from \uD83D) that is now waiting for its partner (0 when none); `high` is the one that was waiting before
+// (from \uD83D) that is now waiting for its partner (0 when none); `high` is the one that was waiting before. A half
+// without its partner becomes U+FFFD.
 fn Json.escaped(p: Str, high: Int) -> (Str, Int)
   requires p.len() > 0
   = {
   let tail = p.slice(1, p.len())
+  let lone = Json.lone(high)
   if p.slice(0, 1) == "u" && tail.len() >= 4 {
     let code = Json.hexValue(tail.slice(0, 4))
     let more = tail.slice(4, tail.len())
-    if code < 0 || code > 65535 { ("\\" ++ p, 0) } else if high >= 55296 && high <= 56319 && code >= 56320 && code <= 57343 {
+    if code < 0 || code > 65535 { (lone ++ "\\" ++ p, 0) } else if high >= 55296 && high <= 56319 && code >= 56320 && code <= 57343 {
       (Char.fromCode(65536 + (high - 55296) * 1024 + (code - 56320)) ++ more, 0)
-    } else if code >= 55296 && code <= 56319 { (more, code) } else { (Char.fromCode(code) ++ more, 0) }
-  } else { (Json.simpleEscape(p.slice(0, 1)) ++ tail, 0) }
+    } else if code >= 55296 && code <= 56319 && more.isEmpty() { (lone, code) } else { (lone ++ Char.fromCode(code) ++ more, 0) }
+  } else { (lone ++ Json.simpleEscape(p.slice(0, 1)) ++ tail, 0) }
 }
+
+// what a high surrogate left without its partner becomes
+fn Json.lone(high: Int) -> Str = if high > 0 { Char.fromCode(65533) } else { "" }
 
 // `parts` are the pieces of a string between its backslashes; `esc` says whether the next piece follows a backslash
 fn Json.decode(parts: List[Str], esc: Bool, high: Int, acc: Str) -> Str = match parts {
-  [] => acc
+  [] => acc ++ Json.lone(high)
   [p, ..rest] =>
-    if !esc { Json.decode(rest, true, 0, acc ++ p) } else if p.len() > 0 {
+    if !esc { Json.decode(rest, true, 0, acc ++ Json.lone(high) ++ p) } else if p.len() > 0 {
       let r = Json.escaped(p, high)
       Json.decode(rest, true, r.1, acc ++ r.0)
-    } else { Json.decode(rest, false, 0, acc ++ "\\") }
+    } else { Json.decode(rest, false, 0, acc ++ Json.lone(high) ++ "\\") }
 }
 
 fn Json.unescape(raw: Str) -> Str = match raw.split("\\") {
@@ -379,20 +381,21 @@ fn Json.unescape(raw: Str) -> Str = match raw.split("\\") {
   [first, ..rest] => Json.decode(rest, true, 0, first)
 }
 
-fn Json.tokens(s: Str, i: Int, acc: List[JsonTok]) -> Result[List[JsonTok], Str]
+// the tokens of a text: (0, punctuation), (1, the text of a string) or (2, a bare word)
+fn Json.tokens(s: Str, i: Int, acc: List[(Int, Str)]) -> Result[List[(Int, Str)], Str]
   requires 0 <= i && i <= s.len()
   decreases s.len() - i
   = if i >= s.len() { Ok(acc) } else {
     let c = s.slice(i, i + 1)
-    if Json.isSpace(c) { Json.tokens(s, i + 1, acc) } else if Json.isPunct(c) { Json.tokens(s, i + 1, acc.append(TkPunct(c))) } else if c == "\"" {
+    if Json.isSpace(c) { Json.tokens(s, i + 1, acc) } else if Json.isPunct(c) { Json.tokens(s, i + 1, acc.append((0, c))) } else if c == "\"" {
       let end = Json.stringEnd(s, i + 1)
       if end < 0 { Err("a string is not closed") } else {
-        Json.tokens(s, end + 1, acc.append(TkStr(Json.unescape(s.slice(i + 1, end)))))
+        Json.tokens(s, end + 1, acc.append((1, Json.unescape(s.slice(i + 1, end)))))
       }
     } else {
       let end = Json.wordEnd(s, i)
       if end == i { Err("unexpected character `" ++ c ++ "` at position " ++ i.toStr()) } else {
-        Json.tokens(s, end, acc.append(TkWord(s.slice(i, end))))
+        Json.tokens(s, end, acc.append((2, s.slice(i, end))))
       }
     }
   }
@@ -402,20 +405,22 @@ fn Json.word(w: Str) -> Result[Json, Str] =
     Ok(JNum(w))
   } else { Err("`" ++ w ++ "` is not a JSON value") }
 
-// puts a finished value into the array or object being built, or makes it the result when nothing is open
-fn Json.attach(stack: List[JsonFrame], v: Json) -> Result[(List[JsonFrame], Option[Json]), Str] = match stack {
+// An open array is (JArr(items so far), "", false); an open object is (JObj(members so far), the name read for the next
+// member, whether that name has been read). Puts a finished value into the innermost one, or makes it the result.
+fn Json.attach(stack: List[(Json, Str, Bool)], v: Json) -> Result[(List[(Json, Str, Bool)], Option[Json]), Str] = match stack {
   [] => Ok(([], Some(v)))
-  [top, ..below] => match top {
-    FrArr(items) => Ok(([FrArr(items.append(v))].concat(below), None))
-    FrObj(items, key, hasKey) =>
-      if hasKey { Ok(([FrObj(items.append((key, v)), "", false)].concat(below), None)) } else {
+  [top, ..below] => match top.0 {
+    JArr(items) => Ok(([(JArr(items.append(v)), "", false)].concat(below), None))
+    JObj(items) =>
+      if top.2 { Ok(([(JObj(items.append((top.1, v))), "", false)].concat(below), None)) } else {
         Err("an object member needs a name before its value")
       }
+    _ => Err("an open value is neither an array nor an object")
   }
 }
 
 // reads one token per call; `stack` holds the arrays and objects that are still open (the innermost first)
-fn Json.step(toks: List[JsonTok], stack: List[JsonFrame], done: Option[Json]) -> Result[Json, Str]
+fn Json.step(toks: List[(Int, Str)], stack: List[(Json, Str, Bool)], done: Option[Json]) -> Result[Json, Str]
   decreases toks.len()
   = match toks {
   [] => match done {
@@ -424,51 +429,65 @@ fn Json.step(toks: List[JsonTok], stack: List[JsonFrame], done: Option[Json]) ->
   }
   [t, ..rest] => match done {
     Some(_) => Err("there is more text after the value")
-    None => match t {
-      TkPunct(p) =>
-        if p == "{" { Json.step(rest, [FrObj([], "", false)].concat(stack), None) } else if p == "[" {
-          Json.step(rest, [FrArr([])].concat(stack), None)
-        } else if p == "]" {
+    None =>
+      if t.0 == 0 {
+        if t.1 == "{" { Json.step(rest, [(JObj([]), "", false)].concat(stack), None) } else if t.1 == "[" {
+          Json.step(rest, [(JArr([]), "", false)].concat(stack), None)
+        } else if t.1 == "]" {
           match stack {
-            [FrArr(items), ..below] => match Json.attach(below, JArr(items)) {
-              Ok(r) => Json.step(rest, r.0, r.1)
-              Err(e) => Err(e)
+            [top, ..below] => match top.0 {
+              JArr(items) => match Json.attach(below, JArr(items)) {
+                Ok(r) => Json.step(rest, r.0, r.1)
+                Err(e) => Err(e)
+              }
+              _ => Err("a `]` closes an object")
             }
-            _ => Err("a `]` closes nothing")
+            [] => Err("a `]` closes nothing")
           }
-        } else if p == "}" {
+        } else if t.1 == "}" {
           match stack {
-            [FrObj(items, key, hasKey), ..below] =>
-              if hasKey { Err("an object member has a name but no value") } else {
-                match Json.attach(below, JObj(items)) {
+            [top, ..below] => match top.0 {
+              JObj(items) =>
+                if top.2 { Err("an object member has a name but no value") } else {
+                  match Json.attach(below, JObj(items)) {
+                    Ok(r) => Json.step(rest, r.0, r.1)
+                    Err(e) => Err(e)
+                  }
+                }
+              _ => Err("a `}` closes an array")
+            }
+            [] => Err("a `}` closes nothing")
+          }
+        } else { Json.step(rest, stack, None) }
+      } else if t.0 == 1 {
+        match stack {
+          [top, ..below] => match top.0 {
+            JObj(items) =>
+              if top.2 {
+                match Json.attach(stack, JStr(t.1)) {
                   Ok(r) => Json.step(rest, r.0, r.1)
                   Err(e) => Err(e)
                 }
-              }
-            _ => Err("a `}` closes nothing")
-          }
-        } else { Json.step(rest, stack, None) }
-      TkStr(s) => match stack {
-        [FrObj(items, key, hasKey), ..below] =>
-          if hasKey {
-            match Json.attach(stack, JStr(s)) {
+              } else { Json.step(rest, [(JObj(items), t.1, true)].concat(below), None) }
+            _ => match Json.attach(stack, JStr(t.1)) {
               Ok(r) => Json.step(rest, r.0, r.1)
               Err(e) => Err(e)
             }
-          } else { Json.step(rest, [FrObj(items, s, true)].concat(below), None) }
-        _ => match Json.attach(stack, JStr(s)) {
-          Ok(r) => Json.step(rest, r.0, r.1)
+          }
+          [] => match Json.attach(stack, JStr(t.1)) {
+            Ok(r) => Json.step(rest, r.0, r.1)
+            Err(e) => Err(e)
+          }
+        }
+      } else {
+        match Json.word(t.1) {
+          Ok(v) => match Json.attach(stack, v) {
+            Ok(r) => Json.step(rest, r.0, r.1)
+            Err(e) => Err(e)
+          }
           Err(e) => Err(e)
         }
       }
-      TkWord(w) => match Json.word(w) {
-        Ok(v) => match Json.attach(stack, v) {
-          Ok(r) => Json.step(rest, r.0, r.1)
-          Err(e) => Err(e)
-        }
-        Err(e) => Err(e)
-      }
-    }
   }
 }
 
@@ -536,8 +555,16 @@ fn Json.members(self: Json) -> List[(Str, Json)] = match self {
   _ => []
 }
 
-fn Json.quote(s: Str) -> Str =
-  "\"" ++ s.split("\\").join("\\\\").split("\"").join("\\\"").split("\n").join("\\n").split("\r").join("\\r").split("\t").join("\\t") ++ "\""
+// a JSON string literal: quotes, backslashes and every control character (U+0000 to U+001F) are escaped
+fn Json.quote(s: Str) -> Str = {
+  let basic = s.split("\\").join("\\\\").split("\"").join("\\\"").split("\n").join("\\n").split("\r").join("\\r").split("\t").join("\\t")
+  "\"" ++ List.range(0, 32).fold(basic, (acc, n) => if n >= 0 && n < 32 { acc.split(Char.fromCode(n)).join(Json.control(n)) } else { acc }) ++ "\""
+}
+
+// the escape for control character n (0 to 31): \u0000 ... \u001f
+fn Json.control(n: Int) -> Str
+  requires 0 <= n && n < 32
+  = "\\u00" ++ (if n < 16 { "0" } else { "1" }) ++ "0123456789abcdef".slice(n % 16, n % 16 + 1)
 
 fn Json.textList(xs: List[Json]) -> Str = match xs {
   [] => ""

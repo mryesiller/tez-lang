@@ -761,6 +761,30 @@ fn watch_runs_again_when_a_file_of_the_project_changes() {
 }
 
 #[test]
+fn prelude_types_leave_names_free_for_programs() {
+    // every prelude type and constructor is a name no program can define, so helpers must not add types of their own
+    let prelude = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/tez_types/prelude/prelude.tez"),
+    )
+    .unwrap();
+    let types: Vec<&str> = prelude
+        .lines()
+        .filter_map(|l| l.strip_prefix("type "))
+        .filter_map(|l| l.split(['[', ' ']).next())
+        .collect();
+    assert_eq!(
+        types,
+        ["Option", "Result", "Html", "Attr", "Sub", "Fetch", "Json"]
+    );
+    let p = temp(
+        "own-token-names.tez",
+        "type Tok = TkStr(Str) | TkWord(Str) | FrArr(Int)\n\ntest own = match TkStr(\"x\") {\n  TkStr(s) => s == \"x\"\n  _ => false\n}\n",
+    );
+    let o = tez(&["test", p.to_str().unwrap()]);
+    assert!(o.status.success(), "{}{}", s(&o.stdout), s(&o.stderr));
+}
+
+#[test]
 fn app_modules_are_documented_in_the_language_reference() {
     let language = std::fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/language.md"),
@@ -780,6 +804,7 @@ fn app_modules_are_documented_in_the_language_reference() {
         "hexValue",
         "simpleEscape",
         "escaped",
+        "lone",
         "decode",
         "unescape",
         "tokens",
@@ -788,6 +813,7 @@ fn app_modules_are_documented_in_the_language_reference() {
         "step",
         "findKey",
         "quote",
+        "control",
         "textList",
         "textMembers",
         "pad2",

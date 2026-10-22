@@ -57,4 +57,16 @@ test textHelpers =
     && "hello".indexOf("ll") == Some(2)
     && "hello".indexOf("z").isNone()
 
+test escapesEveryControlCharacter =
+  JStr("a" ++ Char.fromCode(8) ++ Char.fromCode(0) ++ "\n").toText() == "\"a\\u0008\\u0000\\n\""
+
+test halfAPairBecomesAReplacementCharacter = match Json.parse(
+  "[\"\\ud83dx\\ude00\", \"a\\ud83d\"]"
+) {
+  Ok(j) =>
+    j.list().map(x => x.str().unwrapOr("")) ==
+      [Char.fromCode(65533) ++ "x" ++ Char.fromCode(65533), "a" ++ Char.fromCode(65533)]
+  Err(e) => false
+}
+
 fn main() -> (Str, Int) = (titleOf(story()), commentCount(story()))
