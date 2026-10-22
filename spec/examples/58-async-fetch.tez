@@ -1,0 +1,104 @@
+// A request in flight, shown step by step. The program never waits: `update` answers every message at once, and the
+// page that hosts it performs the request and sends the reply later as one more message.
+type Phase = Idle | Loading(Str) | Loaded(Str, Float, List[Str]) | Failed(Str)
+
+type Model = { phase: Phase, log: List[Str] }
+
+type Msg = Ask(Str) | Reply(Json) | Broke(Str)
+
+fn init() -> Model = Model { phase: Idle, log: [] }
+
+// a reply is read as JSON; a missing field is None, never a crash
+fn forecast(j: Json) -> Option[Phase] = match j.get("city").andThen(c => c.str()) {
+  Some(city) =>
+    Some(
+      Loaded(
+        city,
+        j.get("temp").andThen(t => t.float()).unwrapOr(0.0),
+        j
+          .get("hours")
+          .map(h => h.list())
+          .unwrapOr([])
+          .map(
+            h => h.get("at").andThen(a => a.str()).unwrapOr("?") ++
+              " " ++
+              h.get("temp").andThen(t => t.int()).unwrapOr(0).toStr() ++
+              "°"
+          )
+      )
+    )
+  None => None
+}
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Ask(url) =>
+    m with { phase: Loading(url), log: m.log.append("1. request for " ++ url ++ " is declared") }
+  Reply(j) => match forecast(j) {
+    Some(p) => m with { phase: p, log: m.log.append("2. the reply arrived and was read") }
+    None =>
+      m with {
+        phase: Failed("the reply has no city"),
+        log: m.log.append("2. the reply arrived but was not a forecast")
+      }
+  }
+  Broke(why) => m with { phase: Failed(why), log: m.log.append("2. the request failed: " ++ why) }
+}
+
+// the network is declared like time: while the phase is Loading, the host fetches this address once
+fn fetches(m: Model) -> List[Fetch[Msg]] = match m.phase {
+  Loading(url) => [Fetch.json(url, j => Reply(j), e => Broke(e))]
+  _ => []
+}
+
+fn describe(p: Phase) -> Str = match p {
+  Idle => "Nothing requested yet."
+  Loading(url) => "Waiting for " ++ url ++ " ..."
+  Loaded(city, temp, hours) => city ++ ": " ++ temp.toStr() ++ "° now. " ++ hours.join(", ")
+  Failed(why) => "Could not load: " ++ why
+}
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Async fetch"),
+      Html.paragraph(describe(m.phase)),
+      Html.row(
+        [
+          Html.button("Load the forecast", Ask("demo/weather.json")),
+          Html.button("Load a missing file", Ask("demo/missing.json"))
+        ]
+      ),
+      Html.list(m.log.map(l => Html.text(l)))
+    ]
+  )
+
+fn sample() -> Json = match Json.parse(
+  "{\"city\":\"Oslo\",\"temp\":-2.5,\"hours\":[{\"at\":\"09:00\",\"temp\":-3}]}"
+) {
+  Ok(j) => j
+  Err(e) => JNull
+}
+
+test nothingIsRequestedAtFirst = fetches(init()).isEmpty()
+
+test askingDeclaresExactlyOneRequest = fetches(update(init(), Ask("demo/weather.json"))).len() == 1
+
+test aReplyEndsTheRequest =
+  fetches(update(update(init(), Ask("a.json")), Reply(sample()))).isEmpty()
+
+test theReplyIsRead =
+  describe(update(update(init(), Ask("a.json")), Reply(sample())).phase) ==
+    "Oslo: -2.5° now. 09:00 -3°"
+
+test aReplyWithoutACityFails =
+  describe(update(init(), Reply(JArr([]))).phase) == "Could not load: the reply has no city"
+
+test aFailureEndsTheRequest = fetches(update(update(init(), Ask("a.json")), Broke("404"))).isEmpty()
+
+test everyStepIsLogged = update(update(init(), Ask("a.json")), Broke("404")).log.len() == 2
+
+fn main() -> (Int, Int) =
+  (
+    fetches(update(init(), Ask("x"))).len(),
+    update(update(init(), Ask("x")), Reply(sample())).log.len()
+  )
