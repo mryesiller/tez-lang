@@ -74,7 +74,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y binaryen z3
       - run: node npm/build.mjs
       - run: cd npm/tez-lang && npm test
-      - run: cd npm/tez-lang && npm pack --pack-destination ../../dist
+      - run: mkdir -p dist && cd npm/tez-lang && npm pack --pack-destination ../../dist
       - uses: actions/upload-artifact@v4
         with:
           name: tez-lang-npm
