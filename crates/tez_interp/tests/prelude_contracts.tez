@@ -45,3 +45,5 @@ test sortsKeepLength = lists().all(xs => xs.sort().len() == xs.len() && xs.sortB
 test fromCodeIsOneCharacter = [0, 65, 233, 55357, 56832, 57343, 128512, 1114111].all(n => Char.fromCode(n).len() == 1)
 
 test toFloatReadsOnlyNumbers = "2.5".toFloat().isSome() && "-7".toFloat().isSome() && "1e3".toFloat().isSome() && ".5".toFloat().isNone() && "+1".toFloat().isNone() && "1.".toFloat().isNone() && "abc".toFloat().isNone() && "".toFloat().isNone()
+
+test textIsMeasuredInCharacters = "a😀b".len() == 3 && "a😀b".slice(1, 2) == "😀" && "a😀b".slice(2, 3) == "b" && "héllo".slice(1, 3) == "él" && "ab" < "b" && "😀" > "z"

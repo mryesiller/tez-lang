@@ -1,0 +1,5 @@
+fn fib(n: Int) -> Int
+  requires n >= 0
+  decreases n
+  = if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
+fn main() -> Int = fib(30)

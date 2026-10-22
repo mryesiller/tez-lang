@@ -167,6 +167,36 @@ impl ProcessZ3 {
         Ok(verdict)
     }
 
+    /// `(check-sat)` for a check whose answer is only ever acted on when it is `unsat` (the axioms' consistency check:
+    /// `unknown` and `sat` both mean "no contradiction found"). The no-contradiction answer is remembered per script
+    /// too, so an unchanged script is not given its time limit again.
+    ///
+    /// # Errors
+    /// Returns a message when the solver misbehaves.
+    pub fn check_sat_no_contradiction(&mut self) -> Result<Verdict, String> {
+        let marker = self.cache.as_ref().map(|dir| {
+            let digest = self.script.clone().finalize();
+            let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+            dir.join(format!("{hex}.open"))
+        });
+        if let Some(path) = &marker
+            && path.is_file()
+        {
+            CACHE_HITS.fetch_add(1, Ordering::Relaxed);
+            return Ok(Verdict::Unknown);
+        }
+        let verdict = self.check_sat()?;
+        if verdict != Verdict::Proved
+            && let Some(path) = &marker
+        {
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(path, b"");
+        }
+        Ok(verdict)
+    }
+
     fn check_sat_uncached(&mut self) -> Result<Verdict, String> {
         self.stdin
             .write_all(b"(check-sat)\n")
@@ -532,6 +562,17 @@ impl Z3 {
     pub fn check_sat(&mut self) -> Result<Verdict, String> {
         match self {
             Z3::Process(z) => z.check_sat(),
+            Z3::Replay(z) => z.check_sat(),
+        }
+    }
+
+    /// `(check-sat)` for the consistency check of the axioms (see [`ProcessZ3::check_sat_no_contradiction`]).
+    ///
+    /// # Errors
+    /// When the solver misbehaves.
+    pub fn check_sat_no_contradiction(&mut self) -> Result<Verdict, String> {
+        match self {
+            Z3::Process(z) => z.check_sat_no_contradiction(),
             Z3::Replay(z) => z.check_sat(),
         }
     }

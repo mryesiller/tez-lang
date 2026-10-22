@@ -100,17 +100,21 @@ pub fn verify(prog: &Program, src: &str, opts: &VerifyOptions) -> Result<Vec<Pro
         let _ = std::fs::write(path, slicer.dump(&base, &vc.obligs));
     }
 
+    // Only declarations are left out of what the solver sees (see `Decls`); every assertion is sent as before.
+    let flag_texts: Vec<String> = vc.term_flags.values().cloned().collect();
+    let decls = Decls::new(&base, &flag_texts);
     let mut z3 = Z3::open(opts.backend, opts.timeout_ms, opts.cache_dir.clone())?;
-    z3.run(&base)?;
+    z3.run(&decls.base)?;
     // The axioms must be consistent: an inconsistent set would "prove" everything.
     // (a quick check: inconsistencies are found at once, "unknown" is the normal answer otherwise)
     let mut check = vec![
         "(push 1)".to_string(),
         "(set-option :timeout 300)".to_string(),
     ];
+    check.extend(decls.needed(axioms.iter().map(String::as_str)));
     check.extend(axioms.iter().cloned());
     z3.run(&check)?;
-    let consistent = z3.check_sat()?;
+    let consistent = z3.check_sat_no_contradiction()?;
     z3.run(&[
         "(pop 1)".to_string(),
         format!("(set-option :timeout {})", opts.timeout_ms),
@@ -145,7 +149,7 @@ pub fn verify(prog: &Program, src: &str, opts: &VerifyOptions) -> Result<Vec<Pro
         let mut all_proved = true;
         for i in term {
             let o = &vc.obligs[i];
-            let (verdict, ce) = solve_one(&mut z3, &slicer, o)?;
+            let (verdict, ce) = solve_one(&mut z3, &slicer, &decls, o)?;
             all_proved &= verdict == Verdict::Proved;
             report(o, &verdict, ce);
         }
@@ -159,7 +163,7 @@ pub fn verify(prog: &Program, src: &str, opts: &VerifyOptions) -> Result<Vec<Pro
         }
         for i in rest {
             let o = &vc.obligs[i];
-            let (verdict, ce) = solve_one(&mut z3, &slicer, o)?;
+            let (verdict, ce) = solve_one(&mut z3, &slicer, &decls, o)?;
             report(o, &verdict, ce);
         }
     }
@@ -173,13 +177,14 @@ type Counterexample = Option<Vec<(String, String)>>;
 fn solve_one(
     z3: &mut Z3,
     slicer: &Slicer<'_>,
+    decls: &Decls,
     o: &crate::vc::Obligation,
 ) -> Result<(Verdict, Counterexample), String> {
     if o.goal == "true" {
         return Ok((Verdict::Proved, None));
     }
     let (slice_facts, slice_axioms) = slicer.slice(o);
-    let with_axioms = build_query(&slice_axioms, &slice_facts, o);
+    let with_axioms = build_query(decls, &slice_axioms, &slice_facts, o);
     z3.run(&with_axioms)?;
     let mut verdict = z3.check_sat()?;
     let mut counterexample = None;
@@ -190,7 +195,7 @@ fn solve_one(
     if verdict == Verdict::Unknown {
         // The quantified axioms may keep the solver from answering `sat`. Ask again without
         // them: a model found that way is only a candidate, but it names the failure.
-        let without = build_query(&[], &slice_facts, o);
+        let without = build_query(decls, &[], &slice_facts, o);
         z3.run(&without)?;
         match z3.check_sat()? {
             Verdict::Refuted => {
@@ -205,8 +210,21 @@ fn solve_one(
     Ok((verdict, counterexample))
 }
 
-fn build_query(axioms: &[String], facts: &[String], o: &crate::vc::Obligation) -> Vec<String> {
+fn build_query(
+    decls: &Decls,
+    axioms: &[String],
+    facts: &[String],
+    o: &crate::vc::Obligation,
+) -> Vec<String> {
     let mut q = vec!["(push 1)".to_string()];
+    let texts = axioms
+        .iter()
+        .chain(facts)
+        .chain(&o.path)
+        .map(String::as_str)
+        .chain(std::iter::once(o.goal.as_str()))
+        .chain(o.watch.iter().map(|(_, t)| t.as_str()));
+    q.extend(decls.needed(texts));
     q.extend(axioms.iter().cloned());
     q.extend(facts.iter().map(|f| format!("(assert {f})")));
     q.extend(o.path.iter().map(|p| format!("(assert {p})")));
@@ -221,6 +239,80 @@ fn values(z3: &mut Z3, o: &crate::vc::Obligation) -> Counterexample {
     let terms: Vec<String> = o.watch.iter().map(|(_, t)| t.clone()).collect();
     let vals = z3.get_values(&terms).ok()?;
     Some(o.watch.iter().map(|(n, _)| n.clone()).zip(vals).collect())
+}
+
+/// The declarations the solver is given. A program's encoding declares tens of thousands of constants, and any one
+/// obligation mentions a few hundred at most; sending them all costs more than most proofs (and in the browser
+/// every query would carry all of them). So the sorts, datatypes and anything a `define-fun` or a termination flag
+/// uses go first, and each query declares the constants and functions its own text mentions inside its `push`.
+/// Leaving a declaration out cannot make a proof succeed: assertions are untouched, and a symbol that is used
+/// without being declared is an error from the solver, which rejects the program.
+struct Decls {
+    /// Sent once, before anything else.
+    base: Vec<String>,
+    /// The declarations left for the queries, by the name they declare.
+    by_name: std::collections::HashMap<String, String>,
+}
+
+impl Decls {
+    fn new(base: &[String], base_texts: &[String]) -> Self {
+        let name_of = |l: &str| -> Option<String> {
+            let r = l
+                .strip_prefix("(declare-const ")
+                .or_else(|| l.strip_prefix("(declare-fun "))?;
+            r.split_whitespace().next().map(str::to_string)
+        };
+        let plain = |n: &str| n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+        let mut by_name = std::collections::HashMap::new();
+        let mut keep = Vec::new();
+        for l in base {
+            match name_of(l) {
+                Some(n) if plain(&n) => {
+                    by_name.insert(n, l.clone());
+                }
+                // a name the slicing could not recognise: send everything, as before
+                Some(_) => {
+                    return Self {
+                        base: base.to_vec(),
+                        by_name: std::collections::HashMap::new(),
+                    };
+                }
+                None => keep.push(l.clone()),
+            }
+        }
+        let (defs, mut out): (Vec<String>, Vec<String>) = keep
+            .into_iter()
+            .partition(|l| l.starts_with("(define-fun "));
+        let mut early = std::collections::HashSet::new();
+        for t in defs.iter().chain(base_texts) {
+            for id in idents(t) {
+                if let Some(d) = by_name.remove(id) {
+                    early.insert(d);
+                }
+            }
+        }
+        // declarations keep their original order (a function after the sorts it uses)
+        out.extend(base.iter().filter(|l| early.contains(*l)).cloned());
+        out.extend(defs);
+        Self { base: out, by_name }
+    }
+
+    /// The declarations that the given formulas mention, in a stable order.
+    fn needed<'t>(&self, texts: impl Iterator<Item = &'t str>) -> Vec<String> {
+        let mut out: Vec<&String> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for t in texts {
+            for id in idents(t) {
+                if let Some(d) = self.by_name.get(id)
+                    && seen.insert(id)
+                {
+                    out.push(d);
+                }
+            }
+        }
+        out.sort();
+        out.into_iter().cloned().collect()
+    }
 }
 
 /// Relevance slicing: an obligation only needs the facts connected to it through shared
@@ -423,5 +515,52 @@ impl<'a> Slicer<'a> {
             out.push("(pop 1)".into());
         }
         out.join("\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Decls;
+
+    fn base() -> Vec<String> {
+        [
+            "(declare-sort Str 0)",
+            "(declare-const v1 Int)",
+            "(declare-const v2 Int)",
+            "(declare-fun f (Int) Int)",
+            "(declare-const flag3 Bool)",
+            "(define-fun twice ((x Int)) Int (f (f x)))",
+        ]
+        .map(String::from)
+        .to_vec()
+    }
+
+    #[test]
+    fn a_query_declares_only_what_it_mentions() {
+        let d = Decls::new(&base(), &["flag3".to_string()]);
+        // the sort, what the `define-fun` uses and what the flags use are sent once, up front
+        assert_eq!(
+            d.base,
+            [
+                "(declare-sort Str 0)",
+                "(declare-fun f (Int) Int)",
+                "(declare-const flag3 Bool)",
+                "(define-fun twice ((x Int)) Int (f (f x)))"
+            ]
+        );
+        assert_eq!(
+            d.needed(["(> v2 0)", "(= (f v2) 1)"].into_iter()),
+            ["(declare-const v2 Int)"]
+        );
+        assert!(d.needed(["(> 1 0)"].into_iter()).is_empty());
+    }
+
+    #[test]
+    fn an_unrecognised_name_sends_everything() {
+        let mut b = base();
+        b.push("(declare-const |odd name| Int)".to_string());
+        let d = Decls::new(&b, &[]);
+        assert_eq!(d.base, b);
+        assert!(d.needed(["(> v1 0)"].into_iter()).is_empty());
     }
 }

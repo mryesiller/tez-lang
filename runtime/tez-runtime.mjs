@@ -27,8 +27,22 @@ function codePoints(s) {
   return Array.from(s);
 }
 
+// A text without surrogates has one UTF-16 unit per character, so its length and slices need no copy of every
+// character. Scanning loops ask about the same text over and over: the last answer is kept.
+let lastText = "";
+let lastFlat = true;
+function isFlat(s) {
+  if (s !== lastText) {
+    lastFlat = !/[\ud800-\udfff]/.test(s);
+    lastText = s;
+  }
+  return lastFlat;
+}
+
 function cmpStr(a, b) {
   // compare by code point, as Rust compares UTF-8 bytes
+  if (a === b) return 0;
+  if (isFlat(a) && isFlat(b)) return a < b ? -1 : 1;
   const x = codePoints(a);
   const y = codePoints(b);
   const n = Math.min(x.length, y.length);
@@ -129,11 +143,15 @@ export async function load(bytes) {
     },
     "Float.toStr": (x) => fmtFloat(getFloat(x)),
 
-    "Str.len": (s) => codePoints(s).length,
+    "Str.len": (s) => (isFlat(s) ? s.length : codePoints(s).length),
     "Str.slice": (s, from, to) => {
-      const cp = codePoints(s);
       const f = num(from);
       const t = num(to);
+      if (isFlat(s)) {
+        if (!(f >= 0 && f <= t && t <= s.length)) throw new TezError("E_PRECONDITION", "Str.slice range is out of bounds");
+        return s.slice(f, t);
+      }
+      const cp = codePoints(s);
       if (!(f >= 0 && f <= t && t <= cp.length)) throw new TezError("E_PRECONDITION", "Str.slice range is out of bounds");
       return cp.slice(f, t).join("");
     },
@@ -182,8 +200,8 @@ export async function load(bytes) {
     "List.filter": (l, f) => l.filter((x) => truthy(ex.__apply1(f, x))),
     "List.fold": (l, init, f) => l.reduce((acc, x) => ex.__apply2(f, acc, x), init),
     "List.flatMap": (l, f) => l.flatMap((x) => ex.__apply1(f, x)),
-    "List.append": (l, x) => [...l, x],
-    "List.concat": (a, b) => [...a, ...b],
+    "List.append": (l, x) => l.concat([x]),
+    "List.concat": (a, b) => a.concat(b),
     "List.reverse": (l) => [...l].reverse(),
     "List.take": (l, n) => {
       const k = big(n);

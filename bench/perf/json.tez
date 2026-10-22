@@ -1,0 +1,5 @@
+fn item(i: Int) -> Str = "{\"id\":" ++ i.toStr() ++ ",\"title\":\"story " ++ i.toStr() ++ "\",\"score\":" ++ (i * 3).toStr() ++ "}"
+fn main() -> Int = match Json.parse("[" ++ List.range(0, 300).map(item).join(",") ++ "]") {
+  Ok(j) => j.list().len()
+  Err(e) => -1
+}

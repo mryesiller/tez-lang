@@ -1,0 +1,1 @@
+fn main() -> Int = List.range(0, 100000).map(x => x * 7919 % 100003).sort().get(50000)

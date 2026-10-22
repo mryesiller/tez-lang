@@ -1,0 +1,1 @@
+fn main() -> Int = List.range(0, 50000).map(x => x.toStr()).join(",").split(",").len()
