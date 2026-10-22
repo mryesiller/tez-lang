@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "problems": [],
+  "problemCount": 0,
+  "programsReproved": 2431,
+  "brokenReRejected": 3196,
+  "leaks": 0,
+  "unit": "tokens (estimated: characters / 3.2)",
+  "lengths": {
+    "repair": {
+      "rows": 3235,
+      "mean": 661,
+      "p95": 1159,
+      "max": 2305,
+      "over1024": 426,
+      "over2048": 2,
+      "total": 2138657
+    },
+    "app": {
+      "rows": 1299,
+      "mean": 496,
+      "p95": 1406,
+      "max": 1802,
+      "over1024": 68,
+      "over2048": 0,
+      "total": 644714
+    },
+    "pure": {
+      "rows": 2843,
+      "mean": 165,
+      "p95": 335,
+      "max": 1318,
+      "over1024": 115,
+      "over2048": 0,
+      "total": 468608
+    },
+    "explain": {
+      "rows": 122,
+      "mean": 59,
+      "p95": 76,
+      "max": 98,
+      "over1024": 0,
+      "over2048": 0,
+      "total": 7217
+    },
+    "all": {
+      "rows": 7499,
+      "mean": 435,
+      "p95": 1142,
+      "max": 2305,
+      "over1024": 609,
+      "over2048": 2,
+      "total": 3259196
+    }
+  }
+}

@@ -1,0 +1,327 @@
+{
+  "model": "mlx-community/gemma-4-e4b-it-4bit",
+  "samples": 2,
+  "turns": 2,
+  "results": [
+    {
+      "variant": "none",
+      "task": "w1-counter",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"Html\"\n\ntype CounterState = { count: Int }\n\nfn increment(state: CounterState) -> CounterState =\n  state with { count: state.count + 1 }\n\nfn decrement(state: CounterState) -> CounterState\n  requires state.count > 0\n  = state with { count: state.count - 1 }\n\nfn reset(state: CounterState) -> CounterState =\n  state with { count: 0 }\n\nfn render(state: CounterState) -> Html[Msg] =\n  Html.body {\n    Html.div {\n      Html.h1 { Html.text(state.count.toStr()) }\n      Html.div {\n        Html.button(\"Increment\", Msg.Add)\n        Html.button(\"Decrement\", Msg.Subtract)\n        Html.button(\"Reset\", Msg.Reset)\n      }\n    }\n  }\n\nenum Msg = Add | Subtract | Reset\n\n// Initial state for the application\nlet initialState = CounterState { count: 0 }\n\n// Function to handle messages and transition state\nfn handleMsg(currentState: CounterState, msg: Msg) -> CounterState = match msg {\n  Msg.Add => increment(currentState)\n  Msg.Subtract => \n    // To satisfy the \"never negative\" constraint safely upon transition, \n    // we must ensure decrement is only called if count > 0, or handle the failure.\n    // Since the compiler implies a transition, we use a safe version of decrement.\n    if currentState.count > 0 { decrement(currentState) } else currentState\n  Msg.Reset => reset(currentState)\n}\n"
+    },
+    {
+      "variant": "none",
+      "task": "w1-counter",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_NAME_CASE",
+      "code": "use \"html\"\n\n// State model for the counter application\ntype CounterState = {\n  count: Int\n}\n\n// Messages to transition the state\ntype CounterMsg = {\n  increment\n  reset\n}\n\n// Initial state\nlet initialCounterState = CounterState { count: 0 }\n\n// Function to handle messages and produce the next state and an optional side effect\nfn update(state: CounterState, msg: CounterMsg) -> (CounterState, Option[Msg]) = match msg {\n  CounterMsg::Increment => {\n    // Ensure count never becomes negative through the increment operation itself\n    let newCount = state.count + 1;\n    (CounterState { count: newCount }, None)\n  }\n  CounterMsg::Reset => {\n    (CounterState { count: 0 }, None)\n  }\n}\n\n// Function to render the UI based on the current state\nfn view(state: CounterState) -> Html[CounterMsg] = {\n  Html.body {\n    Html.heading(\"Counter Application\")\n    Html.paragraph(state.count.toStr())\n    Html.div {\n      Html.button(\"Add One\", CounterMsg::Increment)\n      Html.button(\"Reset\", CounterMsg::Reset)\n    }\n  }\n}\n"
+    },
+    {
+      "variant": "none",
+      "task": "w2-toggle",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"ui.tez\"\n\ntype Msg = ShowHide\n\nfn toggleVisibility(isVisible: Bool) -> Msg =\n  if isVisible { Hide } else { Show }\n\n// The view function receives the current model and returns the UI structure,\n// which includes the message that will be generated upon interaction.\nfn view(model: VisibilityModel) -> Html[Msg] = {\n  Html.body {\n    Html.heading(\"Toggle Text\")\n    Html.button(\"Toggle\") {\n      // When the button is clicked, it signals the message based on the current model state.\n      model.isVisible.map(toggleVisibility)\n    }\n    Html.div {\n      model.isVisible.map(\n        {\n          Html.paragraph(\"This is the secret message.\")\n        }\n      )\n    }\n  }\n}\n\n// State definitions should precede execution code\ntype VisibilityModel = {\n  isVisible: Bool\n}\n\n// Initial state setup usually happens outside the main view function in a real app,\n// but we define it here as a constant/binding if needed elsewhere.\n// For the compiler to accept this code, we remove the floating 'let initialModel'\n// unless it's part of a larger execution context.\n"
+    },
+    {
+      "variant": "none",
+      "task": "w2-toggle",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_BAD_ITEM",
+      "code": "use \"tez_types\"\n\n// --- Types ---\n\n// Define messages for state transitions\ntype Msg = {\n  ToggleParagraph\n}\n\n// Define the application state model\ntype Model = {\n  isVisible: Bool\n}\n\n// --- Functions ---\n\n// Function to handle the message and produce the next model\nfn update(model: Model, msg: Msg) -> Model = match msg {\n  ToggleParagraph => model with {\n    isVisible = !model.isVisible\n  }\n}\n\n// Function to render the view based on the current model\nfn view(model: Model) -> Html[Msg] = Html.body {\n  Html.div {\n    // Always show the instruction paragraph\n    Html.p { \"Click the button to toggle the text.\" }\n    \n    // Conditionally render the toggled paragraph\n    if model.isVisible {\n      Html.p { \"This is the currently visible text.\" }\n    } else {\n      Html.p { \"This is the hidden text.\" }\n    }\n    \n    // The button remains the same, triggering the toggle\n    Html.button {\n      label: \"Toggle Text\"\n      msg: ToggleParagraph\n    }\n  }\n}\n\n// Initial state (often defined outside the core functions in a real app)\n// let initialModel = Model { isVisible: true }\n"
+    },
+    {
+      "variant": "none",
+      "task": "w3-converter",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"stdlib\"\n\ntype Temperature = Int // Representing temperature in Celsius\n\n// Conversion function: F = C * 9/5 + 32\nfn celsiusToFahrenheit(c: Temperature) -> Int =\n  (c * 9 / 5) + 32\n\n// UI rendering function\nfn renderPage(celsiusTemp: Temperature) -> Html[Msg] = {\n  let fahrenheitTemp = celsiusToFahrenheit(celsiusTemp)\n  Html.body {\n    Html.heading(\"Temperature Converter\")\n    Html.paragraph(\"Enter temperature in Celsius:\")\n    Html.input(\"celsiusInput\", msg) // Assume a message type Msg is used for input submission\n    Html.button(\"Convert\", msg)\n    Html.paragraph(\"Fahrenheit: \" ++ fahrenheitTemp.toStr())\n  }\n}\n\n// Main application entry point (simulated)\nfn main() -> Unit = {\n  // Initial state setup or handling of incoming messages goes here\n  // For this example, we just show how the conversion works given an input.\n  let initialCelsius = 25\n  let page = renderPage(initialCelsius)\n}\n"
+    },
+    {
+      "variant": "none",
+      "task": "w3-converter",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"html\"\n\n// Converts Celsius to Fahrenheit, returning the rounded integer value.\nfn celsiusToFahrenheit(celsius: Int) -> Int = (celsius * 9 / 5) + 32\n\n// The main view function that takes the current Celsius input and returns the page structure.\nfn temperatureConverterView(celsiusInput: Int) -> Html[Msg] = {\n  let fahrenheit = celsiusToFahrenheit(celsiusInput)\n  Html.body {\n    Html.heading(\"Temperature Converter\")\n    Html.paragraph(\"Enter temperature in Celsius:\")\n    Html.input(\n      value = toStr(celsiusInput),\n      onChange = msg => Msg.UpdateCelsius(msg) // Assuming a message type Msg exists\n    )\n    Html.paragraph(\"Fahrenheit:\")\n    Html.paragraph(toStr(fahrenheit))\n  }\n}\n"
+    },
+    {
+      "variant": "none",
+      "task": "w4-stopwatch",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_NAME_CASE",
+      "code": "use \"clock\"\n\n// Model holds the current time in seconds and the elapsed time\ntype Model = {\n  elapsedTime: Int,\n  isRunning: Bool\n}\n\n// Msg signals user actions or time ticks\ntype Msg = {\n  tick // Time has advanced by 1 second\n  reset\n}\n\n// Update function processes messages and returns the next model and optional side effects\nfn update(model: Model, msg: Msg) -> (Model, Option[Sub[Msg]]) = match msg {\n  tick => {\n    let newElapsed = model.elapsedTime + 1\n    let newModel = model with { elapsedTime: newElapsed }\n    // Schedule the next Tick in 1 second\n    (newModel, Some(Sub.clock(1000, _ => tick)))\n  }\n  reset => {\n    let newModel = Model { elapsedTime: 0, isRunning: false }\n    (newModel, None) // Stop ticking\n  }\n}\n\n// Initial model when the application starts\nfn initialModel() -> Model = Model { elapsedTime: 0, isRunning: true }\n\n// View renders the current model into HTML\nfn view(model: Model) -> Html[Msg] = {\n  let timerText = \"Elapsed Time: \" ++ model.elapsedTime ++ \" seconds\"\n  let resetButton = if model.isRunning {\n    Html.button(\"Reset\", reset)\n  } else {\n    Html.button(\"Start\", {}) // If stopped, \"Start\" button does nothing useful here, but we keep it for completeness\n  }\n\n  Html.body {\n    Html.heading(\"Timer Application\")\n    Html.paragraph(timerText)\n    Html.row {\n      kids: [\n        resetButton\n      ]\n    }\n  }\n}\n\n// Entry point for the application (usually handled by the runtime, but shown here for completeness)\nfn main() -> Model = initialModel()\n"
+    },
+    {
+      "variant": "none",
+      "task": "w4-stopwatch",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"Time\"\n\ntype Msg = Tick | Reset\n\nfn ticks(initialTime: Int) -> List[Sub[Msg]] =\n  { let elapsed = initialTime\n    Sub.every(1000, _ => Tick)\n  }\n\nfn render(currentTime: Int) -> Html[Msg] =\n  Html.body {\n    Html.heading(\"Time Elapsed\")\n    Html.paragraph(currentTime.toStr())\n    Html.button(\"Reset\", Reset)\n  }\n\nfn handle(msg: Msg, currentTime: Int) -> (Int, Option[Msg]) =\n  match msg {\n    Tick => (currentTime + 1, None)\n    Reset => (0, Some(Tick))\n  }\n\nfn main() -> (Int, Option[Msg]) =\n  // Initial state: 0 seconds, no pending message\n  (0, Some(Tick))\n"
+    },
+    {
+      "variant": "none",
+      "task": "w5-greeting",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_USE_NOT_FOUND",
+      "code": "use \"clock.tez\"\n\n// Represents the message to display\ntype Greeting = Str\n\n// The main function that determines the greeting based on the current hour\nfn getGreeting(currentHour: Int) -> Greeting =\n  if currentHour < 12 {\n    \"Good morning\"\n  } else {\n    \"Good afternoon\"\n  }\n\n// The function that produces the message for the UI\nfn produceUiMessage(hour: Int) -> Greeting =\n  getGreeting(hour)\n\n// The function that drives the system by ticking the clock\nfn tick(currentHour: Int) -> Greeting =\n  produceUiMessage(currentHour)\n\n// The entry point for the application, starting the clock ticks\nfn appStart() -> List[Sub[Greeting]] =\n  // To refresh every minute (60 seconds), we use Sub.clock.\n  // The clock ticks, and when it ticks, we need to know the current hour.\n  // We map the clock tick event to producing a message.\n  // This setup assumes the tick provides the current hour somehow, which is often passed into the handler.\n  // Since the compiler requires a concrete return type based on the inputs, and we don't have a 'current hour' input here,\n  // we must use Sub.clock to drive the updates.\n\n  // We create a subscription that ticks every 60 seconds.\n  // When it ticks, we need to produce a message. The message generation (which depends on the current hour)\n  // must happen inside the closure passed to Sub.clock.\n  // Since the compiler environment for this problem is abstract, we simulate the required structure:\n  // A tick happens, and the message is generated based on the time context.\n\n  // For a functional simulation where the message depends on the time:\n  // We assume that when Sub.clock ticks, the system provides the current hour (or we can derive it).\n  // If we assume the tick itself provides the time context needed for the message:\n  let clockTick = Sub.clock(60, hour => tick(hour))\n  [clockTick]\n"
+    },
+    {
+      "variant": "none",
+      "task": "w5-greeting",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_USE_BAD_PATH",
+      "code": "The original code has a few issues based on the compiler diagnostics and the task description:\n\n1.  **`use \"Time\"`**: The diagnostic suggests the path is incorrect. If the module is named `Time`, it should likely be `use \"Time.tez\"` or perhaps just `use \"Time\"` if the compiler handles the extension automatically, but the error suggests otherwise. Since the task implies a dependency on time, I will assume the library is available and adjust the usage context.\n2.  **Time Calculation**: The logic inside `mainLoop` is highly speculative about what `clockTime` represents (seconds since epoch vs. minutes since midnight). Given the requirement is to refresh every minute and display the correct greeting, we need the hour of the day. If `Sub.clock(60, ...)` drives the ticks, then `clockTime` in `mainLoop` is likely the *seconds since the application started*, not the absolute epoch time.\n3.  **Function Signature**: `mainLoop` returns `List[Sub[GreetingMsg]]`. This signature suggests it's returning *new subscriptions* based on the current time, which is usually not how a tick handler works. A tick handler usually takes the current time and returns the *next set of actions/messages* to send to the UI.\n4.  **Goal Mismatch**: The goal is to greet the visitor. The current code only signals an update (`List.singleton(())`) but never generates the actual greeting string based on the time.\n\n**Refactoring based on Tez principles:**\n\nWe need a function that, when called by the clock tick (which happens every 60 seconds), determines the current hour and returns the appropriate greeting message to be displayed.\n\nLet's assume:\n*   `Sub.clock(60, action)` runs `action` every 60 seconds.\n*   The `action` receives the current time (seconds elapsed since the application started).\n*   The action should return a message that drives the UI update.\n\nWe need to refine `mainLoop` to calculate the hour and return the message. Since the compiler requires a return type, and the goal is to update the UI, the return type should probably be the message itself, or a list containing it if the UI update is asynchronous. Given the constraints, I will make `mainLoop` return the message to be displayed.\n\nIf `clockTime` is seconds since the application started:\n*   Hours elapsed = `clockTime / 3600` (integer division)\n*   Current hour of the day (if the app started at midnight) = `(clockTime / 3600) % 24` (This is complex and error-prone).\n\n**Simpler Assumption (to satisfy the prompt structure):** Let's assume the clock ticks drive the function, and we need to calculate the *current hour* based on the ticks. If the ticks happen every minute (60s), then `clockTime / 60` gives the current minute count since the app started.\n\nLet's assume `clockTime` passed to `mainLoop` is the number of **minutes elapsed since midnight**.\n\n*   Hour = `(clockTime / 60)` (integer division)\n\nIf `clockTime` is minutes since midnight (0 to 1439+):\n*   Hour of day (0-23) = `clockTime / 60`\n\nLet's proceed with this assumption for `clockTime` representing minutes since midnight, as it makes the greeting logic clean.\n\nThe function signature should probably be:\n`fn mainLoop(minutesSinceMidnight: Int) -> GreetingMsg`\n\nAnd the entry point subscribes to the ticks.\n\nHere is the corrected, complete program structure:\n\n```tez\nuse\n"
+    },
+    {
+      "variant": "none",
+      "task": "w6-quote",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_BAD_ITEM",
+      "code": "The provided code attempts to implement a simple Elm-like architecture in a hypothetical Tez compiler environment, but it uses syntax that the compiler flags as incorrect based on its strict rules.\n\nHere are the main issues identified by the compiler diagnostics and how to fix them:\n\n1.  **Missing `type` declaration for `Msg`**: The compiler expects declarations like `type`, `fn`, etc., at the top level, not constructors like `Msg`. In this context, `Msg` should likely be defined as a discriminated union or message type, which usually maps to a `type` or a specific message structure in Tez.\n2.  **Syntax for `match` and patterns**: The pattern matching syntax used for `Msg` is causing parsing errors.\n3.  **Structure of `fn` bodies**: The use of `{}` blocks in function definitions seems misplaced or incorrectly terminated in the compiler's view.\n4.  **Missing `Msg.LoadRequest`**: The original code uses `Msg.LoadRequest` but never defines a `LoadRequest` message, which would be needed to trigger the load.\n5.  **`List.repeat` usage in `loadQuoteFile`**: The simulation needs to be cleaner regarding when and how it triggers.\n\nSince the compiler error suggests the initial structure is wrong, I will refactor the code to adhere strictly to the Tez specification provided in the prompt, assuming that the structure needs to be self-contained and follow the strict type/function declaration patterns.\n\nI will assume the following conventions based on the prompt's constraints:\n*   Messages (`Msg`) are defined using a structure that behaves like a discriminated union.\n*   The main application loop drives the state transition.\n\nGiven the constraints and the goal, I must introduce a `Msg` type and ensure all function signatures are complete. I will assume `Msg` should be defined as a `type` or a structure that allows pattern matching.\n\nHere is the corrected version, assuming the compiler allows defining types for messages and using standard message passing:\n\n```tez\nuse \"ui.tez\"\n\n// Define a message type for UI updates\ntype Msg =\n  LoadSuccess(Str)\n  LoadError(Str)\n  LoadRequest // Added LoadRequest message\n\n// Define the main application model\ntype Model = {\n  status: Option[Str]\n}\n\n// Initial model\ninitialModel: Model = Model { status: None }\n\n// The function that processes incoming messages\nfn handleMsg(m: Msg, model: Model) -> (Model, List[Sub[Msg]]) = match m {\n  Msg.LoadSuccess(text) =>\n    (Model { status: Some(text) }, [])\n  Msg.LoadError(err) =>\n    (Model { status: Some(err) }, [])\n  Msg.LoadRequest =>\n    // When LoadRequest arrives, trigger the side effect (loading)\n    (model, []) // Return current model, side effect handled by subs\n}\n\n// The function that renders the UI based on the current model\nfn renderUI(model: Model) -> Html[Msg] = {\n  match model.status {\n  Some(text) =>\n    Html.body {\n      Html.h1(\"Quote Loader\")\n      Html.p(text)\n      Html.button(\"Reload\") { Msg.LoadRequest }\n    }\n  None =>\n    Html.body {\n      Html.h1(\"Quote Loader\")\n      Html.p(\"Click to load quote.\")\n      Html.button(\"Load Quote\") { Msg.LoadRequest }\n    }\n}\n\n// Simulation of loading the file (in a real app, this would be an async effect)\n// Returns a list of messages to be sent asynchronously.\nfn loadQuoteFile(_\n"
+    },
+    {
+      "variant": "none",
+      "task": "w6-quote",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"fs\"\n\nfn loadQuote(path: Str) -> Result[Str, LoadError] =\n  try readFile(path)\n\nfn viewQuotePage(filePath: Str) -> Html[Msg] =\n  let result = loadQuote(filePath) in\n  match result {\n    Ok(content) => Html.body {\n      Html.heading(\"Quote of the Day\")\n      Html.paragraph(content)\n      Html.button(\"Load New Quote\", LoadNext)\n    }\n    Err(e) => Html.body {\n      Html.heading(\"Error Loading Quote\")\n      Html.paragraph(e.toStr())\n      Html.button(\"Try Again\", LoadQuote(filePath))\n    }\n  }\n"
+    },
+    {
+      "variant": "none",
+      "task": "w7-todo",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"Html\"\n\ntype Msg =\n  | AddMsg(Str)\n  | RemoveMsg(Int)\n\ntype Model = {\n  todos: List[Str]\n  newTodoText: Str\n}\n\ntype Update = Msg -> Model -> (Model, Maybe[Sub[Msg]])\n\nfn update(msg: Msg, model: Model) -> (Model, Maybe[Sub[Msg]]) = match msg {\n  AddMsg(text) =>\n    if text.trim().isEmpty() {\n      (model, None)\n    } else {\n      let newTodos = model.todos ++ [text]\n      let newModel = model with { todos: newTodos, newTodoText: \"\" }\n      (newModel, None)\n    }\n  RemoveMsg(index) =>\n    if index >= 0 && index < model.todos.len() {\n      let newTodos = model.todos.take(index).concat(model.todos.drop(index + 1))\n      let newModel = model with { todos: newTodos }\n      (newModel, None)\n    } else {\n      (model, None)\n    }\n}\n\nfn view(model: Model) -> Html[Msg] = {\n  Html.div {\n    Html.input(\n      value = model.newTodoText,\n      onInput = _ => (), // No specific action needed on input change for this simple example\n    )\n    Html.button(\n      label = \"Add\",\n      onClick = AddMsg(model.newTodoText)\n    )\n    Html.ul {\n      model.todos.enumerate().map(i => {\n        Html.li {\n          Html.text(model.todos[i])\n          Html.button(\n            label = \"Remove\",\n            onClick = RemoveMsg(i)\n          )\n        }\n      })\n    }\n  }\n}\n\n// Initial state\nfn initialModel(): Model = Model {\n  todos: [],\n  newTodoText: \"\"\n}\n\n// Main entry point (for demonstration/testing)\nfn main() -> Html[Msg] = {\n  let initialModel = initialModel()\n  view(initialModel)\n}\n"
+    },
+    {
+      "variant": "none",
+      "task": "w7-todo",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_NAME_CASE",
+      "code": "use \"forms.tez\"\n\n// Represents a single ToDo item\ntype TodoItem = { text: Str, id: Int }\n\n// Represents the state of the ToDo application\ntype TodoState = {\n  items: List[TodoItem],\n  newItemText: Str\n}\n\n// Messages sent to update the state\ntype Msg = {\n  addItem(Str),\n  removeItem(Int)\n}\n\n// Initial state\nfn initialState() -> TodoState = TodoState {\n  items: [],\n  newItemText: \"\"\n}\n\n// Handles incoming messages and returns the new state\nfn handleMsg(state: TodoState, msg: Msg) -> TodoState = match msg {\n  addItem(text) if text.isEmpty() == false => TodoState {\n    items: state.items ++ [TodoItem { text: text, id: state.items.len() + 1 }],\n    newItemText: \"\"\n  },\n  addItem(_) => state, // Ignore empty additions\n  removeItem(id) => TodoState {\n    items: state.items.filter(item => item.id != id),\n    newItemText: state.newItemText\n  }\n}\n\n// The view renders the UI based on the current state\nfn view(state: TodoState) -> Html[Msg] = {\n  Html.div {\n    Html.input(\n      value: state.newItemText,\n      on_submit: addItem\n    ),\n    Html.button(label: \"Add\", on_click: addItem) ++\n    Html.ul(\n      state.items.map(item => Html.li {\n        Html.text(item.text) ++\n        Html.button(label: \"Remove\", on_click: removeItem(item.id))\n      })\n    )\n  }\n}\n\n// Main application function signature (simplified for this example)\nfn app(initialState: TodoState) -> Html[Msg] = {\n  // In a real app, this would be a loop driven by Msg processing\n  view(initialState)\n}\n"
+    },
+    {
+      "variant": "none",
+      "task": "w8-visits",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "The original code has several structural and syntactic issues according to the strict Tez compiler rules, including incorrect use of types, missing required constructs (like `decreases` or proper function signatures), and compiler errors in the simulation logic.\n\nThe primary fixes involve:\n1.  Restructuring the code to fit a runnable Tez application pattern, assuming the compiler expects a single entry point or a defined lifecycle structure.\n2.  Fixing syntax errors (`:`, `=`, `->`, `{` placement).\n3.  Adhering to naming conventions (`lowerCamel`).\n4.  Ensuring functions have correct signatures when used in a simulation context.\n\nSince the goal is a \"Visit Counter Page,\" this implies a reactive lifecycle (like Elm architecture), which is complex to map perfectly onto a simple Tez function signature without a full framework binding. I will adjust the code to be syntactically correct Tez while preserving the *intent* of the simulation, making necessary assumptions about the missing compiler environment details (like how `browser_storage` interacts with Tez types).\n\nHere is the corrected version attempting to satisfy the compiler checks:\n\n```tez\nuse \"browser_storage\"\n\n// Represents the state of the visit counter application\ntype VisitCounterState = {\n  count: Int\n}\n\n// Message types for state transitions\nenum Msg {\n  Increment\n}\n\n// Initial state when the page loads for the first time\nfn initialCounterState() -> VisitCounterState = {\n  VisitCounterState {\n    count: 1\n  }\n}\n\n// Function to increment the count and return the new state\nfn incrementCount(currentState: VisitCounterState) -> VisitCounterState = {\n  VisitCounterState {\n    count: currentState.count + 1\n  }\n}\n\n// Function to load the count from storage if available\nfn loadCount(storageKey: Str) -> Option[Int] = {\n  // Simulating load: assumes browser_storage.getItem returns Some(s) or None\n  let loadedValue = browser_storage.getItem(storageKey)\n  if loadedValue.isSome(s) && s.toInt() > 0 {\n    Some(s.toInt())\n  } else {\n    None\n  }\n}\n\n// Function to save the count to storage\nfn saveCount(storageKey: Str, count: Int) = {\n  // Side effect execution\n  browser_storage.setItem(storageKey, count.toStr())\n}\n\n// The main rendering function for the page\nfn renderPage(currentState: VisitCounterState) -> Html[Msg] = {\n  let currentCount = currentState.count\n  let storageKey = \"visit_counter_count\"\n\n  Html.body {\n    Html.heading(\"Visit Count\")\n    Html.paragraph(currentCount.toStr()) // Display the count\n    Html.button(\"Next Page\", Msg.Increment) // Button triggers increment\n  }\n}\n\n// The main update function handles incoming messages and produces a new state\nfn update(msg: Msg, currentState: VisitCounterState) -> (VisitCounterState, Option[Msg]) = {\n  match msg {\n    Msg.Increment => {\n      // 1. Increment the count\n      let newState = incrementCount(currentState)\n      // 2. Save the new count to storage (side effect)\n      let storageKey = \"visit_counter_count\"\n      saveCount(storageKey, newState.count)\n      // 3. Return the new state and no further message\n      (newState, None)\n    }\n  }\n}\n\n// Application entry point simulation: determines the starting state\nfn main() -> VisitCounterState = {\n  let storageKey = \"visit_counter_count\"\n"
+    },
+    {
+      "variant": "none",
+      "task": "w8-visits",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_UNEXPECTED_TOKEN",
+      "code": "use \"browser.tez\"\n\n// Represents the current visit count.\ntype VisitCount = Int\n\n// Initial state for a new visitor.\nfn initialState() -> VisitCount = 1\n\n// Updates the count when a page is viewed.\nfn incrementCount(currentCount: VisitCount) -> VisitCount = currentCount + 1\n\n// The page renders the current count.\nfn renderPage(count: VisitCount) -> Html[PageLoaded] = {\n  Html.body {\n    Html.heading(\"Visit Page\")\n    Html.paragraph(\"You are visit number: \" ++ count.toStr())\n    Html.button(\"Refresh\")\n  }\n}\n\n// Handles potential navigation/action triggers from the page.\nfn handleAction(action: PageLoaded) -> Option[PageLoaded] = {\n  if action.isRefreshTriggered() {\n    Some(PageLoaded)\n  } else {\n    None\n  }\n}\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w1-counter",
+      "sample": 1,
+      "accepted": true,
+      "firstTurn": true,
+      "turns": 1,
+      "firstError": null,
+      "code": "type Model = { count: Int where it >= 0 }\n\ntype Msg = Inc | Reset\n\nfn init() -> Model = Model { count: 0 }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Inc => m with { count: m.count + 1 }\n  Reset => init()\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"Counter\"),\n      Html.paragraph(\"Count: \" ++ m.count.toStr()),\n      Html.row([Html.button(\"+\", Inc), Html.button(\"reset\", Reset)])\n    ]\n  )\n\ntest startsAtZero = init().count == 0\n\ntest incrementsTwice = update(update(init(), Inc), Inc).count == 2\n\nfn main() -> Int = update(update(init(), Inc), Inc).count\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w1-counter",
+      "sample": 2,
+      "accepted": true,
+      "firstTurn": true,
+      "turns": 1,
+      "firstError": null,
+      "code": "type Model = { count: Int where it >= 0 }\n\ntype Msg = Inc | Dec | Reset\n\nfn init() -> Model = Model { count: 0 }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Inc => m with { count: m.count + 1 }\n  Dec => if m.count > 0 { m with { count: m.count - 1 } } else { m }\n  Reset => init()\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"Counter\"),\n      Html.paragraph(\"Count: \" ++ m.count.toStr()),\n      Html.row([Html.button(\"-\", Dec), Html.button(\"+\", Inc), Html.button(\"reset\", Reset)])\n    ]\n  )\n\ntest startsAtZero = init().count == 0\n\ntest neverGoesBelowZero = update(init(), Dec).count == 0\n\ntest incrementsTwice = update(update(init(), Inc), Inc).count == 2\n\nfn main() -> Int = update(update(init(), Inc), Inc).count\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w2-toggle",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_NAME_UNKNOWN_TYPE",
+      "code": "type Model = { isVisible: Bool }\n\ntype Msg = Toggle\n\nfn init() -> Model = Model { isVisible: true }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Toggle => m with { isVisible: !m.isVisible }\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.button(\"Toggle Text\", Toggle),\n      if m.isVisible {\n        Html.paragraph(\"This is the hidden paragraph.\")\n      } else {\n        Html.paragraph(\"\")\n      }\n    ]\n  )\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w2-toggle",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_NAME_UNKNOWN_TYPE",
+      "code": "type Model = { isVisible: Bool }\n\ntype Msg = Toggle\n\nfn init() -> Model = Model { isVisible: true }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Toggle => m with { isVisible: !m.isVisible }\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.paragraph(if m.isVisible { \"Hello world\" } else { \"\" }),\n      Html.button(\"Hide/Show\", Toggle)\n    ]\n  )\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w3-converter",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_USE_NOT_FOUND",
+      "code": "type Model = { celsius: Int }\ntype Msg = CelsiusChanged(Int)\n\nfn init() -> Model = Model { celsius: 0 }\n\nfn celsiusToFahrenheit(c: Int) -> Int = (c * 9 + 32) / 5\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  CelsiusChanged(newC) => m with { celsius: newC }\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"Celsius to Fahrenheit\"),\n      Html.paragraph(\"Celsius: \" ++ m.celsius.toStr()),\n      Html.input(\"Enter Celsius\", m.celsius.toStr(), CelsiusChanged)\n    ]\n  )\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w3-converter",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_LEX_UNEXPECTED_CHAR",
+      "code": "type Model = { celsius: Int }\n\ntype Msg = CelsiusChanged(Int)\n\nfn init() -> Model = Model { celsius: 0 }\n\nfn celsiusToFahrenheit(c: Int) -> Int = (c * 9 + 32) / 5\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  CelsiusChanged(newC) => m with { celsius: newC }\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"Celsius to Fahrenheit\"),\n      Html.paragraph(\"Celsius: \" ++ m.celsius.toStr()),\n      // The compiler error suggests the lambda syntax was incorrect.\n      // We replace \"\\c => CelsiusChanged(c)\" with a proper lambda structure.\n      Html.input(\"Enter Celsius\", m.celsius.toStr(), s => CelsiusChanged(s.toInt()))\n    ]\n  )\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w4-stopwatch",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_STRAY_SEPARATOR",
+      "code": "fn update(m: Model, msg: Msg) -> Model = match msg {\n  Tick => m with { secondsElapsed: m.secondsElapsed + 1 }, // <-- This line might be the problem area if the compiler is strict about delimiters\n  Reset => init()\n}\n\ntype Model = { secondsElapsed: Int }\n\ntype Msg = Tick | Reset\n\nfn init() -> Model = Model { secondsElapsed: 0 }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Tick => m with { secondsElapsed: m.secondsElapsed + 1 },\n  Reset => init()\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"Time Elapsed\"),\n      Html.paragraph(\"Seconds: \" ++ m.secondsElapsed.toStr()),\n      Html.row([Html.button(\"Reset\", Reset)])\n    ]\n  )\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w4-stopwatch",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_USE_NOT_FOUND",
+      "code": "use \"tez\"\n\ntype Model = { secondsElapsed: Int }\n\ntype Msg = Tick | Reset\n\nfn init() -> Model = Model { secondsElapsed: 0 }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Tick => m with { secondsElapsed: m.secondsElapsed + 1 }\n  Reset => init()\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"Time Elapsed\"),\n      Html.paragraph(\"Seconds: \" ++ m.secondsElapsed.toStr()),\n      Html.row([Html.button(\"Reset\", Reset)])\n    ]\n  )\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w5-greeting",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_EXPECTED_EXPR",
+      "code": "use \"Time\"\n\ntype Model = { currentTime: Int }\n\ntype Msg = Tick | UpdateTime\n\nfn init() -> Model = Model { currentTime: 0 }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Tick => m with { currentTime: m.currentTime + 60 } // Advance time by 1 minute (60 seconds)\n  UpdateTime => m // In a real app, this handles external time sync\n}\n\nfn view(m: Model) -> Html[Msg] =\n  let totalSeconds = m.currentTime in\n  let hour = totalSeconds / 60 in\n  if hour < 12 {\n    Html.heading(\"Good morning\")\n  } else {\n    Html.heading(\"Good afternoon\")\n  }\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w5-greeting",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_EXPECTED_EXPR",
+      "code": "use \"Time\"\n\ntype Msg = Tick | DisplayMsg\n\ntype Model = { message: Str }\n\nfn init() -> Model = Model { message: \"Loading...\" }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Tick =>\n    let hour = Time.clockHour()\n    let greeting = if hour < 12 { \"Good morning\" } else { \"Good afternoon\" }\n    m with { message: greeting }\n  DisplayMsg => m // Handle DisplayMsg if needed, otherwise ignore\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.body([\n    Html.heading(m.message),\n    Html.button(\"Refresh\", Tick)\n  ])\n\nfn main() -> Int =\n  // In a real application, the runtime handles the initial state and setting up the timer.\n  // We return the initial state's value as a placeholder for the required Int return type.\n  0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w6-quote",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_STRAY_SEPARATOR",
+      "code": "// ... inside view function\n      match m.quote {\n        Some(q) => Html.paragraph(q),\n        None => Html.paragraph(\"No quote loaded yet.\"),\n      }\n// ...\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w6-quote",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_STRAY_SEPARATOR",
+      "code": "use \"TezLib\"\n\ntype Model = {\n  quote: Option[Str]\n}\n\ntype Msg = LoadQuote | QuoteLoaded(Str) | LoadFailed\n\nfn init() -> Model = Model { quote: None }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  LoadQuote => m with { quote: None } // Triggers loading in a real app cycle\n  QuoteLoaded(s) => m with { quote: Some(s) }\n  LoadFailed => m with { quote: None } // Or maybe store the error if we had one\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.button(\"Load Quote\", LoadQuote),\n      match m.quote {\n        Some(q) => Html.paragraph(q),\n        None => Html.paragraph(\"No quote loaded yet.\")\n      }\n    ]\n  )\n\nfn main() -> Int = 0 // Placeholder return value for the main entry point\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w7-todo",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_EXPECTED_EXPR",
+      "code": "m.items.map(i => Html.row([\n        Html.paragraph(i.text),\n        Html.button(\"Remove\", RemoveItem(i.index))\n      ]))\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.paragraph(m.newItemText),\n      Html.row([\n        Html.input(m.newItemText, |text| AddItem),\n        Html.button(\"Add\", AddItem)\n      ]),\n      m.items.enumerate((index, item) => Html.row([\n        Html.paragraph(item.text),\n        Html.button(\"Remove\", RemoveItem(index))\n      ]))\n    ]\n  )\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w7-todo",
+      "sample": 2,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_EXPECTED_EXPR",
+      "code": "type TodoItem = { text: Str }\ntype Model = { todos: List[TodoItem], inputText: Str }\ntype Msg = AddTodo | RemoveTodo(Int)\n\nfn init() -> Model = Model { todos: [], inputText: \"\" }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  AddTodo => m with { todos: m.todos ++ [TodoItem { text: m.inputText }], inputText: \"\" }\n  RemoveTodo(index) => m with { todos: m.todos.remove(index) }\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"To-Do List\"),\n      Html.row([\n        Html.input(m.inputText, |newText| AddTodo),\n        Html.button(\"Add\", AddTodo)\n      ]),\n      m.todos.map(i => Html.row([\n        Html.paragraph(i.text),\n        Html.button(\"Remove\", RemoveTodo(i))\n      ]))\n    ]\n  )\n\nfn main() -> Int = 0\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w8-visits",
+      "sample": 1,
+      "accepted": false,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_PARSE_EXPECTED_EXPR",
+      "code": "fn init() -> (Model, Msg) = (Model { count: 0 }, Increment) // Line 11 in the compiler's view?\n\nfn update(m: Model, msg: Msg) -> (Model, Msg) = match msg {\n  Increment =>\n    let newCount = m.count + 1 // Line 12 in the compiler's view?\n    in (m with { count: newCount }, Increment)\n// ...\n}\n\nfn main() -> Int = { // Line where compiler complains about `let` usage in init body?\n  let initialModel = init().0\n// ...\n"
+    },
+    {
+      "variant": "counter",
+      "task": "w8-visits",
+      "sample": 2,
+      "accepted": true,
+      "firstTurn": false,
+      "turns": 2,
+      "firstError": "E_TYPE_MISMATCH",
+      "code": "type Model = { count: Int where it >= 0 }\n\ntype Msg = Increment | Decrement | Reset\n\nfn init() -> Model = Model { count: 0 }\n\nfn update(m: Model, msg: Msg) -> Model = match msg {\n  Increment => m with { count: m.count + 1 }\n  Decrement => if m.count > 0 { m with { count: m.count - 1 } } else { m }\n  Reset => init()\n}\n\nfn view(m: Model) -> Html[Msg] =\n  Html.col(\n    [\n      Html.heading(\"Visit Counter\"),\n      Html.paragraph(\"You have visited this page \" ++ m.count.toStr() ++ \" times.\")\n    ]\n  )\n\nfn main() -> Int = init().count\n"
+    }
+  ]
+}

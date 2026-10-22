@@ -13,9 +13,13 @@ export interface Turn {
 }
 export function extractCode(text: string): string;
 export function renderDiagnostics(diags: Diag[], limit?: number): string;
+/** Whether a request is for a web page rather than a function. */
+export function wantsApp(task: string): boolean;
 export function solve(o: {
   task: string;
   card?: string;
+  /** a complete example program shown after the card (used for web apps) */
+  example?: string;
   generate: (prompt: string) => Promise<string>;
   check: (code: string) => Promise<Diag[]>;
   maxTurns?: number;

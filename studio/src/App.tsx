@@ -8,7 +8,8 @@ import runtimeSrc from "../../runtime/tez-runtime.mjs?raw";
 import appSrc from "../../runtime/tez-app.mjs?raw";
 import styleSrc from "./styles.css?raw";
 import { siteHtml } from "../../runtime/export-site.mjs";
-import { solve } from "../../tools/agent/loop.mjs";
+import { solve, wantsApp } from "../../tools/agent/loop.mjs";
+import counterExample from "../../spec/examples/15-counter-app.tez?raw";
 import { inBrowserModel, webGpuAvailable } from "./localModel";
 import { openAICompatible } from "../../tools/agent/providers.mjs";
 import { isApp, mountApp, type AppHandle } from "../../runtime/tez-app.mjs";
@@ -243,6 +244,8 @@ export default function App() {
       const r = await solve({
         task: aiTask,
         card,
+        // a small model copies the shape of a complete app far better than it follows a description of one
+        example: wantsApp(aiTask) ? counterExample : "",
         generate: aiLocal ? inBrowserModel((t) => setAiLog(t)) : openAICompatible({ baseUrl: ai.baseUrl ?? "", model: ai.model ?? "", apiKey: ai.apiKey }),
         // a program is accepted only when it is proved, not just type-correct; without a solver, type errors only
         check: async (code) => {

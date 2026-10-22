@@ -59,3 +59,32 @@ test("rejection sampling keeps accepted unique programs, drops contaminated ones
   assert.equal(r.stats.duplicates, 1);
   assert.equal(r.stats.contaminated, 1);
 });
+
+test("the v2 fine-tuning set is well formed, split by program and free of held-out tasks", () => {
+  const read = (f) => readFileSync(`${root}data/v2/${f}`, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const train = read("train.jsonl");
+  const valid = read("valid.jsonl");
+  const tm = read("train.meta.jsonl");
+  const vm = read("valid.meta.jsonl");
+  assert.equal(train.length, tm.length);
+  assert.equal(valid.length, vm.length);
+  assert.ok(train.length > 5000 && valid.length > 100);
+  const code = (r) => /^```tez\n([\s\S]*?)\n```$/.exec(r.messages[1].content)?.[1];
+  for (const r of [...train, ...valid]) {
+    assert.deepEqual(r.messages.map((m) => m.role), ["user", "assistant"]);
+    assert.ok(r.messages[0].content.trim() && r.messages[1].content.trim());
+  }
+  const kinds = new Set(tm.map((m) => m.kind));
+  for (const k of ["pure", "app", "repair", "explain"]) assert.ok(kinds.has(k), k);
+  // by program: no validation program (or one of its repairs) is in the training set
+  const trainPrograms = new Set(tm.map((m) => m.program));
+  for (const m of vm) assert.ok(!trainPrograms.has(m.program), m.program);
+  // held-out prompts never appear in a prompt
+  const held = [...tasks.map((t) => t.prompt)].map((p) => p.toLowerCase());
+  for (const r of [...train, ...valid]) assert.ok(!held.some((h) => r.messages[0].content.toLowerCase().includes(h)));
+  // a sample of the answers does not overlap a TezBench reference
+  train.filter((_, i) => i % 60 === 0).forEach((r) => {
+    const c = code(r);
+    if (c) assert.deepEqual(overlaps(c), [], c.slice(0, 80));
+  });
+});

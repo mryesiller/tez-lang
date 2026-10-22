@@ -50,3 +50,15 @@ test("the OpenAI-compatible provider speaks the chat protocol", async () => {
   assert.equal(sent.url, "http://x/v1/chat/completions");
   assert.equal(sent.body.messages[0].content, "p");
 });
+
+import { firstPrompt, wantsApp } from "./loop.mjs";
+
+test("web requests get a complete example app in the prompt, functions do not", () => {
+  assert.ok(wantsApp("A web page with a counter and a reset button"));
+  assert.ok(wantsApp("an app that shows the time"));
+  assert.ok(!wantsApp("Return the sum of the squares of a list"));
+  const withExample = firstPrompt({ card: "CARD", task: "a page", example: "fn init() -> Int = 0" });
+  assert.match(withExample, /A complete Tez web app, for reference/);
+  assert.match(withExample, /fn init\(\) -> Int = 0/);
+  assert.doesNotMatch(firstPrompt({ card: "CARD", task: "a function" }), /for reference/);
+});
