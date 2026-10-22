@@ -1,0 +1,208 @@
+{
+  "label": "mlx-cardD-s3",
+  "date": "2026-10-22",
+  "tasks": 20,
+  "summary": {
+    "tez": {
+      "parses": 0.8,
+      "typed": 0.6,
+      "verified": 0.55,
+      "passes": 0.55
+    },
+    "ts": {
+      "parses": 0,
+      "passes": 0
+    }
+  },
+  "rows": [
+    {
+      "id": "01-sum-to",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "02-abs-diff",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "03-largest",
+      "tez": {
+        "level": "invalid",
+        "diag": "E_PARSE_BAD_ITEM"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "04-count-positive",
+      "tez": {
+        "level": "invalid",
+        "diag": "E_PARSE_EXPECTED_EXPR"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "05-reverse-text",
+      "tez": {
+        "level": "parses",
+        "diag": "E_TYPE_UNKNOWN_FIELD"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "06-clamp-score",
+      "tez": {
+        "level": "parses",
+        "diag": "E_NAME_UNKNOWN"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "07-factorial",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "08-fibonacci",
+      "tez": {
+        "level": "typed",
+        "diag": "E_TERMINATION"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "09-is-prime",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "10-sum-of-squares",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "11-keep-evens",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "12-double-all",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "13-join-words",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "14-word-count",
+      "tez": {
+        "level": "invalid",
+        "diag": "E_LEX_UNEXPECTED_CHAR"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "15-capitalize",
+      "tez": {
+        "level": "invalid",
+        "diag": "E_PARSE_EXPECTED_EXPR"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "16-average",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "17-last-or",
+      "tez": {
+        "level": "parses",
+        "diag": "E_TYPE_MISMATCH"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "18-gcd",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "19-power",
+      "tez": {
+        "level": "passes"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    },
+    {
+      "id": "20-zip-sum",
+      "tez": {
+        "level": "parses",
+        "diag": "E_TYPE_ARITY"
+      },
+      "ts": {
+        "level": "missing"
+      }
+    }
+  ]
+}

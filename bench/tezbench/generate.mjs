@@ -3,7 +3,7 @@
 //   tez-card     Tez prompt with spec/card.md                       (Mode B)
 //   tez-repair   tez-card, then up to 3 compiler-feedback turns     (Mode B + loop)
 //   ts           the same task in TypeScript
-// node generate.mjs --base-url http://127.0.0.1:1234/v1 --model google/gemma-4-e4b --out DIR [--modes a,b] [--temp 0]
+// node generate.mjs --base-url http://127.0.0.1:1234/v1 --model google/gemma-4-e4b --out DIR [--modes a,b] [--temp 0] [--card FILE]
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { cliChecker } from "../../tools/agent/checker.mjs";
 import { extractCode, repairPrompt } from "../../tools/agent/loop.mjs";
@@ -17,12 +17,24 @@ const baseUrl = opt("--base-url", process.env.TEZ_LLM_URL);
 const model = opt("--model", process.env.TEZ_LLM_MODEL);
 const out = opt("--out");
 if (!baseUrl || !model || !out) {
-  console.error("usage: generate.mjs --base-url URL --model M --out DIR [--modes tez-nocard,tez-card,tez-repair,ts] [--temp 0]");
+  console.error("usage: generate.mjs --base-url URL --model M --out DIR [--modes tez-nocard,tez-card,tez-repair,ts] [--temp 0] [--card FILE]");
   process.exit(2);
 }
 const modes = opt("--modes", "tez-nocard,tez-card,tez-repair,ts").split(",");
-const generate = openAICompatible({ baseUrl, model, apiKey: process.env.TEZ_LLM_KEY, temperature: Number(opt("--temp", "0")), maxTokens: Number(opt("--max-tokens", "1500")) });
-const card = readFileSync(`${root}spec/card.md`, "utf8");
+const once = openAICompatible({ baseUrl, model, apiKey: process.env.TEZ_LLM_KEY, temperature: Number(opt("--temp", "0")), maxTokens: Number(opt("--max-tokens", "1500")) });
+// a local server can refuse a request for a moment (memory pressure); retrying keeps a run from ending half done
+const generate = async (p) => {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await once(p);
+    } catch (e) {
+      if (attempt >= 6) throw e;
+      console.error(`retry ${attempt}: ${String(e.message).slice(0, 80)}`);
+      await new Promise((r) => setTimeout(r, 5000 * attempt));
+    }
+  }
+};
+const card = readFileSync(opt("--card", `${root}spec/card.md`), "utf8"); // --card compares another version of the card
 const check = cliChecker();
 
 for (const mode of modes) {

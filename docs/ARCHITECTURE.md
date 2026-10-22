@@ -1,69 +1,75 @@
-# Tez — Mimari Spesifikasyon v0.3
+# Tez — Architecture Specification v0.3
 
-> Durum: Taslak · Tarih: 2026-10-14 · Lisans: açık kaynak (MIT OR Apache-2.0)
+> Status: draft · Date: 2026-10-14 · License: open source (MIT OR Apache-2.0)
 >
-> **Tez** (Türkçe: *hızlı*) — 3–4B parametreli modellerin bile yüksek doğrulukla yazabildiği, derlenen her programın tanımlı hata sınıflarından arınmış olduğu kanıtlanan, WebAssembly'ye derlenen ve tamamen tarayıcıda geliştirilebilen bir programlama dili.
+> **Tez** (Turkish for *fast*) is a programming language that even 3–4B-parameter models can write accurately, whose compiled programs are proven free of defined error classes, which compiles to WebAssembly and which can be developed entirely in the browser.
 
-## 0. Sürüm Geçmişi
+## 0. Version History
 
-**v0.5 (uygulama)** — v0.4 tasarımı gerçekleştirildi; sapmalar:
-- Doğrulama: ilk sürümde **Z3 süreci** (SMT-LIB); gömülü `tez_solve` (L1) ve tarayıcıda Z3 WASM ertelendi. Tarayıcıdaki `check` doğrulamayı **çalıştırmaz** ve bunu `verified: false` ile açıkça bildirir.
-- Hata kodu sayısı 61; `decreases` artık `Int` ya da veri değeri (yapısal ölçü); özyinelemeli tanımlar yalnızca sonlanma kanıtlandıktan sonra çözücüye verilir.
-- Kod üretimi: **tek tip `anyref` gösterimi** (spec için bkz. `crates/tez_wasm`), kütüphane JS çalışma zamanında (`runtime/`). Yorumlayıcı referans/oracle olarak kalır; her program için derlenmiş WASM ≡ yorumlayıcı diferansiyel testle doğrulanır.
-- Sözdizimi: boru (`|>`) yok, tek yol metot sözdizimi (`xs.map(f)`); `List.map(xs, f)` hata ve otomatik düzeltme üretir.
-- Soundness: aksiyom tutarlılık denetimi, ilgi alanı kesme, rastgele program fuzz'ı (kabul edilen program çalışırken ihlal üretmez).
+**v0.6 (implementation, 2026-10)**
+- Programs may span several files (`use "other.tez"`); each file sees its own names and those of the files it uses directly (`E_USE_MISSING`).
+- Apps may subscribe to time and browser state (`Sub.every/clock/online/visible`), keep state in the browser (`save`/`restore`) and fetch from allow-listed origins (`fetches` → `Fetch.get`). All of it is declared as pure data; the host performs the effects.
+- Verification also runs in the browser: the compiler (WebAssembly) asks for SMT queries, the page solves them with Z3 (WebAssembly) and runs the compiler again.
+- Programs can be published as one self-contained web page (`tez site`, Studio *Publish*) under a strict Content-Security-Policy. The compiler is also an npm package, `tez-lang`.
+
+**v0.5 (implementation)** — the v0.4 design was implemented; deviations:
+- Verification: the first version uses a **Z3 process** (SMT-LIB); the embedded `tez_solve` (L1) and Z3 WASM in the browser were postponed. `check` in the browser **does not run** verification and says so explicitly with `verified: false`.
+- 61 error codes; `decreases` is now an `Int` or a data value (structural measure); recursive definitions are handed to the solver only after termination is proven.
+- Code generation: a **single uniform `anyref` representation** (spec: see `crates/tez_wasm`), library in the JS runtime (`runtime/`). The interpreter stays as reference/oracle; for every program, compiled WASM ≡ interpreter is checked by differential testing.
+- Syntax: no pipe (`|>`), a single way to call, method syntax (`xs.map(f)`); `List.map(xs, f)` produces an error and an automatic fix.
+- Soundness: axiom consistency check, cone-of-influence slicing, random-program fuzzing (an accepted program does not violate anything while running).
 
 **v0.4**
-- **Referans model: Gemma 4 E4B** (Apache-2.0). Tokenizer, kart ve ölçümler buna göre ayarlanır (§9.0).
-- Tek-token kuralı: **birincil tokenizer'da (Gemma 4) zorunlu**, ikincil tokenizer'larda yalnızca raporlanır.
-- Mod C için yol netleşti: `onnx-community/gemma-4-E4B-it-ONNX` + Transformers.js (`q4f16`, WebGPU).
+- **Reference model: Gemma 4 E4B** (Apache-2.0). Tokenizer, card and measurements are tuned for it (§9.0).
+- One-token rule: **mandatory in the primary tokenizer (Gemma 4)**, only reported for secondary tokenizers.
+- The path for Mode C became clear: `onnx-community/gemma-4-E4B-it-ONNX` + Transformers.js (`q4f16`, WebGPU).
 
 **v0.3**
-- Ad: AILang/Axiom → **Tez** (`.tez`, CLI `tez`). Sunholo'nun AILang projesiyle ad çakışması.
-- Hedef model boyutu: **3–4B**. Dil kartı bütçesi 2.000 → **1.200 token**.
-- Yeni §9: **Eğitim seti ve model stratejisi** (derleyici-doğrulamalı sentetik veri, ince ayar).
-- Bytecode VM kaldırıldı → **doğrudan WasmGC codegen** (Faz 2). Referans yorumlayıcı yalnızca test için.
-- Doğrulama iki katmanlı: **gömülü hafif çözücü (Rust, WASM içinde)** + gerektiğinde tembel yüklenen Z3.
-- `Int`: keyfi hassasiyet, **i64 hızlı yol + taşmada bigint'e terfi**.
-- Yeni §7: **Hız bütçeleri** (derleme/doğrulama gecikme hedefleri).
-- Yeni §10: Konumlanma (Sunholo AILang, MoonBit vb.).
+- Name: AILang/Axiom → **Tez** (`.tez`, CLI `tez`). The old name clashed with Sunholo's AILang project.
+- Target model size: **3–4B**. Language card budget 2,000 → **1,200 tokens**.
+- New §9: **Training set and model strategy** (compiler-verified synthetic data, fine-tuning).
+- Bytecode VM removed → **direct WasmGC codegen** (Phase 2). The reference interpreter is for tests only.
+- Verification in two layers: an **embedded lightweight solver (Rust, inside the WASM)** + a lazily loaded Z3 when needed.
+- `Int`: arbitrary precision, **i64 fast path + promotion to bigint on overflow**.
+- New §7: **Speed budgets** (compile/verify latency targets).
+- New §10: Positioning (Sunholo AILang, MoonBit, etc.).
 
-**v0.2:** Bağımlı türler → refinement + SMT; tanıdık kanonik sözdizimi; TEA runtime; Worker + fuel; logos + elle yazılmış parser.
+**v0.2:** Dependent types → refinement + SMT; familiar canonical syntax; TEA runtime; Worker + fuel; logos + hand-written parser.
 
-## 1. Öncelikler
+## 1. Priorities
 
-Tasarım çatışmalarında bu sıra hakemdir:
+In design conflicts this order is the referee:
 
-1. **Minimum hata** — derlenen program tanımlı hata sınıflarını üretemez (§5); dil, yanlış yazılması zor olacak şekilde tasarlanır.
-2. **LLM anlaşılırlığı** — 3–4B modeller dil kartı + kısıtlı üretimle, ince ayarlı modeller kartsız yüksek doğrulukla yazabilmeli.
-3. **Token tasarrufu** — aynı programı TypeScript'ten daha az token'la ifade etmek; birden çok tokenizer'da ölçülür.
-4. **Hız** — derleme, doğrulama ve çalışma; tümü tarayıcıda (§7).
-5. **WebAssembly** — tek hedef WasmGC; native/JS hedefi yok.
-6. **Tamamen tarayıcıda geliştirme** — kurulum gerektirmeyen editör + derleyici + doğrulayıcı + runtime (+ isteğe bağlı tarayıcı içi LLM).
+1. **Minimum errors** — a compiled program cannot produce the defined error classes (§5); the language is designed to be hard to write wrongly.
+2. **LLM comprehension** — 3–4B models should write it with the language card + constrained generation, fine-tuned models with high accuracy and no card.
+3. **Token economy** — express the same program in fewer tokens than TypeScript; measured with several tokenizers.
+4. **Speed** — compiling, verifying and running; all in the browser (§7).
+5. **WebAssembly** — a single target, WasmGC; no native/JS target.
+6. **Fully in-browser development** — an editor + compiler + verifier + runtime that need no installation (+ an optional in-browser LLM).
 
-**Kapsam dışı (ilk aşama):** dış yan etkiler (HTTP, depolama, zamanlayıcı), paket yöneticisi, çoklu dosya modülleri.
+**Out of scope (first stage):** external side effects (HTTP, storage, timers), a package manager, multi-file modules. *(Since added as pure declarations the host carries out: see v0.6.)*
 
-## 2. Dil Tasarım İlkeleri
+## 2. Language Design Principles
 
-1. **Tek kanonik yol.** Her kavramın tek yazımı vardır; `tez fmt` bunu zorlar. Varyasyon yok → küçük modelin olasılık kütlesi tek yola yoğunlaşır.
-2. **Tanıdıklık.** Her yapı eğitim verisinde bol bulunan bir dilden (TypeScript, Rust, Kotlin, Elm) gelir. Yeni sembol icat edilmez.
-3. **Yerel akıl yürütme.** Üst düzey fonksiyonlarda tür imzası zorunlu; gölgeleme, aşırı yükleme, örtük dönüşüm yok. Bir satırı anlamak uzak bağlam gerektirmez — küçük modellerin kısa dikkat menzili için kritik.
-4. **Yanlış yazımı imkânsız kılan sözdizimi.** `null`, istisna, değişken atama, `for/while`, sınıf, kalıtım, makro, varsayılan parametre yok. `&&` ile `||` parantezsiz karıştırılamaz.
-5. **LL(1), bağlamdan bağımsız gramer.** GBNF olarak yayımlanır → kısıtlı üretimle sözdizimi hatası sıfır.
-6. **Tek-token anahtar kelimeler.** Her anahtar kelime ve operatör, **birincil tokenizer'da (Gemma 4, §9.4)** tek token olmalı; olmayan aday reddedilir. İkincil tokenizer'larda sonuç raporlanır ama engelleyici değildir.
-7. **Küçük yüzey alanı.** Dil kartı ≤ 1.200 token. Eklenen her özellik bu bütçeden pay alır; bütçeyi aşan özellik kabul edilmez.
+1. **One canonical way.** Every concept has exactly one spelling; `tez fmt` enforces it. No variation → a small model's probability mass concentrates on a single path.
+2. **Familiarity.** Every construct comes from a language that is abundant in training data (TypeScript, Rust, Kotlin, Elm). No new symbols are invented.
+3. **Local reasoning.** Type signatures are mandatory on top-level functions; no shadowing, overloading or implicit conversion. Understanding a line needs no distant context — critical for the short attention span of small models.
+4. **Syntax that makes mistakes impossible.** No `null`, exceptions, variable assignment, `for/while`, classes, inheritance, macros or default parameters. `&&` and `||` cannot be mixed without parentheses.
+5. **LL(1), context-free grammar.** Published as GBNF → zero syntax errors with constrained generation.
+6. **Single-token keywords.** Every keyword and operator must be a single token in the **primary tokenizer (Gemma 4, §9.4)**; a candidate that is not is rejected. Results for secondary tokenizers are reported but do not block.
+7. **Small surface area.** The language card is ≤ 1,200 tokens. Every added feature takes a share of this budget; a feature that exceeds it is not accepted.
 
-## 3. Sözdizimi Taslağı (v0)
+## 3. Syntax Sketch (v0)
 
 ```tez
-// Tek yorum biçimi
+// The only comment form
 
-// --- Türler ---
+// --- Types ---
 type Pos = Int where it > 0
 type Point = { x: Int, y: Int }
 type Shape = Circle(r: Pos) | Rect(w: Pos, h: Pos)
 
-// --- Fonksiyon gövdesi her zaman `= ifade` ---
+// --- A function body is always `= expression` ---
 fn area(s: Shape) -> Int = match s {
   Circle(r) => 3 * r * r
   Rect(w, h) => w * h
@@ -71,7 +77,7 @@ fn area(s: Shape) -> Int = match s {
 
 fn div(a: Int, b: Int where it != 0) -> Int = a / b
 
-// --- Sözleşmeler ---
+// --- Contracts ---
 fn avg(xs: List[Int]) -> Int
   requires len(xs) > 0
   = sum(xs) / len(xs)
@@ -81,131 +87,131 @@ fn clamp(x: Int, lo: Int, hi: Int) -> Int
   ensures lo <= result && result <= hi
   = if x < lo { lo } else if x > hi { hi } else { x }
 
-// --- Özyineleme: sonlanma kanıtı zorunlu ---
+// --- Recursion: a termination proof is mandatory ---
 fn fact(n: Int where it >= 0) -> Int
   decreases n
   = if n == 0 { 1 } else { n * fact(n - 1) }
 
-// --- Blok, let, pipe, lambda ---
+// --- Block, let, pipe, lambda ---
 fn score(xs: List[Int]) -> Int = {
   let evens = xs |> List.filter(x => x % 2 == 0)
   List.fold(evens, 0, (acc, x) => acc + x) * 2
 }
 
-// --- Değişmez kayıt güncelleme ---
+// --- Immutable record update ---
 fn moveRight(p: Point) -> Point = { p with x: p.x + 1 }
 ```
 
-| Karar | Seçim | Neden |
+| Decision | Choice | Why |
 |---|---|---|
-| Blok | `{ }` | Girinti duyarlılığı küçük modellerde ve kopyala/yapıştırda kırılgan; parantez hatası yerel tespit edilir |
-| Satır sonu | Noktalı virgül yok | Token tasarrufu |
-| Generic | `List[Int]` | `<>` karşılaştırma ile belirsiz |
-| Lambda | `x => e`, `(a, b) => e` | TypeScript'te en yaygın |
-| Refinement | `T where it > 0` | Okunur İngilizce; `it` Kotlin'den |
-| Sözleşme | `requires` / `ensures` / `decreases` | Dafny standardı |
-| Gövde | Her zaman `= ifade` | Tek kanonik yol |
-| Match kolu | Satır başına bir kol, virgül yok | Daha az token ve hata |
-| Adlandırma | değer `camelCase`, tür `PascalCase` | Tek kural; parser ayrımı büyük harften yapar |
-| Erişim | `List.map` | Aşırı yükleme ve ad çakışması yok |
+| Block | `{ }` | Indentation sensitivity is fragile in small models and in copy/paste; a missing brace is detected locally |
+| Line end | No semicolons | Token economy |
+| Generics | `List[Int]` | `<>` is ambiguous with comparison |
+| Lambda | `x => e`, `(a, b) => e` | Most common in TypeScript |
+| Refinement | `T where it > 0` | Readable English; `it` is from Kotlin |
+| Contract | `requires` / `ensures` / `decreases` | The Dafny standard |
+| Body | Always `= expression` | One canonical way |
+| Match arm | One arm per line, no commas | Fewer tokens and errors |
+| Naming | values `camelCase`, types `PascalCase` | One rule; the parser tells them apart by the capital letter |
+| Access | `List.map` | No overloading or name clashes |
 
-> Bu tablo Faz 0'daki tokenizer ve küçük-model ölçümleriyle (§9) kesinleşir. Ölçüm bir kararı kötü gösterirse karar değişir.
+> This table is finalised by the tokenizer and small-model measurements of Phase 0 (§9). If a measurement shows a decision to be bad, the decision changes.
 
-## 4. Tür Sistemi
+## 4. Type System
 
-- **Temel türler:** `Int` (keyfi hassasiyet), `Float` (f64), `Bool`, `Str`, `Unit`.
-- **Bileşik:** kayıt, toplam türleri (ADT), `List[T]`, `Map[K, V]`, `Option[T]`, `Result[T, E]`.
-- **Parametrik polimorfizm** (generic); trait/typeclass **yok** (v1'de değerlendirilir — küçük modeller için karmaşıklık maliyeti yüksek).
-- **Çift yönlü denetim:** üst düzey imzalar zorunlu; fonksiyon içi HM yerel çıkarım.
-- **Refinement türleri:** `T where P(it)`, burada P karar verilebilir parçada (§5.1) bir yüklem.
-- **`Int` gösterimi:** WasmGC'de `i31ref`/i64 hızlı yol; taşma anında bigint nesnesine terfi. Taşma hiçbir zaman hata değildir ve kanıt yükü getirmez.
+- **Base types:** `Int` (arbitrary precision), `Float` (f64), `Bool`, `Str`, `Unit`.
+- **Compound:** records, sum types (ADTs), `List[T]`, `Map[K, V]`, `Option[T]`, `Result[T, E]`.
+- **Parametric polymorphism** (generics); **no** traits/typeclasses (to be considered in v1 — the complexity cost is high for small models).
+- **Bidirectional checking:** top-level signatures are mandatory; local HM inference inside functions.
+- **Refinement types:** `T where P(it)`, where P is a predicate in the decidable fragment (§5.1).
+- **`Int` representation:** `i31ref`/i64 fast path in WasmGC; promoted to a bigint object on overflow. Overflow is never an error and carries no proof burden.
 
-## 5. Garanti Modeli
+## 5. Guarantee Model
 
-> **Derleme başarılıysa program aşağıdaki hata sınıflarının hiçbirini çalışma anında üretemez ve yazılmış tüm sözleşmelere uyar. Kanıtlanamayan her durum reddedilir (sound).**
+> **If compilation succeeds, the program cannot produce any of the following error classes at run time and it honours all written contracts. Every case that cannot be proven is rejected (sound).**
 
-Hiçbir sistem programın *istenen şeyi* yaptığını kanıtlayamaz; mantık hataları yalnızca `ensures` ile ifade edildikleri ölçüde yakalanır. Bu nedenle eğitim seti, her fonksiyona sözleşme yazmayı öğretir (§9).
+No system can prove that a program does *what was intended*; logic errors are caught only to the extent they are expressed with `ensures`. This is why the training set teaches writing a contract for every function (§9).
 
-| Hata sınıfı | Mekanizma | Faz |
+| Error class | Mechanism | Phase |
 |---|---|---|
-| Null / tanımsız | `null` yok; `Option[T]` | 1 |
-| Tür uyuşmazlığı | Çift yönlü denetim | 1 |
-| Eksik match | Kapsamlılık denetimi | 1 |
-| Yakalanmamış istisna | İstisna yok; `Result[T, E]` | 1 |
-| Yan etki / paylaşılan durum | Saf dil, değişmez veri | 1 |
-| Tanımsız isim | Ad çözümleme | 1 |
-| Tamsayı taşması | Keyfi hassasiyetli `Int` | 1 |
-| Sıfıra bölme | `b != 0` VC | 4 |
-| Sınır dışı erişim | `0 <= i < len(xs)` VC | 4 |
-| Sözleşme ihlali | `requires`/`ensures`/`where` VC | 4 |
-| Sonlanmama | Döngü yok; `decreases` VC; yalnızca sınırlı `List.fold/map/range` | 4 |
-| Float NaN/∞ | `/` için `b != 0.0`, `sqrt` için `x >= 0.0` VC | 4 |
-| Tarayıcı donması | Sonlanma kanıtı + Worker + fuel (savunma derinliği) | 2 |
-| Sandbox kaçışı | WASM yetki modeli: yalnızca runtime'ın verdiği import'lar | 2 |
-| Bellek tükenmesi | Runtime tavanı → kontrollü `E_RESOURCE` (statik kanıtlanamayan tek sınıf) | 2 |
+| Null / undefined | No `null`; `Option[T]` | 1 |
+| Type mismatch | Bidirectional checking | 1 |
+| Missing match arm | Exhaustiveness checking | 1 |
+| Uncaught exception | No exceptions; `Result[T, E]` | 1 |
+| Side effect / shared state | Pure language, immutable data | 1 |
+| Undefined name | Name resolution | 1 |
+| Integer overflow | Arbitrary-precision `Int` | 1 |
+| Division by zero | `b != 0` VC | 4 |
+| Out-of-bounds access | `0 <= i < len(xs)` VC | 4 |
+| Contract violation | `requires`/`ensures`/`where` VC | 4 |
+| Non-termination | No loops; `decreases` VC; only bounded `List.fold/map/range` | 4 |
+| Float NaN/∞ | `b != 0.0` for `/`, `x >= 0.0` for `sqrt` VC | 4 |
+| Browser freeze | Termination proof + Worker + fuel (defence in depth) | 2 |
+| Sandbox escape | WASM capability model: only the imports the runtime provides | 2 |
+| Memory exhaustion | Runtime ceiling → controlled `E_RESOURCE` (the only class that cannot be proven statically) | 2 |
 
-### 5.1 İki katmanlı doğrulama (hız için)
+### 5.1 Two-layer verification (for speed)
 
-| Katman | Ne | Nerede | Kapsam |
+| Layer | What | Where | Scope |
 |---|---|---|---|
-| **L1 — `tez_solve`** | Rust'ta yazılmış hafif karar prosedürü: doğrusal tamsayı aritmetiği (simplex + branch-and-bound / Fourier–Motzkin), eşitlik + yorumlanmamış fonksiyonlar (congruence closure), `len` ölçümleri | Derleyiciyle aynı `.wasm` içinde | Pratikte VC'lerin büyük çoğunluğu (sıfıra bölme, sınırlar, basit sözleşmeler); hedef < 1 ms/VC |
-| **L2 — Z3** | `z3-solver` (resmi WASM derlemesi) | Ayrı Worker; **yalnızca L1 `unknown` dediğinde** tembel yüklenir | Doğrusal olmayan aritmetik, karmaşık niceleyiciler |
+| **L1 — `tez_solve`** | A lightweight decision procedure written in Rust: linear integer arithmetic (simplex + branch-and-bound / Fourier–Motzkin), equality + uninterpreted functions (congruence closure), `len` measures | In the same `.wasm` as the compiler | In practice the vast majority of VCs (division by zero, bounds, simple contracts); target < 1 ms/VC |
+| **L2 — Z3** | `z3-solver` (the official WASM build) | A separate Worker; loaded lazily **only when L1 says `unknown`** | Non-linear arithmetic, complex quantifiers |
 
-- L2 yüklenemezse veya zaman aşımına uğrarsa → `E_UNPROVEN` + öneri. Sağlamlık hiçbir zaman hız için feda edilmez.
-- Z3 tarayıcıda `SharedArrayBuffer` gerektirir → sayfa COOP/COEP başlıklarıyla sunulur.
-- Her VC, normalize edilmiş biçiminin hash'iyle önbelleğe alınır; değişmeyen fonksiyonlar yeniden kanıtlanmaz.
+- If L2 cannot be loaded or times out → `E_UNPROVEN` + a suggestion. Soundness is never sacrificed for speed.
+- Z3 needs `SharedArrayBuffer` in the browser → the page is served with COOP/COEP headers.
+- Every VC is cached by the hash of its normalised form; unchanged functions are not re-proven.
 
-## 6. Derleyici Mimarisi
+## 6. Compiler Architecture
 
 ```
-kaynak (.tez)
-  ▼ tez_syntax   logos lexer → recursive-descent parser (hata kurtarmalı) → AST + span
-  ▼ tez_resolve  ad çözümleme
-  ▼ tez_types    çift yönlü denetim + yerel HM + kapsamlılık + refinement taşıma
-  ▼ tez_verify   VC üretimi → L1 tez_solve → (gerekirse) L2 Z3
-  ▼ tez_ir       Core IR (ANF), refinement'lar silinir
-  ▼ tez_wasm     WasmGC codegen (wasm-encoder)  ──►  .wasm modülü
-  ╰ tez_interp   referans yorumlayıcı (yalnızca test: codegen ile diferansiyel test)
-Her aşama ─► tez_diag  tek tip Diagnostic → JSON
+source (.tez)
+  ▼ tez_syntax   logos lexer → recursive-descent parser (with error recovery) → AST + span
+  ▼ tez_resolve  name resolution
+  ▼ tez_types    bidirectional checking + local HM + exhaustiveness + refinement propagation
+  ▼ tez_verify   VC generation → L1 tez_solve → (if needed) L2 Z3
+  ▼ tez_ir       Core IR (ANF), refinements erased
+  ▼ tez_wasm     WasmGC codegen (wasm-encoder)  ──►  .wasm module
+  ╰ tez_interp   reference interpreter (tests only: differential testing against codegen)
+Every stage ─► tez_diag  one uniform Diagnostic → JSON
 ```
 
-**Artımlılık:** Derleme birimi fonksiyondur. Her fonksiyonun (imza hash'i, gövde hash'i) çifti tür denetimi, VC ve codegen sonuçlarını önbelleğe alır. Editörde bir tuş vuruşu yalnızca değişen fonksiyonu ve imzası değiştiyse çağıranlarını yeniden işler.
+**Incrementality:** The unit of compilation is the function. The pair (signature hash, body hash) of each function caches the type-checking, VC and codegen results. A keystroke in the editor re-processes only the changed function, and its callers if its signature changed.
 
-**Neden VM değil WasmGC:** WasmGC tüm büyük tarayıcılarda destekleniyor; çöp toplayıcıyı tarayıcı sağlar → küçük çıktı, kendi GC'mizi yazmayız, yerel hıza yakın çalışma. Küçük modüllerin `WebAssembly.compile` süresi milisaniye düzeyinde olduğu için ayrı bir VM'e gerek kalmaz.
+**Why WasmGC and not a VM:** WasmGC is supported in all major browsers; the browser provides the garbage collector → small output, no GC of our own to write, near-native speed. Since `WebAssembly.compile` of small modules takes milliseconds, a separate VM is unnecessary.
 
-### Repo yapısı
+### Repository layout
 
 ```
 tez/
-├── .agents/         # ortak ajanlar, beceriler, komutlar, MCP (tek doğruluk kaynağı)
+├── .agents/         # shared agents, skills, commands, MCP (single source of truth)
 ├── docs/            # ARCHITECTURE.md, ROADMAP.md
 ├── crates/
 │   ├── tez_syntax/  tez_resolve/  tez_types/  tez_verify/  tez_solve/
 │   ├── tez_ir/      tez_wasm/     tez_interp/  tez_diag/   tez_fmt/
 │   ├── tez_cli/     # `tez check | run | build | fmt | grammar`
 │   └── tez_web/     # wasm-bindgen API
-├── runtime/         # TS: TEA döngüsü, Virtual DOM diff, Worker host, hot-swap
-├── studio/          # React + Monaco: tarayıcı IDE'si
+├── runtime/         # TS: TEA loop, Virtual DOM diff, Worker host, hot-swap
+├── studio/          # React + Monaco: the in-browser IDE
 ├── spec/
-│   ├── grammar.ebnf      # normatif
-│   ├── grammar.gbnf      # kısıtlı üretim
-│   └── card.md           # ≤ 1.200 token dil kartı
-├── data/            # eğitim seti üretim hattı (§9)
+│   ├── grammar.ebnf      # normative
+│   ├── grammar.gbnf      # constrained generation
+│   └── card.md           # language card, ≤ 1,200 tokens
+├── data/            # training-set pipeline (§9)
 └── bench/           # TezBench
 ```
 
-## 7. Hız Bütçeleri
+## 7. Speed Budgets
 
-Tarayıcıda, orta seviye bir dizüstünde ölçülür. CI'da regresyon testi olarak izlenir.
+Measured in the browser on a mid-range laptop. Tracked as regression tests in CI.
 
-| İşlem | Hedef |
+| Operation | Target |
 |---|---|
-| Derleyici `.wasm` boyutu (gzip, Z3 hariç) | < 1,5 MB |
-| Studio ilk açılış (Z3 hariç) | < 1,5 s |
-| Tuş vuruşu → tanılar (1.000 satır, artımlı, L1) | < 50 ms |
-| Tam derleme + doğrulama (1.000 satır, L1, soğuk) | < 300 ms |
-| Kaydet → hot-swap → yeni ekran | < 100 ms |
-| L2 (Z3) ilk yükleme | arka planda; editörü bloklamaz |
+| Compiler `.wasm` size (gzip, without Z3) | < 1.5 MB |
+| Studio first open (without Z3) | < 1.5 s |
+| Keystroke → diagnostics (1,000 lines, incremental, L1) | < 50 ms |
+| Full compile + verify (1,000 lines, L1, cold) | < 300 ms |
+| Save → hot-swap → new screen | < 100 ms |
+| L2 (Z3) first load | in the background; does not block the editor |
 
 ## 8. Runtime: Elm Architecture + Sandbox
 
@@ -224,80 +230,80 @@ fn view(m: Model) -> Html[Msg] =
   row([ button(Dec, "-"), text(m.count), button(Inc, "+") ])
 ```
 
-`else { m }` silinirse doğrulayıcı `count >= 0` ihlalini `m.count = 0, msg = Dec` karşı örneğiyle reddeder.
+If `else { m }` is deleted, the verifier rejects the `count >= 0` violation with the counterexample `m.count = 0, msg = Dec`.
 
-- **Yürütme:** Modül bir Web Worker'da çalışır; her `update`/`view` çağrısı fuel (codegen'in döngü/özyineleme noktalarına eklediği sayaç) ve bellek tavanıyla sınırlı.
-- **DOM:** Worker Virtual DOM ağacını ana thread'e gönderir; ana thread diff alıp uygular; olaylar `Msg` olarak döner.
-- **Hot-swap:** `Model` kanonik bir değer kodlamasıyla serileştirilir → yeni modül örneklenir → durum geri yüklenir. `Model` türü değiştiyse yapısal göç (aynı ad + tür alanlar taşınır, yeniler varsayılan alır); mümkün değilse `init()` ve kullanıcıya bildirim.
-- **Yan etkiler (Faz 7+):** TEA `Cmd`/`Sub`.
+- **Execution:** The module runs in a Web Worker; every `update`/`view` call is bounded by fuel (a counter codegen inserts at loop/recursion points) and a memory ceiling.
+- **DOM:** The Worker sends the Virtual DOM tree to the main thread; the main thread diffs and applies it; events come back as `Msg`.
+- **Hot-swap:** `Model` is serialised with a canonical value encoding → the new module is instantiated → the state is restored. If the `Model` type changed, a structural migration (fields with the same name and type are carried over, new ones get defaults); if that is impossible, `init()` and a notice to the user.
+- **Side effects (Phase 7+):** TEA `Cmd`/`Sub`.
 
-## 9. LLM Stratejisi: Eğitim Seti, Model, Ölçüm
+## 9. LLM Strategy: Training Set, Model, Measurement
 
-### 9.0 Referans model: Gemma 4 E4B
+### 9.0 Reference model: Gemma 4 E4B
 
-| Özellik | Değer (kaynak: model kartı) |
+| Property | Value (source: model card) |
 |---|---|
-| Lisans | Apache-2.0 → ince ayarlı ağırlıkları ve veri setini açık yayınlayabiliriz |
-| Boyut | 4,5B etkin parametre, gömülemelerle 8B toplam (Per-Layer Embeddings) |
-| Sözlük / bağlam | 262K token / 128K |
-| Mimari | 42 katman, 512 token kayan pencere + global dikkat karışımı; görüntü ve ses kodlayıcıları var |
-| Kod başarımı (talimatlı) | LiveCodeBench v6: %52,0 · Codeforces ELO: 940 |
-| Önerilen örnekleme | sıcaklık 1,0 · top_p 0,95 · top_k 64 |
-| Düşünme modu | `enable_thinking` ile açılır/kapanır |
-| Tarayıcı | `onnx-community/gemma-4-E4B-it-ONNX`, Transformers.js, `q4f16`, WebGPU |
+| License | Apache-2.0 → we can publish the fine-tuned weights and the dataset openly |
+| Size | 4.5B effective parameters, 8B total with embeddings (Per-Layer Embeddings) |
+| Vocabulary / context | 262K tokens / 128K |
+| Architecture | 42 layers, a mix of 512-token sliding-window and global attention; has image and audio encoders |
+| Code performance (instruction-tuned) | LiveCodeBench v6: 52.0% · Codeforces ELO: 940 |
+| Recommended sampling | temperature 1.0 · top_p 0.95 · top_k 64 |
+| Thinking mode | switched on/off with `enable_thinking` |
+| Browser | `onnx-community/gemma-4-E4B-it-ONNX`, Transformers.js, `q4f16`, WebGPU |
 
-Sonuçları ve tasarım etkileri:
-- **262K sözlük**, yaygın kelimelerin tek token olma ihtimalini artırır; yine de her anahtar kelime ölçülür (§2, ilke 6).
-- **Kart bütçesi** (1.200 token) bağlam sınırından değil, küçük modelde dikkat kalitesinden ve tarayıcıda ilk dolum (prefill) gecikmesinden gelir; 128K bağlam bunu değiştirmez.
-- **Benchmark protokolü:** her ölçüm hem *greedy* hem önerilen örneklemeyle, düşünme modu kapalı **ve** açık raporlanır. Mod C varsayılanı gecikme için düşünme kapalıdır.
-- **İnce ayar riski (Faz 5):** model çok kipli sarmalayıcıyla geliyor (`Gemma4ForConditionalGeneration`) ve PLE tabloları var; LoRA yalnızca metin çözücüsüne uygulanacak. Araç desteği (ör. Unsloth sürümleri) mevcut görünüyor ama **Faz 0'da küçük bir deneme ince ayarıyla doğrulanmalı**.
-- **Mod C riski (ölçüldü, 2026-10-15):** `onnx-community/gemma-4-E4B-it-ONNX` metin-only `q4f16` = **4,9 GB** (kod çözücü 2,9 + `embed_tokens` 2,0; görüntü +0,1, ses +0,17); q4 5,6 GB; fp16 16,5 GB (`bench/onnx-sizes.mjs`). Bu, tarayıcı için ağır: Mod C "isteğe bağlı indirme" (bir kez indir, Cache Storage'da tut) olarak sunulur; daha küçük bir ince ayarlı model (ör. ≤1–2 GB) Faz 5/6'da hedef.
-- Diğer 3–4B modeller **desteklenir ama hedeflenmez**: kart ve sözdizimi Gemma 4'e göre ayarlanır, diğerleri regresyon göstergesidir.
+Consequences and design implications:
+- The **262K vocabulary** raises the chance that common words are single tokens; every keyword is still measured (§2, principle 6).
+- The **card budget** (1,200 tokens) comes not from the context limit but from attention quality in a small model and from the prefill latency in the browser; the 128K context does not change that.
+- **Benchmark protocol:** every measurement is reported with both *greedy* and the recommended sampling, with thinking mode off **and** on. The Mode C default is thinking off, for latency.
+- **Fine-tuning risk (Phase 5):** the model ships with a multimodal wrapper (`Gemma4ForConditionalGeneration`) and has PLE tables; LoRA will be applied to the text decoder only. Tooling support (e.g. Unsloth releases) appears to exist but **must be verified with a small trial fine-tune in Phase 0**.
+- **Mode C risk (measured, 2026-10-15):** `onnx-community/gemma-4-E4B-it-ONNX` text-only `q4f16` = **4.9 GB** (decoder 2.9 + `embed_tokens` 2.0; vision +0.1, audio +0.17); q4 5.6 GB; fp16 16.5 GB (`bench/onnx-sizes.mjs`). This is heavy for a browser: Mode C is offered as an "optional download" (download once, keep in Cache Storage); a smaller fine-tuned model (e.g. ≤ 1–2 GB) is the target for Phase 5/6.
+- Other 3–4B models are **supported but not targeted**: the card and syntax are tuned for Gemma 4; the others are regression indicators.
 
-### 9.1 Kullanım modları
+### 9.1 Usage modes
 
-| Mod | Model | Mekanizma |
+| Mode | Model | Mechanism |
 |---|---|---|
-| **A — Sıfır ince ayar** | Gemma 4 E4B (referans); diğer 3–4B+ modeller | `card.md` + birkaç örnek + GBNF kısıtlı üretim + hata döngüsü |
-| **B — İnce ayarlı** | Tez-Coder = Gemma 4 E4B ince ayarı (açık ağırlık, Apache-2.0) | LoRA/tam ince ayar; kart gerekmez |
-| **C — Tamamen tarayıcıda** | Tez-Coder, `q4f16` ONNX | WebGPU (Transformers.js) + GBNF; sunucu yok, ağ yok |
+| **A — Zero fine-tuning** | Gemma 4 E4B (reference); other 3–4B+ models | `card.md` + a few examples + GBNF constrained generation + error loop |
+| **B — Fine-tuned** | Tez-Coder = a Gemma 4 E4B fine-tune (open weights, Apache-2.0) | LoRA/full fine-tuning; no card needed |
+| **C — Fully in the browser** | Tez-Coder, `q4f16` ONNX | WebGPU (Transformers.js) + GBNF; no server, no network |
 
-Mod C, "tamamen tarayıcıda geliştirme" hedefinin uç noktasıdır: editör, derleyici, doğrulayıcı, runtime **ve model** kullanıcının cihazında.
+Mode C is the far end of the "fully in-browser development" goal: editor, compiler, verifier, runtime **and model** on the user's device.
 
-### 9.2 Eğitim seti üretim hattı
+### 9.2 Training-set pipeline
 
-Derleyici bir **mükemmel doğrulayıcı** olduğundan, veriyi büyük ölçüde sentetik ve otomatik doğrulanmış üretebiliriz:
+Because the compiler is a **perfect verifier**, data can be produced largely synthetically and verified automatically:
 
-1. **Tohum görevler:** Açık lisanslı problem setleri (MBPP, HumanEval tarzı) + TEA UI görevleri; doğal dil açıklaması + testler.
-2. **Üretim:** Büyük bir model, `card.md` ile her görev için N aday Tez programı üretir.
-3. **Reddetmeli örnekleme:** Yalnızca `tez check` (tür + doğrulama) ve testleri geçenler tutulur.
-4. **Kanonikleştirme:** Tüm örnekler `tez fmt`'den geçer → veri setinde tek bir stil.
-5. **Düzeltme izleri:** Başarısız adaylar atılmaz; `(hatalı kod, JSON hata) → düzeltilmiş kod` çiftleri olarak saklanır. Model yalnızca yazmayı değil, **döngünün kendisini** öğrenir.
-6. **Sözleşme zenginleştirme:** Her fonksiyona `ensures` eklenmiş varyantlar; model sözleşme yazmayı alışkanlık edinir.
-7. **Mutasyon verisi:** Doğru programlara kontrollü hatalar enjekte edilir (sınır, sıfıra bölme, eksik kol) → hata/düzeltme çiftleri.
-8. **Ayrık test seti:** TezBench görevleri eğitimde asla kullanılmaz (kirlenme kontrolü).
+1. **Seed tasks:** Openly licensed problem sets (MBPP, HumanEval style) + TEA UI tasks; a natural-language description + tests.
+2. **Generation:** A large model, with `card.md`, produces N candidate Tez programs for every task.
+3. **Rejection sampling:** Only those that pass `tez check` (types + verification) and the tests are kept.
+4. **Canonicalisation:** All samples go through `tez fmt` → a single style in the dataset.
+5. **Repair traces:** Failed candidates are not thrown away; they are stored as `(faulty code, JSON error) → repaired code` pairs. The model learns not only to write but **the loop itself**.
+6. **Contract enrichment:** Variants with `ensures` added to every function; the model acquires the habit of writing contracts.
+7. **Mutation data:** Controlled faults are injected into correct programs (bounds, division by zero, missing arm) → error/repair pairs.
+8. **Held-out test set:** TezBench tasks are never used in training (contamination check).
 
 ### 9.3 TezBench
 
-- 100+ görev: saf fonksiyonlar, veri dönüşümleri, TEA uygulamaları; her biri testli ve sözleşmeli.
-- Karşılaştırma: aynı görevlerin TypeScript sürümleri, aynı modellerle.
-- Model sınıfları: **Gemma 4 E4B (ana hedef)**, bir ikincil küçük model (regresyon göstergesi), bir öncü model.
+- 100+ tasks: pure functions, data transformations, TEA apps; each with tests and contracts.
+- Comparison: TypeScript versions of the same tasks, with the same models.
+- Model classes: **Gemma 4 E4B (main target)**, a secondary small model (regression indicator), a frontier model.
 
-| Metrik | Tanım | Hedef (Faz 0'da kalibre) |
+| Metric | Definition | Target (calibrated in Phase 0) |
 |---|---|---|
-| Sözdizimi geçerliliği | İlk denemede parse olan çıktı | GBNF ile %100; GBNF'siz, Mod A 3–4B ≥ %90 |
-| pass@1 (Mod A, 3–4B) | İlk denemede tüm kontrolleri geçen | TypeScript ile eşit veya üstü |
-| pass@1 (Mod B, 3–4B) | İnce ayarlı | Mod A'nın belirgin üstü |
-| Döngü yakınsaması | ≤ 3 turda geçen | ≥ %90 |
-| Token oranı | Tez / TS token sayısı | ≤ 0,8 (Gemma 4 tokenizer'ında; ikincillerde raporlanır) |
+| Syntax validity | Output that parses on the first try | 100% with GBNF; without GBNF, Mode A 3–4B ≥ 90% |
+| pass@1 (Mode A, 3–4B) | Passes all checks on the first try | Equal to or better than TypeScript |
+| pass@1 (Mode B, 3–4B) | Fine-tuned | Clearly above Mode A |
+| Loop convergence | Passes within ≤ 3 turns | ≥ 90% |
+| Token ratio | Tez / TS token count | ≤ 0.8 (on the Gemma 4 tokenizer; reported for the secondary ones) |
 
-### 9.4 Tokenizer kümesi
+### 9.4 Tokenizer set
 
-**Birincil:** Gemma 4 (`google/gemma-4-E4B`, `tokenizer.json`, 262K sözlük). Tasarım kararları buna göre verilir; tek-token kuralı ve token oranı hedefi burada **bağlayıcıdır**.
+**Primary:** Gemma 4 (`google/gemma-4-E4B`, `tokenizer.json`, 262K vocabulary). Design decisions are made against it; the one-token rule and the token-ratio target are **binding** here.
 
-**İkincil:** iki farklı aileden birer tokenizer (seçim Faz 0'da). Yalnızca raporlanır; Tez'in tek bir tokenizer'a aşırı uyum sağlamadığını göstermek içindir. İkincilde belirgin kötüleşme varsa karar gözden geçirilir ama otomatik reddedilmez.
+**Secondary:** one tokenizer each from two different families (chosen in Phase 0). Reported only; they exist to show that Tez is not over-fitted to a single tokenizer. If there is a marked degradation on a secondary one, the decision is reviewed but not rejected automatically.
 
-## 10. Yapılandırılmış Hata Şeması
+## 10. Structured Error Schema
 
 ```json
 {
@@ -306,12 +312,12 @@ Derleyici bir **mükemmel doğrulayıcı** olduğundan, veriyi büyük ölçüde
   "diagnostics": [{
     "code": "E_REFINEMENT",
     "phase": "verify",
-    "message": "Bölen sıfır olabilir",
+    "message": "The divisor may be zero",
     "span": { "start": { "line": 7, "col": 14 }, "end": { "line": 7, "col": 19 } },
     "expected": "len(xs) != 0",
     "counterexample": { "xs": "[]" },
     "fixes": [{
-      "title": "Ön koşul ekle",
+      "title": "Add a precondition",
       "edits": [{ "span": { "start": { "line": 6, "col": 33 }, "end": { "line": 6, "col": 33 } },
                   "replace": "\n  requires len(xs) > 0" }]
     }]
@@ -319,39 +325,39 @@ Derleyici bir **mükemmel doğrulayıcı** olduğundan, veriyi büyük ölçüde
 }
 ```
 
-- Bir düzenleme `span` aralığını `replace` metniyle değiştirir; boş aralık = ekleme.
-- Kararlı kodlar: `E_PARSE_*`, `E_TYPE_*`, `E_MATCH_*`, `E_REFINEMENT`, `E_UNPROVEN`, `E_TERMINATION`, `E_RESOURCE`.
-- Hata kurtarmalı parser → tek derlemede tüm hatalar.
-- Mesajlar kısa ve kalıplı — küçük modelin bağlamına az token ekler; eğitim setinde aynı kalıplar kullanılır.
+- An edit replaces the `span` range with the `replace` text; an empty range = an insertion.
+- Stable codes: `E_PARSE_*`, `E_TYPE_*`, `E_MATCH_*`, `E_REFINEMENT`, `E_UNPROVEN`, `E_TERMINATION`, `E_RESOURCE`.
+- A parser with error recovery → all errors in a single compile.
+- Messages are short and templated — they add few tokens to a small model's context; the training set uses the same templates.
 
-## 11. Konumlanma
+## 11. Positioning
 
-| Proje | İlişki | Tez'in farkı |
+| Project | Relation | How Tez differs |
 |---|---|---|
-| **AILang (Sunholo)** | AI tarafından yazılan kod için saf fonksiyonel dil; açık etkiler | Tez: SMT ile kanıtlanmış hata sınıfları, 3–4B hedefi + açık eğitim seti/model, WasmGC + tamamen tarayıcıda geliştirme |
-| **MoonBit** | AI-dostu, WASM öncelikli | Tez: biçimsel doğrulama, küçük model odaklı minimal yüzey |
-| **Elm** | Saf, TEA, çalışma anı hatası yok | Tez: refinement/sözleşme, LLM döngüsü, WASM |
-| **Dafny / F\*** | SMT tabanlı doğrulama | Tez: web uygulaması runtime'ı, LLM-öncelikli sözdizimi, tarayıcıda çalışma |
-| **v0 / Bolt / Lovable** | Prompt → web uygulaması ürünleri | Tez: garanti eden derleyici; tamamen yerel çalışabilen açık yığın |
+| **AILang (Sunholo)** | A pure functional language for AI-written code; explicit effects | Tez: SMT-proven error classes, a 3–4B target with an open training set/model, WasmGC + fully in-browser development |
+| **MoonBit** | AI-friendly, WASM-first | Tez: formal verification, a minimal surface focused on small models |
+| **Elm** | Pure, TEA, no run-time errors | Tez: refinements/contracts, an LLM loop, WASM |
+| **Dafny / F\*** | SMT-based verification | Tez: a web-app runtime, LLM-first syntax, runs in the browser |
+| **v0 / Bolt / Lovable** | Prompt → web-app products | Tez: a compiler that gives guarantees; an open stack that can run entirely locally |
 
-**Tek cümle:** *Tez, küçük bir modelin bile tarayıcıda yazıp anında çalıştırabildiği ve derlendiyse belirli hataları içeremeyeceği kanıtlanmış dildir.*
+**In one sentence:** *Tez is a language in which even a small model can write and instantly run programs in the browser, and which, once compiled, is proven unable to contain certain errors.*
 
-## 12. Yol Haritası
+## 12. Roadmap
 
-| Faz | Süre | Çıktı | Çıkış kriteri |
+| Phase | Duration | Output | Exit criterion |
 |---|---|---|---|
-| **0. Dil tasarımı + ölçüm** | 2 hafta | `grammar.ebnf/.gbnf`, `card.md`, 30 örnek program, tokenizer ölçüm aracı, TezBench iskeleti (20 görev) | Mod A, bir 3–4B modelde ≥ %80 sözdizimi geçerliliği; token oranı ≤ 0,9 |
-| **1. Çekirdek** | 3 hafta | lexer, parser, ad çözümleme, tür denetimi, kapsamlılık, `tez_interp`, JSON hatalar, `tez fmt`, CLI | §5 Faz-1 sınıfları testlerle kanıtlı |
-| **2. WasmGC + tarayıcı** | 3 hafta | `tez_wasm`, `tez_web`, Studio (Monaco), TEA runtime, Worker, fuel, hot-swap | Sayaç örneği tarayıcıda canlı; §7 bütçeleri (L1 hariç) tutuyor |
-| **3. LLM döngüsü + veri hattı v1** | 2 hafta | Studio'da LLM entegrasyonu, otomatik düzeltme, §9.2 hattının ilk sürümü | **İlk uçtan uca demo**; TezBench ilk ölçüm |
-| **4. Doğrulama** | 4 hafta | refinement, VC üretimi, `tez_solve` (L1), Z3 (L2), karşı örnekler, `decreases`, VC önbelleği | §5'teki tüm sınıflar aktif; L1 < 1 ms/VC |
-| **5. Tez-Coder v0** | 3 hafta | Eğitim seti v1 (doğrulanmış + düzeltme izleri), 3–4B ince ayar, açık ağırlık yayını | Mod B pass@1, Mod A'nın belirgin üstü |
-| **6. Tarayıcı içi model** | 2 hafta | Mod C: WebGPU + GBNF Studio'da | İnternetsiz uçtan uca demo |
-| **7. Etkiler** | sonra | `Cmd`/`Sub`, HTTP, depolama | — |
+| **0. Language design + measurement** | 2 weeks | `grammar.ebnf/.gbnf`, `card.md`, 30 example programs, tokenizer measurement tool, TezBench skeleton (20 tasks) | Mode A: ≥ 80% syntax validity on a 3–4B model; token ratio ≤ 0.9 |
+| **1. Core** | 3 weeks | lexer, parser, name resolution, type checking, exhaustiveness, `tez_interp`, JSON errors, `tez fmt`, CLI | The §5 Phase-1 classes proven by tests |
+| **2. WasmGC + browser** | 3 weeks | `tez_wasm`, `tez_web`, Studio (Monaco), TEA runtime, Worker, fuel, hot-swap | The counter example is live in the browser; the §7 budgets (except L1) hold |
+| **3. LLM loop + data pipeline v1** | 2 weeks | LLM integration in the Studio, automatic repair, the first version of the §9.2 pipeline | **First end-to-end demo**; first TezBench measurement |
+| **4. Verification** | 4 weeks | refinements, VC generation, `tez_solve` (L1), Z3 (L2), counterexamples, `decreases`, VC cache | All classes in §5 active; L1 < 1 ms/VC |
+| **5. Tez-Coder v0** | 3 weeks | Training set v1 (verified + repair traces), a 3–4B fine-tune, open-weights release | Mode B pass@1 clearly above Mode A |
+| **6. In-browser model** | 2 weeks | Mode C: WebGPU + GBNF in the Studio | An end-to-end demo without internet |
+| **7. Effects** | later | `Cmd`/`Sub`, HTTP, storage | — |
 
-## 13. Açık Sorular
+## 13. Open Questions
 
-1. ~~Ad kontrolü~~ **Karar: marka Tez, paket/depo `tez-lang`** (yayında, 2026-10-14). Açık: domain.
-2. ~~Referans model~~ **Karar: Gemma 4 E4B** (§9.0). Açık: iki ikincil tokenizer ailesi, Mod C indirme boyutu, LoRA denemesi.
-3. **Veri üretimi için büyük model:** §9.2 adım 2'de hangi model/API kullanılacak? (Çıktı lisans koşulları kontrol edilmeli.)
-4. **Studio dağıtımı:** Statik barındırma (COOP/COEP başlıkları destekli) — hangi platform?
+1. ~~Name check~~ **Decision: the brand is Tez, the package/repository is `tez-lang`** (published, 2026-10-14). Open: the domain.
+2. ~~Reference model~~ **Decision: Gemma 4 E4B** (§9.0). Open: two secondary tokenizer families, the Mode C download size, the LoRA trial.
+3. **A large model for data generation:** which model/API will be used in §9.2 step 2? (Check the output licence terms.)
+4. **Studio hosting:** static hosting (with COOP/COEP header support) — which platform?

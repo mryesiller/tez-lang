@@ -14,7 +14,9 @@
     <nav>
       <a href="#proof">Proofs</a>
       <a href="#numbers">Numbers</a>
+      <a href="#live">Live sites</a>
       <a href="./docs/#/tour">Docs</a>
+      <a href="./studio/">Studio</a>
       <a href="https://github.com/mryesiller/tez-lang">GitHub</a>
     </nav>
   </header>
@@ -37,7 +39,7 @@
     <section id="try" class="try">
       <div class="try-head">
         <h2>This page is running Tez.</h2>
-        <p>The compiler is Rust built to WebAssembly (about 257 KB gzipped). The counter on the right is compiled by it, in your browser, to WebAssembly and driven by the Tez app runtime. Edit the code: your count survives the change.</p>
+        <p>The compiler is Rust built to WebAssembly (about 300 KB gzipped). The counter on the right is compiled by it, in your browser, to WebAssembly and driven by the Tez app runtime. Edit the code: your count survives the change.</p>
       </div>
       <div class="try-grid">
         <div class="editor">
@@ -57,11 +59,39 @@
 
     <section class="pillars">
       <article><h3>Proved, not tested</h3><p>Every index, division and recursion is checked by an SMT solver at compile time. If Tez cannot prove it, it does not compile. No warnings exist to ignore.</p></article>
-      <article><h3>Made for small models</h3><p>One way to do each thing, no shadowing, no operator overloading, no implicit anything. The whole language card is about 1,000 tokens.</p></article>
+      <article><h3>Made for small models</h3><p>One way to do each thing, no shadowing, no operator overloading, no implicit anything. The whole language card is about 1,200 tokens.</p></article>
       <article><h3>Token-lean</h3><p>Measured with the Gemma 4 tokenizer: the same programs take about 12% fewer tokens than their TypeScript twins (16% when the lines that exist only to be proved are not counted), and 36 of 38 keywords are a single token.</p></article>
       <article><h3>WebAssembly GC</h3><p>Compiled output uses WasmGC and a tiny runtime. A recursive <code>fib(30)</code> runs in about 0.03 s compiled, against 0.65 s in the reference interpreter.</p></article>
       <article><h3>Entirely in the browser</h3><p>Parser, type checker, formatter, compiler and the app runtime all run client-side. No server, no install, no account.</p></article>
-      <article><h3>Errors an agent can fix</h3><p>Sixty-one stable error codes with spans, expected forms, counterexamples and machine-applicable fixes, as JSON for tools and as plain text for people.</p></article>
+      <article><h3>Errors an agent can fix</h3><p>Sixty-four stable error codes with spans, expected forms, counterexamples and machine-applicable fixes, as JSON for tools and as plain text for people.</p></article>
+    </section>
+
+    <section id="live" class="proof">
+      <h2>Sites that run themselves.</h2>
+      <p class="sub">A Tez web app is a pure <code>init</code>, <code>update</code> and <code>view</code>. Time, browser state, storage and the network are not calls in your code: they are declared as data, and the page that hosts the program performs them. The program stays pure, so it stays proven.</p>
+      <div class="two">
+        <pre class="code" data-tez>// every minute, and when the browser goes on/offline
+fn subs(m: Model) -> List[Sub[Msg]] =
+  [Sub.clock(60000, t =&gt; Tick(t)), Sub.online(b =&gt; Net(b))]
+
+// fetch a file from this site
+fn fetches(m: Model) -> List[Fetch[Msg]] = if m.wanted {
+  [Fetch.get("quote.txt", t =&gt; Got(t), e =&gt; Failed(e))]
+} else { [] }
+
+// what the browser remembers
+fn save(m: Model) -> Str = m.count.toStr()</pre>
+        <div>
+          <ul class="checks">
+            <li class="done">Cron-style updates with <code>Sub.clock</code>; <code>Sub.every</code> for intervals</li>
+            <li class="done">Online/offline and tab-visible events</li>
+            <li class="done">Saved state that comes back after a reload, rebuilt through the program's own checked code</li>
+            <li class="done">Fetches only from origins the page allows: no cookies, no redirects, 10 s and 1 MB limits</li>
+            <li class="done">Publish the whole site as one HTML file under a strict Content-Security-Policy</li>
+          </ul>
+          <p><a class="btn primary" href="./studio/">Build one in the Studio</a></p>
+        </div>
+      </div>
     </section>
 
     <section id="proof" class="proof">
@@ -114,10 +144,10 @@ fn main() -> Light = next(Red)</pre>
       <h2>Measured, not promised.</h2>
       <div class="stats">
         <div><b>0.88</b><span>Tez tokens ÷ TypeScript tokens over 28 paired programs (0.84 without proof lines; Gemma 4 tokenizer)</span></div>
-        <div><b>~1,000</b><span>tokens for the complete language card (budget 1,200)</span></div>
-        <div><b>61</b><span>stable diagnostic codes, each tested</span></div>
+        <div><b>1,198</b><span>tokens for the complete language card (budget 1,200)</span></div>
+        <div><b>64</b><span>stable diagnostic codes, each tested</span></div>
         <div><b>0</b><span>soundness violations in 4,286 fuzzed runs of 300 generated programs</span></div>
-        <div><b>257 KB</b><span>gzipped compiler that runs in a browser tab</span></div>
+        <div><b>~300 KB</b><span>gzipped compiler that runs in a browser tab</span></div>
         <div><b>0.03 s</b><span><code>fib(30)</code> compiled to WasmGC</span></div>
       </div>
       <p class="note">Numbers come from <code>bench/</code> and the test suite in the repository; rerun them yourself with <code>make check</code>.</p>
@@ -129,9 +159,12 @@ fn main() -> Light = next(Red)</pre>
         <li class="done">Lexer, parser, type checker, exhaustiveness, formatter</li>
         <li class="done">SMT verifier for contracts, indexing, division and termination</li>
         <li class="done">WasmGC compiler and runtime, checked against the reference interpreter</li>
-        <li class="done">Browser compiler, Studio IDE, TEA app runtime with hot-swap</li>
+        <li class="done">Browser compiler, Studio IDE with multi-file projects, TEA app runtime with hot-swap</li>
+        <li class="done">Programs of several files (<code>use "file.tez"</code>), each file seeing only what it imports</li>
+        <li class="done">Live sites: timers, the wall clock, saved state and allow-listed fetches; publish as one page</li>
         <li class="done">Proofs in the browser: Z3 as WebAssembly in the Studio (33 MB, loaded when you press Verify)</li>
-        <li class="todo">Fine-tuned small model and TezBench (next phase, after the language)</li>
+        <li class="done">TezBench: 20 tasks measured with Gemma 4 E4B, and a first LoRA fine-tune</li>
+        <li class="todo">Open Tez-Coder weights, and a model that runs in the browser</li>
       </ul>
       <p><a class="btn" href="./docs/#/roadmap">Full roadmap</a></p>
     </section>

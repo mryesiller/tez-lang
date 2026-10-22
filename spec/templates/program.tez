@@ -1,0 +1,11 @@
+// A first Tez program.
+//   tez check main.tez   prove it: contracts, division, indexing and termination
+//   tez test main.tez    run the tests below
+//   tez run main.tez     print the value of main()
+fn average(xs: List[Int]) -> Int
+  requires xs.len() > 0
+  = xs.sum() / xs.len()
+
+test averageOfThree = average([2, 4, 9]) == 5
+
+fn main() -> Int = average([10, 20, 30])

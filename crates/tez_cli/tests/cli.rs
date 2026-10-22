@@ -556,3 +556,202 @@ fn files_see_only_the_names_of_files_they_use() {
         "{v}"
     );
 }
+
+fn scratch(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("tez-cli-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    dir
+}
+
+/// Like `project`, but in a directory named for the test, so parallel tests never share one.
+fn project_in(name: &str, files: &[(&str, &str)]) -> PathBuf {
+    let dir = scratch(name);
+    for (file, text) in files {
+        let p = dir.join(file);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, text).unwrap();
+    }
+    dir
+}
+
+#[test]
+fn help_succeeds_and_a_missing_command_or_a_misspelt_flag_does_not() {
+    for args in [
+        &["--help"][..],
+        &["help"],
+        &["check", "--help"],
+        &["new", "-h"],
+    ] {
+        let out = tez(args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}");
+        assert!(s(&out.stdout).contains("USAGE:"), "{args:?}");
+    }
+    // no command at all is a usage error, printed on stderr
+    let none = tez(&[]);
+    assert_eq!(none.status.code(), Some(2));
+    assert!(s(&none.stderr).contains("USAGE:"));
+    // a typo in a flag must not be ignored silently
+    let p = temp("flag.tez", "fn main() -> Int = 1\n");
+    let p = p.to_str().unwrap();
+    for args in [
+        &["check", p, "--jsno"][..],
+        &["run", p, "--check"],
+        &["fmt", p, "--watch"],
+        &["new", "x", "--json"],
+    ] {
+        let out = tez(args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        assert!(
+            s(&out.stderr).contains("does not take"),
+            "{args:?}: {}",
+            s(&out.stderr)
+        );
+    }
+}
+
+#[test]
+fn new_starts_projects_that_check_test_run_and_are_formatted() {
+    for (flag, run_prints) in [(None, Some("20")), (Some("--app"), None)] {
+        let dir = scratch(flag.unwrap_or("program"));
+        let d = dir.to_str().unwrap();
+        let mut args = vec!["new", d];
+        args.extend(flag);
+        let out = tez(&args);
+        assert!(out.status.success(), "{}", s(&out.stderr));
+        let main = dir.join("main.tez");
+        let m = main.to_str().unwrap();
+        let check = tez(&["check", m]);
+        assert!(check.status.success(), "{flag:?}: {}", s(&check.stderr));
+        assert!(!s(&check.stdout).contains("NOT verified"));
+        let t = tez(&["test", m]);
+        assert!(t.status.success(), "{flag:?}: {}", s(&t.stdout));
+        assert!(
+            tez(&["fmt", m, "--check"]).status.success(),
+            "{flag:?}: not formatted"
+        );
+        if let Some(want) = run_prints {
+            assert_eq!(s(&tez(&["run", m]).stdout).trim(), want);
+        }
+        // a second `new` into the same place refuses and leaves the files alone
+        let before = std::fs::read_to_string(&main).unwrap();
+        std::fs::write(&main, format!("{before}// mine\n")).unwrap();
+        let again = tez(&args);
+        assert_eq!(again.status.code(), Some(2));
+        assert!(
+            std::fs::read_to_string(&main)
+                .unwrap()
+                .ends_with("// mine\n")
+        );
+    }
+    // `new` creates the directory when it does not exist, nested too
+    let nested = scratch("nested").join("a").join("b");
+    assert!(tez(&["new", nested.to_str().unwrap()]).status.success());
+    assert!(nested.join("main.tez").exists());
+}
+
+#[test]
+fn fmt_takes_a_directory() {
+    let dir = project_in(
+        "fmtdir",
+        &[
+            (
+                "main.tez",
+                "use \"lib/a.tez\"\n\nfn main() -> Int = double(2)\n",
+            ),
+            ("lib/a.tez", "fn double(n:Int)->Int=n*2\n"),
+            ("notes.txt", "not a tez file\n"),
+        ],
+    );
+    let d = dir.to_str().unwrap();
+    assert_eq!(tez(&["fmt", d]).status.code(), Some(2)); // needs --check or --write
+    let check = tez(&["fmt", d, "--check"]);
+    assert_eq!(check.status.code(), Some(1));
+    assert!(
+        s(&check.stderr).contains("a.tez is not formatted"),
+        "{}",
+        s(&check.stderr)
+    );
+    assert!(!s(&check.stderr).contains("main.tez is not formatted"));
+    assert!(tez(&["fmt", d, "--write"]).status.success());
+    assert!(tez(&["fmt", d, "--check"]).status.success());
+    assert_eq!(
+        std::fs::read_to_string(dir.join("lib/a.tez")).unwrap(),
+        "fn double(n: Int) -> Int = n * 2\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.join("notes.txt")).unwrap(),
+        "not a tez file\n"
+    );
+    // an empty directory is an error, not a silent success
+    let empty = scratch("empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    assert_eq!(
+        tez(&["fmt", empty.to_str().unwrap(), "--check"])
+            .status
+            .code(),
+        Some(2)
+    );
+}
+
+/// Waits (up to 15 s) until `file` contains `needle`.
+fn wait_for(file: &Path, needle: &str) -> bool {
+    for _ in 0..150 {
+        if std::fs::read_to_string(file).is_ok_and(|t| t.contains(needle)) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    false
+}
+
+#[test]
+fn watch_runs_again_when_a_file_of_the_project_changes() {
+    let dir = project_in(
+        "watch",
+        &[
+            ("main.tez", "use \"lib.tez\"\n\nfn main() -> Int = one()\n"),
+            ("lib.tez", "fn one() -> Int = 1\n"),
+        ],
+    );
+    let log = scratch("watch-out.log");
+    let err = scratch("watch-err.log");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_tez"))
+        .args(["check", "--watch", dir.join("main.tez").to_str().unwrap()])
+        .stdout(std::fs::File::create(&log).unwrap())
+        .stderr(std::fs::File::create(&err).unwrap())
+        .spawn()
+        .unwrap();
+    let ok1 = wait_for(&log, "ok: ");
+    // break the *imported* file: the watcher must notice files that are not the entry file
+    std::fs::write(dir.join("lib.tez"), "fn one() -> Int = \"x\"\n").unwrap();
+    let broke = wait_for(&err, "E_TYPE_MISMATCH");
+    std::fs::write(dir.join("lib.tez"), "fn one() -> Int = 2\n").unwrap();
+    let fixed = {
+        // a second "ok:" line shows up once the project is healthy again
+        let mut n = 0;
+        for _ in 0..150 {
+            n = std::fs::read_to_string(&log)
+                .unwrap_or_default()
+                .matches("ok: ")
+                .count();
+            if n >= 2 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        n >= 2
+    };
+    let _ = child.kill();
+    let _ = child.wait();
+    assert!(
+        ok1,
+        "first run printed nothing: {}",
+        std::fs::read_to_string(&log).unwrap_or_default()
+    );
+    assert!(
+        broke,
+        "the change to lib.tez was not noticed: {}",
+        std::fs::read_to_string(&err).unwrap_or_default()
+    );
+    assert!(fixed, "the fix was not noticed");
+}

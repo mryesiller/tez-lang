@@ -12,6 +12,7 @@ const USAGE: &str = "\
 tez: a fast, verified language for LLMs and the browser
 
 USAGE:
+    tez new <dir> [--app]                    start a project: a small program, or a web app
     tez check <file> [--json] [--no-verify]  type-check and verify a program
     tez run <file> [fn] [--no-verify] [--contracts]
                                             run a zero-argument function (default: main)
@@ -19,14 +20,31 @@ USAGE:
                                             run the `test` items
     tez build <file> [-o out.wasm] [--no-verify]
                                             compile to a WebAssembly (WasmGC) module
-    tez fmt <file> [--check | --write]      print / check / rewrite canonical formatting
+    tez fmt <file|dir> [--check | --write]  print / check / rewrite canonical formatting
+                                            (a directory: every .tez file below it; needs --check or --write)
     tez grammar                             print the normative grammar (EBNF)
     tez --version
+
+`check`, `run`, `test` and `build` take `--watch`: run again whenever a .tez file next to the entry file
+(or below it) changes; stop with Ctrl-C.
 
 Programs are verified before they run. `--no-verify` skips verification (nothing is then
 guaranteed); `--contracts` evaluates requires/ensures/refinements while running, which is
 how to test a program that is not verified yet.
 ";
+
+/// The flags each command accepts; anything else is a usage error (a typo must not be ignored silently).
+const FLAGS: &[(&str, &[&str])] = &[
+    ("check", &["--json", "--no-verify", "--watch"]),
+    ("run", &["--json", "--no-verify", "--contracts", "--watch"]),
+    ("test", &["--json", "--no-verify", "--contracts", "--watch"]),
+    ("build", &["--json", "--no-verify", "--watch"]),
+    ("fmt", &["--check", "--write"]),
+    ("new", &["--app"]),
+];
+
+const TEMPLATE_PROGRAM: &str = include_str!("../../../spec/templates/program.tez");
+const TEMPLATE_APP: &str = include_str!("../../../spec/templates/app.tez");
 
 const GRAMMAR: &str = include_str!("../../../spec/grammar.ebnf");
 
@@ -46,6 +64,8 @@ fn parse_args() -> Args {
     while let Some(a) = it.next() {
         if a == "-o" {
             out = it.next();
+        } else if a == "-h" {
+            flags.push("--help".to_string());
         } else if a.starts_with("--") {
             flags.push(a);
         } else {
@@ -91,37 +111,179 @@ fn print_report(report: &Report, src: &str, path: &str, json: bool) {
 
 fn main() -> ExitCode {
     let args = parse_args();
+    // `tez --help`, `tez help` and `tez <command> --help` print the usage and succeed; `tez` alone is a usage error
+    if args.flag("--help") || matches!(args.cmd.as_str(), "--help" | "help") {
+        print!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
+    if let Some((_, allowed)) = FLAGS.iter().find(|(c, _)| *c == args.cmd)
+        && let Some(bad) = args.flags.iter().find(|f| !allowed.contains(&f.as_str()))
+    {
+        return usage_error(&format!("`{}` does not take `{bad}`", args.cmd));
+    }
     match args.cmd.as_str() {
         "--version" | "-V" => {
             println!("tez {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        "" | "--help" | "-h" | "help" => {
-            print!("{USAGE}");
-            ExitCode::SUCCESS
-        }
+        "" => usage_error("a command is needed"),
         "grammar" => {
             print!("{GRAMMAR}");
             ExitCode::SUCCESS
         }
+        "new" => cmd_new(&args),
         "check" | "run" | "test" | "fmt" | "build" => {
             let Some(path) = args.positional.first().cloned() else {
                 return usage_error(&format!("`{}` needs a file", args.cmd));
             };
-            let src = match read(&path) {
-                Ok(s) => s,
-                Err(code) => return code,
-            };
-            match args.cmd.as_str() {
-                "check" => cmd_check(&args, &src, &path),
-                "run" => cmd_run(&args, &src, &path),
-                "test" => cmd_test(&args, &src, &path),
-                "build" => cmd_build(&args, &src, &path),
-                _ => cmd_fmt(&args, &src, &path),
+            if args.cmd == "fmt" && std::path::Path::new(&path).is_dir() {
+                return cmd_fmt_dir(&args, &path);
             }
+            if args.flag("--watch") {
+                return watch(&args, &path);
+            }
+            run_command(&args, &path)
         }
         other => usage_error(&format!("unknown command `{other}`")),
     }
+}
+
+/// Reads `path` and runs the command once.
+fn run_command(args: &Args, path: &str) -> ExitCode {
+    let src = match read(path) {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    match args.cmd.as_str() {
+        "check" => cmd_check(args, &src, path),
+        "run" => cmd_run(args, &src, path),
+        "test" => cmd_test(args, &src, path),
+        "build" => cmd_build(args, &src, path),
+        _ => cmd_fmt(args, &src, path),
+    }
+}
+
+/// Every `.tez` file next to the entry file or below it, with its modification time and size.
+fn tez_files(entry: &str) -> Vec<(std::path::PathBuf, Option<std::time::SystemTime>, u64)> {
+    fn walk(
+        dir: &std::path::Path,
+        depth: usize,
+        out: &mut Vec<(std::path::PathBuf, Option<std::time::SystemTime>, u64)>,
+    ) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            let name = e.file_name().to_string_lossy().into_owned();
+            let Ok(meta) = e.metadata() else { continue };
+            if meta.is_dir() {
+                if depth < 6 && !name.starts_with('.') && name != "target" && name != "node_modules"
+                {
+                    walk(&p, depth + 1, out);
+                }
+            } else if p.extension().is_some_and(|x| x == "tez") {
+                out.push((p, meta.modified().ok(), meta.len()));
+            }
+        }
+    }
+    let dir = std::path::Path::new(entry)
+        .parent()
+        .filter(|d| !d.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let mut out = Vec::new();
+    walk(dir, 0, &mut out);
+    out.sort();
+    out
+}
+
+/// Runs the command, then again every time a `.tez` file of the project changes. Never returns.
+fn watch(args: &Args, path: &str) -> ExitCode {
+    use std::io::{IsTerminal, Write};
+    let tty = std::io::stdout().is_terminal();
+    let mut seen = tez_files(path);
+    loop {
+        if tty {
+            print!("\x1b[2J\x1b[H");
+        }
+        run_command(args, path);
+        println!("\n[watching {path}: it runs again when a .tez file changes; Ctrl-C stops]");
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if tez_files(path) != seen {
+                // an editor may write in several steps: wait until the files hold still
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    let now = tez_files(path);
+                    if now == tez_files(path) {
+                        seen = now;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
+/// `tez new <dir> [--app]`: a directory with a `main.tez` that already checks, tests and runs.
+fn cmd_new(args: &Args) -> ExitCode {
+    let Some(dir) = args.positional.first() else {
+        return usage_error("`new` needs a directory name");
+    };
+    let target = std::path::Path::new(dir);
+    if target.exists() && !target.is_dir() {
+        eprintln!("tez: `{dir}` exists and is not a directory");
+        return ExitCode::from(2);
+    }
+    if std::fs::read_dir(target).is_ok_and(|mut d| d.next().is_some()) {
+        eprintln!("tez: `{dir}` is not empty; nothing was written");
+        return ExitCode::from(2);
+    }
+    let app = args.flag("--app");
+    let text = if app { TEMPLATE_APP } else { TEMPLATE_PROGRAM };
+    let main = target.join("main.tez");
+    if let Err(e) = std::fs::create_dir_all(target).and_then(|()| std::fs::write(&main, text)) {
+        eprintln!("tez: cannot write `{}`: {e}", main.display());
+        return ExitCode::from(2);
+    }
+    println!("created {}", main.display());
+    println!("next:  cd {dir} && tez check main.tez && tez test main.tez");
+    if app {
+        println!(
+            "       open main.tez in the Studio (https://mryesiller.github.io/tez-lang/studio/) to run the app"
+        );
+    } else {
+        println!("       tez run main.tez");
+    }
+    ExitCode::SUCCESS
+}
+
+/// `tez fmt <dir> --check|--write`: every `.tez` file below the directory.
+fn cmd_fmt_dir(args: &Args, dir: &str) -> ExitCode {
+    if !args.flag("--check") && !args.flag("--write") {
+        return usage_error("`fmt` on a directory needs --check or --write");
+    }
+    let files = tez_files(&format!("{}/x", dir.trim_end_matches('/')));
+    if files.is_empty() {
+        eprintln!("tez: no .tez files below `{dir}`");
+        return ExitCode::from(2);
+    }
+    let mut worst = 0;
+    for (p, _, _) in files {
+        let path = p.to_string_lossy().into_owned();
+        let src = match read(&path) {
+            Ok(s) => s,
+            Err(code) => return code,
+        };
+        let code = cmd_fmt(args, &src, &path);
+        if code != ExitCode::SUCCESS {
+            worst = worst.max(if code == ExitCode::from(2) { 2 } else { 1 });
+        }
+    }
+    ExitCode::from(worst)
 }
 
 /// Compiles `path` and the files it `use`s (read from its directory, never from outside it).

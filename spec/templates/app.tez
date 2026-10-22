@@ -1,0 +1,42 @@
+// A first Tez web app: a counter that remembers its value in the browser.
+//   tez check main.tez   prove it
+//   tez test main.tez    run the tests below
+// Open it in the Studio (https://mryesiller.github.io/tez-lang/studio/) to run it, or publish it as one page
+// with `tez site main.tez -o index.html` (npm package tez-lang).
+type Model = { count: Int where it >= 0 }
+
+type Msg = Inc | Dec | Reset
+
+fn init() -> Model = Model { count: 0 }
+
+fn update(m: Model, msg: Msg) -> Model = match msg {
+  Inc => m with { count: m.count + 1 }
+  Dec => if m.count > 0 { m with { count: m.count - 1 } } else { m }
+  Reset => init()
+}
+
+fn view(m: Model) -> Html[Msg] =
+  Html.col(
+    [
+      Html.heading("Counter"),
+      Html.paragraph("Count: " ++ m.count.toStr()),
+      Html.row([Html.button("-", Dec), Html.button("+", Inc), Html.button("reset", Reset)])
+    ]
+  )
+
+// what the browser keeps, and how it comes back (a restored count is checked like any other)
+fn save(m: Model) -> Str = m.count.toStr()
+
+fn restore(s: Str) -> Option[Model] = match s.toInt() {
+  Some(n) => if n >= 0 { Some(Model { count: n }) } else { None }
+  None => None
+}
+
+test startsAtZero = init().count == 0
+
+test neverGoesBelowZero = update(init(), Dec).count == 0
+
+test comesBack = match restore(save(update(init(), Inc))) {
+  Some(m) => m.count == 1
+  None => false
+}

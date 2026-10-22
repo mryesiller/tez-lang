@@ -48,11 +48,17 @@ Not: bu belgenin önceki sürümündeki 0,99 oranı ve 930 token kart güncel de
 | Tez, kart (ilk sürüm) | greedy, 1 örnek | %75 | %30 |
 | Tez, kart v2 | greedy, 1 örnek | %85 | %65 |
 | Tez, güncel kart | **T=0,7, 3 örnek** | %75 / %80 / %80 | **%50 / %50 / %50** |
+| **mlx-serve, `mlx-community/gemma-4-e4b-it-4bit`** — kart A (çok dosya satırından önce, 1.148 token) | **T=0,7, 5 örnek** | %78 | **%52** (50–55) |
+| aynı model, kart B (+ çok dosya satırı) | T=0,7, 5 örnek | %82 | **%53** (50–55) |
+| aynı model, **güncel kart** (+ `Sub.clock/online/visible`, 1.198 token) | T=0,7, 5 örnek | %75 | **%46** (45–50) |
+| aynı model, güncel kart − `Sub.clock/online/visible` cümlesi | T=0,7, 5 örnek | %72 | **%49** (45–55) |
 | Tez, kart + 3 tur derleyici geri bildirimi | greedy | %90 | %55 |
 | Phi-4-mini-reasoning, kart | greedy | %75 | %5 |
 | Gemma 4 E4B + küçük LoRA, kart yok | greedy | %80 | **%70** |
 | aynı, GBNF kısıtlı üretim | greedy | %95 | %70 |
 | TypeScript (aynı görevler) | greedy | — | %100 |
+
+**Kart değişikliğinin maliyeti (2026-10-22, mlx-serve 4-bit Gemma 4 E4B, 20 görev × 5 örnek, T=0,7):** eski kartlar %52–53, güncel kart %46. LM Studio'daki eski %50/%50/%50 ile tutarlı (aynı model, farklı sunucu/kuantizasyon). Düşüş birkaç göreve yoğunlaşıyor: `18-gcd` 4/5 → 0/5 (model `decreases b` satırını unutuyor), `04-count-positive` 4/5 → 1/5, `08-fibonacci` 5/5 → 3/5; hiçbir kartla geçmeyen 8 görev değişmedi. `Sub` cümlesi geri alınınca %49'a çıkıyor, yani etkinin bir kısmı cümleden, bir kısmı kısaltılan `use` satırından ya da gürültüden (örnek kümesi sapması ≈ ±2–4 puan); kesin ayrıştırma bu örnek sayısıyla mümkün değil. **Karar:** canlı siteler birinci hedef olduğu için `Sub.clock/online/visible` kartta kalıyor; maliyet saf fonksiyon görevlerinde ≈ 6 puan. Düzeltme adayı: web/uygulama istemlerine kart eki, saf görevlere çekirdek kart (kart ≤ 1.200 kuralı nedeniyle çekirdek küçülmeden eklenemez) — ayrı karar. Sonuçlar: `bench/results/tezbench-mlx-card{A,B,C,D}-s{1..5}-2026-10-22.json`.
 
 **Ölçüm dersi:** tek greedy örnekle 20 görev ±%20 oynuyor. Kart v2'nin %65'i iyimser bir tek örnekti; 3 örnekli ölçüm %48–50. Bundan sonra karşılaştırmalar **en az 3 örnek, T=0,7** ile yapılmalı ve aynı adaylar eski/yeni derleyiciyle yeniden yargılanmalı (`TEZ_BIN=…`).
 
@@ -122,3 +128,9 @@ Açık: gerçek WebGPU model denemesi, `tez_web` ile `Fetch` için POST/başlık
 - **Fetch**: gövde akışla okunur, 1 MB (byte) aşılınca okuma kesilir; `stop()` uçuştaki istekleri iptal eder.
 - **Hot-swap logu**: dolunca program `save`/`restore` tanımlıysa o anki durum checkpoint olur (log sıfırlanır); tanımlı değilse kaydedilemeyen olaylar sayılır ve swap bunları `dropped` olarak bildirir (önceden sessizce farklı duruma replay ediyordu). Geri yüklenmiş (restore) bir oturumda swap artık `init()` yerine o durumdan başlar; yeni sürüm okuyamazsa `restarted: true`.
 - **Dosya başına görünürlük** (`E_USE_MISSING`): bir dosya yalnızca kendi adlarını ve doğrudan `use` ettiği dosyalarınkini görür (geçişli değil). Tip denetiminden sonra ayrı bir geçiş (`tez_driver/src/visibility.rs`), yalnızca reddeder; fix `use` satırını ekler, döngü yaratacaksa taşımayı önerir. Kart: 1.198/1.200.
+
+
+## 8. CLI turu ve gerçek model (2026-10-22)
+- **Dokümanlar İngilizce**: sitede görünen `docs/ARCHITECTURE.md` ve `docs/ROADMAP.md` İngilizceye çevrildi (site artık tamamen İngilizce; `DEVELOPMENT.md` sitede yok, Türkçe kaldı). Açılış sayfası güncellendi (kart 1.198 token, 64 hata kodu, ~300 KB derleyici, "Sites that run themselves" bölümü), README ve GitHub deposu açıklaması/konuları güncellendi.
+- **CLI** (yerel ikili ve npm sürümü aynı davranış, ikisi de testli): `--help` çıkış kodu 0, komutsuz `tez` 2; bilinmeyen bayrak reddedilir; `--watch`; `tez new <dir> [--app]` (`spec/templates/`); `tez fmt <dir>`. VS Code/LSP ertelendi.
+- **Gerçek model**: mlx-serve (`mlx-community/gemma-4-e4b-it-4bit`, OpenAI uyumlu, `:11234`). Uygulamanın sunucusunda başka bir model yüklü olduğu için GPU belleği dalgalanıyordu (istekler `prefill refused` ile reddedildi → yarım kalan koşular 0 görünür). Çözüm: ikinci bir örnek `mlx-serve --serve --port 11235 --skip-mem-preflight --no-vision --ctx-size 4096 --kv-quant 8 --prefill-chunk 256 --os-reserve-gib 1`; `bench/tezbench/generate.mjs` artık geçici hatada yeniden dener ve `--card DOSYA` ile kartın başka bir sürümünü ölçer.

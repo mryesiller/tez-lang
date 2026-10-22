@@ -10,7 +10,7 @@
     "./runtime": "./runtime/tez-runtime.mjs",
     "./app": "./runtime/tez-app.mjs"
   },
-  "files": ["bin", "src", "wasm", "runtime", "grammar.ebnf", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+  "files": ["bin", "src", "wasm", "runtime", "templates", "grammar.ebnf", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
   "engines": { "node": ">=22" },
   "keywords": ["language", "compiler", "wasm", "wasmgc", "llm", "verification"],
   "license": "MIT OR Apache-2.0",

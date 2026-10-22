@@ -28,4 +28,5 @@ dist
 /npm/tez-lang/wasm
 /npm/tez-lang/runtime
 /npm/tez-lang/grammar.ebnf
+/npm/tez-lang/templates
 /npm/tez-lang/LICENSE-*
