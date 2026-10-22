@@ -1,6 +1,6 @@
 {
   "name": "tez-lang",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Tez: a fast, verified programming language for LLMs and the browser. The compiler (WebAssembly) and the `tez` command for Node.",
   "type": "module",
   "bin": { "tez": "bin/tez.mjs" },
