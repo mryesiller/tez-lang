@@ -779,6 +779,7 @@ fn app_modules_are_documented_in_the_language_reference() {
         "hexDigit",
         "hexValue",
         "simpleEscape",
+        "escaped",
         "decode",
         "unescape",
         "tokens",

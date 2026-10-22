@@ -349,24 +349,29 @@ fn Json.hexValue(four: Str) -> Int =
 fn Json.simpleEscape(c: Str) -> Str =
   if c == "n" { "\n" } else if c == "t" { "\t" } else if c == "r" { "\r" } else if c == "b" { Char.fromCode(8) } else if c == "f" { Char.fromCode(12) } else { c }
 
-// `parts` are the pieces of a string between its backslashes; `esc` says whether the next piece follows a backslash and
-// `high` holds a high surrogate (from \uD83D) that is waiting for its partner
+// the text for an escape sequence that starts at the beginning of `p` (the piece after a backslash) and the high surrogate
+// (from \uD83D) that is now waiting for its partner (0 when none); `high` is the one that was waiting before
+fn Json.escaped(p: Str, high: Int) -> (Str, Int)
+  requires p.len() > 0
+  = {
+  let tail = p.slice(1, p.len())
+  if p.slice(0, 1) == "u" && tail.len() >= 4 {
+    let code = Json.hexValue(tail.slice(0, 4))
+    let more = tail.slice(4, tail.len())
+    if code < 0 || code > 65535 { ("\\" ++ p, 0) } else if high >= 55296 && high <= 56319 && code >= 56320 && code <= 57343 {
+      (Char.fromCode(65536 + (high - 55296) * 1024 + (code - 56320)) ++ more, 0)
+    } else if code >= 55296 && code <= 56319 { (more, code) } else { (Char.fromCode(code) ++ more, 0) }
+  } else { (Json.simpleEscape(p.slice(0, 1)) ++ tail, 0) }
+}
+
+// `parts` are the pieces of a string between its backslashes; `esc` says whether the next piece follows a backslash
 fn Json.decode(parts: List[Str], esc: Bool, high: Int, acc: Str) -> Str = match parts {
   [] => acc
   [p, ..rest] =>
-    if !esc { Json.decode(rest, true, 0, acc ++ p) } else if p.len() == 0 { Json.decode(rest, false, 0, acc ++ "\\") } else {
-      let c = p.slice(0, 1)
-      let tail = p.slice(1, p.len())
-      if c == "u" && tail.len() >= 4 {
-        let code = Json.hexValue(tail.slice(0, 4))
-        let more = tail.slice(4, tail.len())
-        if code < 0 || code > 65535 { Json.decode(rest, true, 0, acc ++ "\\" ++ p) } else if high >= 55296 && high <= 56319 && code >= 56320 && code <= 57343 {
-          Json.decode(rest, true, 0, acc ++ Char.fromCode(65536 + (high - 55296) * 1024 + (code - 56320)) ++ more)
-        } else if code >= 55296 && code <= 56319 { Json.decode(rest, true, code, acc ++ more) } else {
-          Json.decode(rest, true, 0, acc ++ Char.fromCode(code) ++ more)
-        }
-      } else { Json.decode(rest, true, 0, acc ++ Json.simpleEscape(c) ++ tail) }
-    }
+    if !esc { Json.decode(rest, true, 0, acc ++ p) } else if p.len() > 0 {
+      let r = Json.escaped(p, high)
+      Json.decode(rest, true, r.1, acc ++ r.0)
+    } else { Json.decode(rest, false, 0, acc ++ "\\") }
 }
 
 fn Json.unescape(raw: Str) -> Str = match raw.split("\\") {
