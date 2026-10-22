@@ -1,10 +1,13 @@
-body { background: #f6f6ef; color: #222; }
-#app { max-width: 680px; }
-h1 { font-size: 1.4rem; border-bottom: 2px solid #ff6600; padding-bottom: .4rem; }
+/* Layout only: the colors and the font come from theme.tez and change every 5 minutes. */
+body { margin: 0; padding: 0; }
+#app { max-width: none; margin: 0; }
+.page { min-height: 100vh; padding: 24px; box-sizing: border-box; transition: background .6s, color .6s; }
+.col { max-width: 680px; margin: 0 auto; }
+h1 { font-size: 1.4rem; border-bottom: 2px solid var(--accent); padding-bottom: .4rem; }
 ol { padding-left: 1.4rem; }
 li { margin: 0 0 .9rem; }
-li a { color: #000; font-weight: 600; text-decoration: none; }
+li a { color: var(--accent); font-weight: 600; text-decoration: none; }
 li a:hover { text-decoration: underline; }
-.meta { color: #828282; font-size: .85rem; }
-.status { color: #828282; font-size: .8rem; margin-top: 1.5rem; }
-@media (prefers-color-scheme: dark) { body { background: #1b1b1b; color: #ddd; } li a { color: #fff; } }
+.meta, .status { opacity: .7; }
+.meta { font-size: .85rem; }
+.status { font-size: .8rem; margin-top: 1.5rem; }

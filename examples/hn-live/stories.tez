@@ -1,12 +1,12 @@
-// Written by build.mjs at 2026-10-22T08:24:16.000Z. Do not edit.
+// Written by build.mjs at 2026-10-22T14:04:21.000Z. Do not edit.
 use "story.tez"
 
-fn bakedAt() -> Int = 1792657456
+fn bakedAt() -> Int = 1792677861
 
 fn baked() -> List[Story] = [
-  Story { id: 50191507, title: "OpenAI CLI", url: "https://github.com/openai/openai-cli", score: 85, by: "armcat" },
-  Story { id: 50190363, title: "WorldTUI: I trained a 360M model to pretend to be a terminal", url: "https://simedw.com/2026/10/21/world-model-terminal/", score: 133, by: "alphax314" },
-  Story { id: 50190455, title: "The recently proposed o(n log n) integer multiplication algorithm [pdf]", url: "https://web.maths.unsw.edu.au/~davidharvey/research/subnlogn.pdf", score: 180, by: "craigcitro" },
-  Story { id: 50192254, title: "A Markdown File Should Just Open", url: "https://joshuamorris.info/notes/2026/10/13/a-markdown-file-should-just-open/", score: 17, by: "TheWoollyBully" },
-  Story { id: 50188948, title: "There isn't an easy exploit for this PHP vulnerability", url: "https://eliastaylor.com/noexploit/", score: 489, by: "zkldi" }
+  Story { id: 50192900, title: "CVE-2026-111943: Compromised Intermediate Certificate Authority", url: "https://nvd.nist.gov/vuln/detail/cve-2026-111943", score: 303, by: "keks24" },
+  Story { id: 50150163, title: "What Is Gridifcation", url: "https://musicalform.substack.com/p/what-is-gridifcation", score: 119, by: "gumby" },
+  Story { id: 50192536, title: "Jailbreaking the Switch 2", url: "https://pepsipu.com/blog/2026-10-switch2-jailbreak-ns2jb/", score: 303, by: "ledoge" },
+  Story { id: 50194833, title: "Woman faces six years in prison over Cash App account she never opened", url: "https://www.techspot.com/news/114296-woman-spends-three-nights-jail-faces-six-years.html", score: 104, by: "oidar" },
+  Story { id: 50193170, title: "Faster than earcut: triangulating 3.7M map polygons in 489 ms", url: "https://globus.software/blog/2026/10/16/cutting-map-polygons/", score: 114, by: "molind" }
 ]

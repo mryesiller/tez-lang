@@ -13,15 +13,24 @@ No server, no framework, no JavaScript written by hand: the page is `main.tez`, 
    5-minute mark (hh:00, hh:05, ...) it asks the API again (`Fetch.json`) and redraws. The schedule is ordinary pure code
    in `update` (`slotOf(t) != m.slot`), covered by tests.
 
+## A new look every 5 minutes
+
+`theme(slot)` in `theme.tez` turns the 5-minute slot number into a palette (hue, saturation, light or dark) and one of eight
+system fonts. It is plain arithmetic, so the build and the open page always agree and nothing is random at run time. The
+contract on `theme` is proved by the compiler for every slot: the text is at least 60 points of lightness away from the
+background and the links at least 40, so a hard-to-read theme can never be published (weaken the numbers and `tez check`
+rejects the page with a counterexample). The page footer names the current look.
+
 ## Files
 
 | File | What |
 |---|---|
-| `main.tez` | the page: model, schedule, requests, JSON reading, view, 18 tests |
+| `main.tez` | the page: model, schedule, requests, JSON reading, view, 20 tests |
+| `theme.tez` | the look: a new palette and font every 5 minutes, computed from the slot number, with proved readability |
 | `story.tez` | the `Story` type |
 | `stories.tez` | the stories baked in by the last build (rewritten by `build.mjs`) |
 | `build.mjs` | the cron job's build step |
-| `style.css` | the look |
+| `style.css` | layout only (colors and font come from `theme.tez`) |
 | `workflow/build.yml` | the GitHub Actions workflow (copy to `.github/workflows/`) |
 
 ## Try it

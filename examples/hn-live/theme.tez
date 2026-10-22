@@ -1,0 +1,102 @@
+// A new look every 5 minutes: the palette and the font come from the slot number alone (no randomness, no network),
+// so the build and the open page always agree, and every theme is the same on every machine.
+type Theme = { hue: Int, sat: Int, dark: Bool, bgL: Int, fgL: Int, accentL: Int, font: Int }
+
+// the system fonts a page may use without loading anything (the page's policy forbids outside fonts)
+fn fontStack(i: Int) -> Str = if i == 0 { "system-ui, sans-serif" } else if i == 1 {
+  "Georgia, 'Times New Roman', serif"
+} else if i == 2 { "'Palatino Linotype', Palatino, 'Book Antiqua', serif" } else if i == 3 {
+  "'Trebuchet MS', Tahoma, sans-serif"
+} else if i == 4 { "Verdana, Geneva, sans-serif" } else if i == 5 {
+  "ui-monospace, Menlo, Consolas, monospace"
+} else if i == 6 { "'Courier New', Courier, monospace" } else {
+  "Optima, Candara, 'Gill Sans', sans-serif"
+}
+
+fn fontName(i: Int) -> Str = if i == 0 { "System UI" } else if i == 1 { "Georgia" } else if i == 2 {
+  "Palatino"
+} else if i == 3 { "Trebuchet" } else if i == 4 { "Verdana" } else if i == 5 {
+  "Monospace"
+} else if i == 6 { "Courier" } else { "Optima" }
+
+// The text and the background are always at least 60 points of lightness apart (and the links at least 40 from the
+// background); the compiler proves it for every slot, so a theme that is hard to read can never be published.
+fn theme(slot: Int) -> Theme
+  requires slot >= 0
+  ensures result.hue >= 0 && result.hue < 360 && result.font >= 0 && result.font < 8
+  ensures result.bgL >= 0
+    && result.bgL <= 100
+    && result.fgL >= 0
+    && result.fgL <= 100
+    && result.accentL >= 0
+    && result.accentL <= 100
+  ensures result.bgL - result.fgL >= 60 || result.fgL - result.bgL >= 60
+  ensures result.bgL - result.accentL >= 40 || result.accentL - result.bgL >= 40
+  = {
+    let dark = (slot * 7 + slot / 3) % 5 < 2
+    let hue = slot * 137 % 360
+    let sat = 35 + slot * 11 % 40
+    let font = (slot * 5 + slot / 7) % 8
+    if dark {
+      Theme {
+        hue: hue,
+        sat: sat,
+        dark: true,
+        bgL: 8 + slot % 7,
+        fgL: 88 + slot % 7,
+        accentL: 68 + slot * 3 % 12,
+        font: font
+      }
+    } else {
+      Theme {
+        hue: hue,
+        sat: sat,
+        dark: false,
+        bgL: 92 + slot % 7,
+        fgL: 10 + slot % 8,
+        accentL: 30 + slot * 3 % 12,
+        font: font
+      }
+    }
+  }
+
+fn hsl(h: Int, s: Int, l: Int) -> Str =
+  "hsl(" ++ h.toStr() ++ ", " ++ s.toStr() ++ "%, " ++ l.toStr() ++ "%)"
+
+fn pageStyle(t: Theme) -> Str =
+  "background:" ++
+    hsl(t.hue, t.sat, t.bgL) ++
+    ";color:" ++
+    hsl(t.hue, t.sat / 3, t.fgL) ++
+    ";font-family:" ++
+    fontStack(t.font) ++
+    ";--accent:" ++
+    hsl((t.hue + 180) % 360, 70, t.accentL)
+
+fn describe(t: Theme) -> Str =
+  (if t.dark { "dark" } else { "light" }) ++
+    " " ++
+    hsl(t.hue, t.sat, t.bgL) ++
+    ", " ++
+    fontName(t.font)
+
+fn gap(a: Int, b: Int) -> Int = if a > b { a - b } else { b - a }
+
+test everyThemeIsReadable =
+  List.range(0, 2000).all(
+    s => gap(theme(s).bgL, theme(s).fgL) >= 60 && gap(theme(s).bgL, theme(s).accentL) >= 40
+  )
+
+test neighbouringThemesDiffer = List.range(0, 500).all(s => theme(s).hue != theme(s + 1).hue)
+
+test bothModesAndAllFontsAppear =
+  List.range(0, 200).any(s => theme(s).dark)
+    && List.range(0, 200).any(s => !theme(s).dark)
+    && List.range(0, 8).all(f => List.range(0, 200).any(s => theme(s).font == f))
+
+test fontsAreNamed = List.range(0, 8).all(i => fontStack(i).len() > 0 && fontName(i).len() > 0)
+
+test sameSlotSameTheme = theme(5934) == theme(5934)
+
+test styleCarriesTheColorsAndTheFont =
+  pageStyle(theme(3)).contains("background:hsl(") && pageStyle(theme(3)).contains("font-family:")
